@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'supabase_service.dart';
 import 'login_page.dart';
 import 'dashboard_page.dart';
+import 'register_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,6 +28,7 @@ class MyApp extends StatelessWidget {
       routes: {
         '/login': (_) => const LoginPage(),
         '/dashboard': (_) => const DashboardPage(),
+        '/register': (_) => const RegisterPage(),
       },
     );
   }

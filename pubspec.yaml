@@ -1,5 +1,5 @@
 name: link_tattoo_manager
-description: A tattoo studio management app.
+description: Aplicación de gestión para estudios de tatuajes.
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -10,15 +10,16 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.8
+  flutter_launcher_icons: ^0.14.4
 
-  # Cliente Supabase
+  # Backend y autenticación
   supabase_flutter: ^2.9.1
 
   # Almacenamiento offline
   hive: ^2.2.3
   hive_flutter: ^1.1.0
 
-  # PDF y compartición
+  # Gestión de archivos
   pdf: ^3.11.3
   share_plus: ^11.0.0
 
@@ -30,7 +31,7 @@ dependencies:
   provider: ^6.1.5
   intl: ^0.20.2
 
-  # Calendario
+  # UI y calendario
   table_calendar: ^3.2.0
 
 dev_dependencies:
@@ -41,4 +42,18 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - assets/images/
+    - assets/images/logo.png
+    - assets/images/icon.png
+    - assets/fonts/Roboto-Regular.ttf
+    - assets/fonts/Roboto-Bold.ttf
+
+  fonts:
+    - family: Roboto
+      fonts:
+        - asset: assets/fonts/Roboto-Regular.ttf
+        - asset: assets/fonts/Roboto-Bold.ttf
+
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/icon.png"
