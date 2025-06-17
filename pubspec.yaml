@@ -1,0 +1,44 @@
+name: link_tattoo_manager
+description: A tattoo studio management app.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.8.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+
+  # Cliente Supabase
+  supabase_flutter: ^2.9.1
+
+  # Almacenamiento offline
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+
+  # PDF y compartición
+  pdf: ^3.11.3
+  share_plus: ^11.0.0
+
+  # Notificaciones y conectividad
+  flutter_local_notifications: ^19.2.1
+  connectivity_plus: ^6.1.4
+
+  # Estado y utilidades
+  provider: ^6.1.5
+  intl: ^0.20.2
+
+  # Calendario
+  table_calendar: ^3.2.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
