@@ -1,9 +1,8 @@
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'theme_provider.dart';
+import 'nav_panel.dart';
 
 class DashboardPage extends StatelessWidget {
   const DashboardPage({super.key});
@@ -149,7 +148,7 @@ class NotificationTile extends StatelessWidget {
       leading: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: const ui.Color(0xFFBDA206).withValues(alpha: 0.1), // Corregido withOpacity
+          color: const ui.Color(0xFFBDA206).withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Icon(icon, color: const ui.Color(0xFFBDA206)),
@@ -191,82 +190,6 @@ class BlurredBackground extends StatelessWidget {
   }
 }
 
-class NavPanel extends StatelessWidget {
-  final User user;
-  final VoidCallback onLogout;
-
-  const NavPanel({super.key, required this.user, required this.onLogout});
-
-  @override
-  Widget build(BuildContext context) {
-    final String current = ModalRoute.of(context)?.settings.name ?? '';
-    final bool isDark = Provider.of<ThemeProvider>(context).mode == ThemeMode.dark;
-    const ui.Color highlight = ui.Color(0xFFBDA206);
-
-    Widget navTile(IconData icon, String label, String route) {
-      final selected = current == route;
-      return ListTile(
-        leading: Icon(icon, color: selected ? highlight : null),
-        title: Text(label,
-            style: TextStyle(
-                fontWeight: selected ? FontWeight.bold : null,
-                color: selected ? highlight : null)),
-        selected: selected,
-        onTap: () => Navigator.of(context).pushReplacementNamed(route),
-      );
-    }
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      color: Theme.of(context).brightness == Brightness.light 
-          ? Colors.transparent  // Transparente para ver el fondo difuminado
-          : null,
-      child: Column(
-        children: [
-          UserAccountsDrawerHeader(
-            decoration: const BoxDecoration(color: highlight),
-            accountName: Text(user.email!.split('@')[0],
-                style: const TextStyle(color: Colors.black)),
-            accountEmail:
-                Text(user.email!, style: const TextStyle(color: Colors.black54)),
-            currentAccountPicture: CircleAvatar(
-              backgroundColor: Colors.white,
-              child: Text(user.email![0].toUpperCase(),
-                  style: const TextStyle(fontSize: 24, color: highlight)),
-            ),
-          ),
-          Expanded(
-            child: ListView(
-              children: [
-                navTile(Icons.dashboard, 'Dashboard', '/dashboard'),
-                navTile(Icons.event_available, 'Citas', '/appointments'),
-                navTile(Icons.calendar_month, 'Calendario', '/calendar'),
-                navTile(Icons.people, 'Clientes', '/clients'),
-                navTile(Icons.picture_as_pdf, 'Reportes', '/reports'),
-              ],
-            ),
-          ),
-          const Divider(),
-          ListTile(
-            leading: Icon(isDark ? Icons.dark_mode : Icons.light_mode),
-            title: const Text('Modo Oscuro'),
-            trailing: Switch(
-              value: isDark,
-              onChanged: (_) =>
-                  Provider.of<ThemeProvider>(context, listen: false).toggle(),
-            ),
-          ),
-          ListTile(
-            leading: const Icon(Icons.logout),
-            title: const Text('Cerrar sesión'),
-            onTap: onLogout,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class MainContent extends StatelessWidget {
   const MainContent({super.key});
 
@@ -274,27 +197,30 @@ class MainContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final Size size = MediaQuery.of(context).size;
     final bool isWide = size.width >= 800;
-    const double padding = 16;
-    const double spacing = 12;
+    const double padding = 24; // Aumentado de 16 a 24
+    const double spacing = 16; // Aumentado de 12 a 16
     final bool isLight = Theme.of(context).brightness == Brightness.light;
 
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 200), // Transición suave
-      color: isLight ? Colors.transparent : null, // Transparente para ver el fondo difuminado
+      duration: const Duration(milliseconds: 200),
+      color: isLight ? Colors.transparent : null,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: EdgeInsets.symmetric(
-          horizontal: isWide ? 32 : padding, // Más padding en pantallas anchas
+          horizontal: isWide ? 40 : padding, // Aumentado el padding lateral
           vertical: padding,
         ),
         child: ConstrainedBox(
           constraints: BoxConstraints(
-            maxWidth: isWide ? 700 : double.infinity, // Reducido de 900 a 700
-            minHeight: size.height - 100, // Asegurar altura mínima para scroll
+            maxWidth: isWide ? 800 : double.infinity, // Aumentado de 700 a 800
+            minHeight: size.height - 140, // Aumentado para más espacio
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Espacio superior adicional
+              const SizedBox(height: 8),
+              
               // Grid de estadísticas 2x2
               Row(
                 children: [
@@ -305,7 +231,7 @@ class MainContent extends StatelessWidget {
                       icon: Icons.event_available,
                     ),
                   ),
-                  const SizedBox(width: spacing),
+                  SizedBox(width: spacing),
                   Expanded(
                     child: StatCard(
                       title: 'Clientes',
@@ -315,7 +241,7 @@ class MainContent extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: spacing),
+              SizedBox(height: spacing),
               Row(
                 children: [
                   Expanded(
@@ -325,7 +251,7 @@ class MainContent extends StatelessWidget {
                       icon: Icons.schedule,
                     ),
                   ),
-                  const SizedBox(width: spacing),
+                  SizedBox(width: spacing),
                   Expanded(
                     child: StatCard(
                       title: 'Ingresos',
@@ -335,7 +261,7 @@ class MainContent extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 32), // Más espacio antes del botón
               
               // Botón principal Nueva Cita
               SizedBox(
@@ -360,7 +286,7 @@ class MainContent extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: spacing + 4), // Espacio después del botón
               
               // Botones secundarios
               Row(
@@ -374,7 +300,7 @@ class MainContent extends StatelessWidget {
                       onTap: () => Navigator.pushNamed(context, '/appointments'),
                     ),
                   ),
-                  const SizedBox(width: spacing),
+                  SizedBox(width: spacing),
                   Expanded(
                     child: ActionCard(
                       icon: Icons.history,
@@ -386,12 +312,12 @@ class MainContent extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 40), // Más espacio para el gráfico
               
               // Gráfico de ingresos
               AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(20), // Más padding interno
                 decoration: BoxDecoration(
                   color: isLight ? Colors.white.withValues(alpha: 0.95) : Theme.of(context).cardColor,
                   borderRadius: BorderRadius.circular(12),
@@ -415,7 +341,7 @@ class MainContent extends StatelessWidget {
                       'Ingresos de la Semana',
                       style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 20), // Más espacio
                     SizedBox(
                       height: 220,
                       child: SfCartesianChart(
@@ -482,12 +408,12 @@ class MainContent extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 40), // Más espacio
               
               // Sección de actividad reciente
               AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(20), // Más padding interno
                 decoration: BoxDecoration(
                   color: isLight ? Colors.white.withValues(alpha: 0.95) : Theme.of(context).cardColor,
                   borderRadius: BorderRadius.circular(12),
@@ -511,7 +437,7 @@ class MainContent extends StatelessWidget {
                       'Actividad Reciente',
                       style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 20), // Más espacio
                     const ActivityTile(
                       title: 'Cita completada',
                       subtitle: 'Carlos Ruiz',
@@ -532,7 +458,7 @@ class MainContent extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(height: 32), // Padding extra al final
+              const SizedBox(height: 40), // Más padding al final
             ],
           ),
         ),
