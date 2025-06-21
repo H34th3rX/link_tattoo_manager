@@ -15,7 +15,6 @@ class _RegisterPageState extends State<RegisterPage>
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   final _confirmPasswordCtrl = TextEditingController();
-  final _usernameCtrl = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   
   // Animation
@@ -64,7 +63,6 @@ class _RegisterPageState extends State<RegisterPage>
       curve: Curves.easeIn,
     ));
 
-    // Iniciar animación después de que se construya el widget
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _animationController.forward();
     });
@@ -79,23 +77,20 @@ class _RegisterPageState extends State<RegisterPage>
     });
 
     try {
-      final navigator = Navigator.of(context);
       final response = await Supabase.instance.client.auth.signUp(
         email: _emailCtrl.text.trim(),
         password: _passwordCtrl.text.trim(),
       );
 
       if (response.user != null && mounted) {
-        ScaffoldMessenger.of(navigator.context).showSnackBar(
-          SnackBar(
-            content: const Text('Registro exitoso. Revisa tu email para confirmar tu cuenta.'),
-            backgroundColor: _accentColor,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-        navigator.pushReplacementNamed('/login');
+        _showSuccessDialog('Cuenta creada. Se ha enviado un correo de verificación.');
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) {
+            Navigator.pushReplacementNamed(context, '/login');
+          }
+        });
       } else if (mounted) {
-        _setError('No se pudo completar el registro. Intenta de nuevo.');
+        _setError('No se pudo crear la cuenta. Intenta de nuevo.');
       }
     } on AuthException catch (e) {
       if (mounted) {
@@ -114,12 +109,47 @@ class _RegisterPageState extends State<RegisterPage>
 
   void _setError(String error) {
     setState(() => _error = error);
-    // Limpiar error después de 5 segundos
     Future.delayed(const Duration(seconds: 5), () {
       if (mounted) {
         setState(() => _error = null);
       }
     });
+  }
+
+  void _showSuccessDialog(String message) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Dialog(
+        backgroundColor: _cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.check_circle, color: Colors.green, size: 48),
+              const SizedBox(height: 16),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: _textColor, fontSize: 16),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _accentColor,
+                  foregroundColor: _backgroundColor,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   String _getLocalizedAuthError(String? message) {
@@ -136,19 +166,6 @@ class _RegisterPageState extends State<RegisterPage>
     }
     
     return message;
-  }
-
-  String? _validateUsername(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'El nombre de usuario es requerido';
-    }
-    if (value.length < 3) {
-      return 'El nombre de usuario debe tener al menos 3 caracteres';
-    }
-    if (!RegExp(r'^[a-zA-Z0-9_]+$').hasMatch(value)) {
-      return 'Solo se permiten letras, números y guiones bajos';
-    }
-    return null;
   }
 
   String? _validateEmail(String? value) {
@@ -254,38 +271,59 @@ class _RegisterPageState extends State<RegisterPage>
                     ),
                   ],
                 ),
-                child: _buildFormContent(),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildLogo(),
+                      const SizedBox(height: 16),
+                      _buildTitle(),
+                      const SizedBox(height: 32),
+                      if (_error != null) ...[
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          margin: const EdgeInsets.only(bottom: 20),
+                          decoration: BoxDecoration(
+                            color: Colors.redAccent.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: Colors.redAccent.withValues(alpha: 0.3),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.error_outline, color: Colors.redAccent, size: 20),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _error!,
+                                  style: const TextStyle(
+                                    color: Colors.redAccent,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      _buildEmailField(),
+                      const SizedBox(height: 20),
+                      _buildPasswordField(),
+                      const SizedBox(height: 20),
+                      _buildConfirmPasswordField(),
+                      const SizedBox(height: 24),
+                      _buildRegisterButton(),
+                      const SizedBox(height: 20),
+                      _buildLoginLink(),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildFormContent() {
-    return Form(
-      key: _formKey,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _buildLogo(),
-          const SizedBox(height: 16),
-          _buildTitle(),
-          const SizedBox(height: 32),
-          _buildErrorMessage(),
-          _buildUsernameField(),
-          const SizedBox(height: 20),
-          _buildEmailField(),
-          const SizedBox(height: 20),
-          _buildPasswordField(),
-          const SizedBox(height: 20),
-          _buildConfirmPasswordField(),
-          const SizedBox(height: 24),
-          _buildRegisterButton(),
-          const SizedBox(height: 20),
-          _buildLoginLink(),
-        ],
       ),
     );
   }
@@ -315,53 +353,6 @@ class _RegisterPageState extends State<RegisterPage>
             blurRadius: 10,
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildErrorMessage() {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      height: _error != null ? 60 : 0,
-      child: _error != null
-          ? Container(
-              padding: const EdgeInsets.all(12),
-              margin: const EdgeInsets.only(bottom: 20),
-              decoration: BoxDecoration(
-                color: Colors.redAccent.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: Colors.redAccent.withValues(alpha: 0.3),
-                ),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.error_outline, color: Colors.redAccent, size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      _error!,
-                      style: const TextStyle(
-                        color: Colors.redAccent,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            )
-          : const SizedBox.shrink(),
-    );
-  }
-
-  Widget _buildUsernameField() {
-    return TextFormField(
-      controller: _usernameCtrl,
-      style: const TextStyle(color: _textColor),
-      validator: _validateUsername,
-      decoration: _buildInputDecoration(
-        label: 'Nombre de usuario',
-        icon: Icons.person_outline,
       ),
     );
   }
@@ -512,7 +503,6 @@ class _RegisterPageState extends State<RegisterPage>
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
     _confirmPasswordCtrl.dispose();
-    _usernameCtrl.dispose();
     _animationController.dispose();
     super.dispose();
   }

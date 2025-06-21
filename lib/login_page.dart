@@ -12,7 +12,7 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage>
     with SingleTickerProviderStateMixin {
   // Controllers
-  final _emailCtrl = TextEditingController();
+  final _credentialCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   
@@ -61,7 +61,6 @@ class _LoginPageState extends State<LoginPage>
       curve: Curves.easeIn,
     ));
 
-    // Iniciar animación después de que se construya el widget
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _animationController.forward();
     });
@@ -76,23 +75,68 @@ class _LoginPageState extends State<LoginPage>
     });
 
     try {
-      final response = await Supabase.instance.client.auth.signInWithPassword(
-        email: _emailCtrl.text.trim(),
-        password: _passCtrl.text.trim(),
-      );
+      final credential = _credentialCtrl.text.trim();
+      final password = _passCtrl.text.trim();
 
-      if (response.session != null && mounted) {
-        Navigator.pushReplacementNamed(context, '/dashboard');
-      } else if (mounted) {
-        _setError('No se pudo iniciar sesión. Intenta de nuevo.');
+      // Determinar si el credential es un email o username
+      final bool isEmail = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(credential);
+      
+      if (isEmail) {
+        // Si es email, intentar login directo
+        final response = await Supabase.instance.client.auth.signInWithPassword(
+          email: credential,
+          password: password,
+        );
+        
+        if (response.session != null) {
+          await _checkAndRedirect(response.user!);
+          return;
+        }
+      } else {
+        // Si es username, buscar el email asociado
+        final userResponse = await Supabase.instance.client
+            .from('employees')
+            .select('email, username, id')
+            .eq('username', credential)
+            .maybeSingle();
+        
+        if (userResponse != null && userResponse['email'] != null) {
+          final loginEmail = userResponse['email'] as String;
+          
+          // Intentar login con el email encontrado
+          try {
+            final response = await Supabase.instance.client.auth.signInWithPassword(
+              email: loginEmail,
+              password: password,
+            );
+            
+            if (response.session != null) {
+              await _checkAndRedirect(response.user!);
+              return;
+            }
+          } catch (authError) {
+            if (authError is AuthException && authError.message.contains('Invalid login credentials')) {
+              _setError('Contraseña incorrecta para el usuario: $credential');
+              return;
+            }
+            rethrow; // Reemplazamos throw authError por rethrow
+          }
+        } else {
+          _setError('Usuario no encontrado. Verifica que el nombre de usuario sea correcto.');
+          return;
+        }
       }
-    } on AuthException catch (e) {
-      if (mounted) {
-        _setError(_getLocalizedAuthError(e.message));
-      }
+
+      // Si llegamos aquí, el login falló
+      _setError('Credenciales inválidas. Verifica tu email o nombre de usuario y contraseña.');
+
     } catch (e) {
-      if (mounted) {
-        _setError('Error inesperado. Verifica tu conexión a internet.');
+      if (e is AuthException) {
+        _setError(_getLocalizedAuthError(e.message));
+      } else if (e is PostgrestException) {
+        _setError('Error de conexión con la base de datos. Intenta de nuevo.');
+      } else {
+        _setError('Error inesperado al iniciar sesión. Intenta de nuevo.');
       }
     } finally {
       if (mounted) {
@@ -101,9 +145,24 @@ class _LoginPageState extends State<LoginPage>
     }
   }
 
+  Future<void> _checkAndRedirect(User user) async {
+    final profileExists = await Supabase.instance.client
+        .from('employees')
+        .select('id')
+        .eq('id', user.id)
+        .maybeSingle();
+    
+    if (mounted) {
+      if (profileExists != null) {
+        Navigator.pushReplacementNamed(context, '/dashboard');
+      } else {
+        Navigator.pushReplacementNamed(context, '/complete_profile');
+      }
+    }
+  }
+
   void _setError(String error) {
     setState(() => _error = error);
-    // Limpiar error después de 5 segundos
     Future.delayed(const Duration(seconds: 5), () {
       if (mounted) {
         setState(() => _error = null);
@@ -111,28 +170,37 @@ class _LoginPageState extends State<LoginPage>
     });
   }
 
+  String? _validateEmailOrUsername(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'El email o nombre de usuario es requerido';
+    }
+    
+    final bool isValidEmail = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value);
+    final bool isValidUsername = RegExp(r'^[a-zA-Z0-9_-]{3,}$').hasMatch(value);
+    
+    if (!isValidEmail && !isValidUsername) {
+      return 'Ingresa un email válido o un nombre de usuario (mínimo 3 caracteres, solo letras, números, - y _)';
+    }
+    
+    return null;
+  }
+
   String _getLocalizedAuthError(String? message) {
     if (message == null) return 'Error de autenticación';
     
     if (message.contains('Invalid login credentials')) {
-      return 'Credenciales inválidas. Verifica tu email y contraseña.';
+      return 'Credenciales inválidas. Verifica tu email o nombre de usuario y contraseña.';
     } else if (message.contains('Email not confirmed')) {
-      return 'Email no confirmado. Revisa tu bandeja de entrada.';
+      return 'Email no confirmado. Revisa tu bandeja de entrada y confirma tu cuenta.';
     } else if (message.contains('Too many requests')) {
-      return 'Demasiados intentos. Espera un momento antes de intentar de nuevo.';
+      return 'Demasiados intentos fallidos. Espera unos minutos antes de intentar de nuevo.';
+    } else if (message.contains('User not found')) {
+      return 'Usuario no encontrado. Verifica tus credenciales.';
+    } else if (message.contains('Invalid password')) {
+      return 'Contraseña incorrecta.';
     }
     
-    return message;
-  }
-
-  String? _validateEmail(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'El email es requerido';
-    }
-    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-      return 'Ingresa un email válido';
-    }
-    return null;
+    return 'Error de autenticación: $message';
   }
 
   String? _validatePassword(String? value) {
@@ -235,7 +303,7 @@ class _LoginPageState extends State<LoginPage>
           _buildTitle(),
           const SizedBox(height: 32),
           _buildErrorMessage(),
-          _buildEmailField(),
+          _buildEmailOrUsernameField(),
           const SizedBox(height: 20),
           _buildPasswordField(),
           const SizedBox(height: 16),
@@ -311,15 +379,15 @@ class _LoginPageState extends State<LoginPage>
     );
   }
 
-  Widget _buildEmailField() {
+  Widget _buildEmailOrUsernameField() {
     return TextFormField(
-      controller: _emailCtrl,
+      controller: _credentialCtrl,
       keyboardType: TextInputType.emailAddress,
       style: const TextStyle(color: _textColor),
-      validator: _validateEmail,
+      validator: _validateEmailOrUsername,
       decoration: _buildInputDecoration(
-        label: 'Dirección de email',
-        icon: Icons.email_outlined,
+        label: 'Email o Nombre de usuario',
+        icon: Icons.person_outline,
       ),
     );
   }
@@ -459,7 +527,7 @@ class _LoginPageState extends State<LoginPage>
 
   @override
   void dispose() {
-    _emailCtrl.dispose();
+    _credentialCtrl.dispose();
     _passCtrl.dispose();
     _animationController.dispose();
     super.dispose();
