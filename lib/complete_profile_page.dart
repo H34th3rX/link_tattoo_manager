@@ -2,6 +2,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/services.dart';
+import 'loading_screen.dart';
 
 class CompleteProfilePage extends StatefulWidget {
   const CompleteProfilePage({super.key});
@@ -130,7 +131,13 @@ class _CompleteProfilePageState extends State<CompleteProfilePage>
         _showSuccessDialog('Perfil completado exitosamente');
         Future.delayed(const Duration(seconds: 2), () {
           if (mounted) {
-            Navigator.pushReplacementNamed(context, '/dashboard');
+            Navigator.pop(context); // Cierra el diálogo
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => LoadingScreen(userName: _usernameCtrl.text.trim()),
+              ),
+            );
           }
         });
       }

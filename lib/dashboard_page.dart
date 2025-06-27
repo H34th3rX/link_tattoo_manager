@@ -1,11 +1,41 @@
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'nav_panel.dart';
+import 'theme_provider.dart';
 
-class DashboardPage extends StatelessWidget {
+class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
+
+  @override
+  State<DashboardPage> createState() => _DashboardPageState();
+}
+
+class _DashboardPageState extends State<DashboardPage> {
+  String? _userName;
+  late Future<void> _loadUserData;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData = _fetchUserData();
+  }
+
+  Future<void> _fetchUserData() async {
+    final user = Supabase.instance.client.auth.currentUser!;
+    final snapshot = await Supabase.instance.client
+        .from('employees')
+        .select('username')
+        .eq('id', user.id)
+        .maybeSingle();
+    if (mounted) {
+      setState(() {
+        _userName = snapshot?['username'] as String? ?? user.email!.split('@')[0];
+      });
+    }
+  }
 
   Future<void> _logout(BuildContext context) async {
     final nav = Navigator.of(context);
@@ -70,60 +100,77 @@ class DashboardPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final bool isWide = MediaQuery.of(context).size.width >= 800;
     final user = Supabase.instance.client.auth.currentUser!;
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final bool isDark = themeProvider.isDark;
 
-    return Scaffold(
-      backgroundColor: Theme.of(context).brightness == Brightness.light 
-          ? Colors.white 
-          : null, // Forzar fondo blanco en modo claro
-      appBar: AppBar(
-        backgroundColor: const ui.Color(0xFFBDA206),
-        title: const Text('Dashboard', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-        iconTheme: const IconThemeData(color: Colors.black),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            onPressed: () => _showNotifications(context),
+    return FutureBuilder(
+      future: _loadUserData,
+      builder: (context, snapshot) {
+        return Scaffold(
+          backgroundColor: isDark ? null : Colors.grey.shade50,
+          appBar: AppBar(
+            backgroundColor: isDark 
+                ? const Color(0xFF2A2A2A)
+                : const ui.Color(0xFFBDA206),
+            title: Text('Dashboard',
+                style: TextStyle(
+                  color: isDark ? Colors.white : Colors.black, 
+                  fontWeight: FontWeight.bold
+                )),
+            iconTheme: IconThemeData(color: isDark ? Colors.white : Colors.black),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.notifications_outlined),
+                onPressed: () => _showNotifications(context),
+              ),
+              IconButton(
+                icon: const Icon(Icons.person_outline),
+                onPressed: () {},
+              ),
+            ],
+            leading: isWide
+                ? null
+                : Builder(builder: (ctx) {
+                    return IconButton(
+                      icon: const Icon(Icons.menu),
+                      onPressed: () => Scaffold.of(ctx).openDrawer(),
+                    );
+                  }),
           ),
-          IconButton(
-            icon: const Icon(Icons.person_outline),
-            onPressed: () {},
-          ),
-        ],
-        leading: isWide
-            ? null
-            : Builder(builder: (ctx) {
-                return IconButton(
-                  icon: const Icon(Icons.menu),
-                  onPressed: () => Scaffold.of(ctx).openDrawer(),
-                );
-              }),
-      ),
-      drawer: isWide
-          ? null
-          : Drawer(child: NavPanel(user: user, onLogout: () => _logout(context))),
-      body: Stack(
-        children: [
-          const BlurredBackground(),
-          // Hacer que todo el Stack sea scrolleable
-          SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            child: SizedBox(
-              height: MediaQuery.of(context).size.height - AppBar().preferredSize.height - MediaQuery.of(context).padding.top,
-              child: isWide
+          drawer: isWide
+              ? null
+              : Drawer(
+                  child: _userName != null
+                      ? NavPanel(user: user, onLogout: () => _logout(context), userName: _userName!)
+                      : const Center(child: CircularProgressIndicator()),
+                ),
+          body: Stack(
+            children: [
+              BlurredBackground(isDark: isDark),
+              isWide
                   ? Row(
                       children: [
                         SizedBox(
-                            width: 260,
-                            child: NavPanel(user: user, onLogout: () => _logout(context))),
+                          width: 280,
+                          child: _userName != null
+                              ? NavPanel(
+                                  user: user,
+                                  onLogout: () => _logout(context),
+                                  userName: _userName!,
+                                )
+                              : const Center(child: CircularProgressIndicator()),
+                        ),
                         const VerticalDivider(width: 1),
-                        const Expanded(child: MainContent()),
+                        Expanded(
+                          child: MainContent(isDark: isDark),
+                        ),
                       ],
                     )
-                  : const MainContent(),
-            ),
+                  : MainContent(isDark: isDark),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -161,7 +208,9 @@ class NotificationTile extends StatelessWidget {
 }
 
 class BlurredBackground extends StatelessWidget {
-  const BlurredBackground({super.key});
+  final bool isDark;
+  
+  const BlurredBackground({super.key, required this.isDark});
 
   @override
   Widget build(BuildContext context) {
@@ -180,9 +229,9 @@ class BlurredBackground extends StatelessWidget {
         child: BackdropFilter(
           filter: ui.ImageFilter.blur(sigmaX: 8, sigmaY: 8),
           child: Container(
-            color: Theme.of(context).brightness == Brightness.light
-                ? Colors.white.withValues(alpha: 0.8)  // Más transparente para ver el logo
-                : const Color.fromRGBO(0, 0, 0, 0.2),
+            color: isDark
+                ? const Color.fromRGBO(0, 0, 0, 0.3)
+                : Colors.white.withValues(alpha: 0.85),
           ),
         ),
       ),
@@ -191,275 +240,298 @@ class BlurredBackground extends StatelessWidget {
 }
 
 class MainContent extends StatelessWidget {
-  const MainContent({super.key});
+  final bool isDark;
+  
+  const MainContent({super.key, required this.isDark});
 
   @override
   Widget build(BuildContext context) {
     final Size size = MediaQuery.of(context).size;
     final bool isWide = size.width >= 800;
-    const double padding = 24; // Aumentado de 16 a 24
-    const double spacing = 16; // Aumentado de 12 a 16
-    final bool isLight = Theme.of(context).brightness == Brightness.light;
+    const double padding = 24;
+    const double spacing = 16;
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      color: isLight ? Colors.transparent : null,
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.symmetric(
-          horizontal: isWide ? 40 : padding, // Aumentado el padding lateral
-          vertical: padding,
-        ),
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: Center(
         child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: isWide ? 800 : double.infinity, // Aumentado de 700 a 800
-            minHeight: size.height - 140, // Aumentado para más espacio
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Espacio superior adicional
-              const SizedBox(height: 8),
-              
-              // Grid de estadísticas 2x2
-              Row(
-                children: [
-                  Expanded(
-                    child: StatCard(
-                      title: 'Citas Hoy',
-                      value: '8',
-                      icon: Icons.event_available,
-                    ),
-                  ),
-                  SizedBox(width: spacing),
-                  Expanded(
-                    child: StatCard(
-                      title: 'Clientes',
-                      value: '156',
-                      icon: Icons.people_outline,
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: spacing),
-              Row(
-                children: [
-                  Expanded(
-                    child: StatCard(
-                      title: 'Próxima',
-                      value: '2:30 PM',
-                      icon: Icons.schedule,
-                    ),
-                  ),
-                  SizedBox(width: spacing),
-                  Expanded(
-                    child: StatCard(
-                      title: 'Ingresos',
-                      value: '\$12.4K',
-                      icon: Icons.trending_up,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 32), // Más espacio antes del botón
-              
-              // Botón principal Nueva Cita
-              SizedBox(
-                width: double.infinity,
-                height: 60,
-                child: ElevatedButton.icon(
-                  onPressed: () => Navigator.pushNamed(context, '/appointments/new'),
-                  icon: const Icon(Icons.add, color: Colors.black),
-                  label: const Text(
-                    'Nueva Cita',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const ui.Color(0xFFBDA206),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-              ),
-              SizedBox(height: spacing + 4), // Espacio después del botón
-              
-              // Botones secundarios
-              Row(
-                children: [
-                  Expanded(
-                    child: ActionCard(
-                      icon: Icons.calendar_today,
-                      label: 'Ver Citas',
-                      color: isLight ? Colors.white.withValues(alpha: 0.95) : Colors.grey[800]!,
-                      textColor: const ui.Color(0xFFBDA206),
-                      onTap: () => Navigator.pushNamed(context, '/appointments'),
-                    ),
-                  ),
-                  SizedBox(width: spacing),
-                  Expanded(
-                    child: ActionCard(
-                      icon: Icons.history,
-                      label: 'Historial',
-                      color: isLight ? Colors.white.withValues(alpha: 0.95) : Colors.grey[800]!,
-                      textColor: const ui.Color(0xFFBDA206),
-                      onTap: () => Navigator.pushNamed(context, '/calendar'),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 40), // Más espacio para el gráfico
-              
-              // Gráfico de ingresos
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.all(20), // Más padding interno
-                decoration: BoxDecoration(
-                  color: isLight ? Colors.white.withValues(alpha: 0.95) : Theme.of(context).cardColor,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: const ui.Color(0xFFBDA206).withValues(alpha: 0.3),
-                    width: 1,
-                  ),
-                  boxShadow: isLight ? [
-                    BoxShadow(
-                      color: Colors.grey.withValues(alpha: 0.15),
-                      spreadRadius: 1,
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ] : null,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          constraints: const BoxConstraints(maxWidth: 1200),
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: isWide ? 40 : padding,
+              vertical: padding,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 8),
+                Row(
                   children: [
-                    const Text(
-                      'Ingresos de la Semana',
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    Expanded(
+                      child: StatCard(
+                        title: 'Citas Hoy',
+                        value: '8',
+                        icon: Icons.event_available,
+                        isDark: isDark,
+                      ),
                     ),
-                    const SizedBox(height: 20), // Más espacio
-                    SizedBox(
-                      height: 220,
-                      child: SfCartesianChart(
-                        plotAreaBorderWidth: 0,
-                        primaryXAxis: const CategoryAxis(
-                          majorGridLines: MajorGridLines(width: 0),
-                          axisLine: AxisLine(width: 0),
-                          majorTickLines: MajorTickLines(size: 0),
-                        ),
-                        primaryYAxis: const NumericAxis(
-                          majorGridLines: MajorGridLines(
-                            width: 0.5,
-                            color: Colors.grey,
-                            dashArray: [5, 5],
-                          ),
-                          axisLine: AxisLine(width: 0),
-                          majorTickLines: MajorTickLines(size: 0),
-                          labelFormat: '\${value}K',
-                        ),
-                        tooltipBehavior: TooltipBehavior(
-                          enable: true,
-                          canShowMarker: true,
-                          header: '',
-                          format: 'point.x: \$point.yK',
-                        ),
-                        series: <CartesianSeries>[
-                          SplineAreaSeries<_SalesData, String>(
-                            dataSource: [
-                              _SalesData('Lun', 5.2),
-                              _SalesData('Mar', 7.8),
-                              _SalesData('Mié', 6.4),
-                              _SalesData('Jue', 9.1),
-                              _SalesData('Vie', 8.7),
-                              _SalesData('Sáb', 12.4),
-                              _SalesData('Dom', 4.2),
-                            ],
-                            xValueMapper: (_SalesData data, _) => data.day,
-                            yValueMapper: (_SalesData data, _) => data.amount,
-                            splineType: SplineType.natural,
-                            cardinalSplineTension: 0.9,
-                            borderWidth: 3,
-                            borderColor: const ui.Color(0xFFBDA206),
-                            gradient: LinearGradient(
-                              colors: [
-                                const ui.Color(0xFFBDA206).withValues(alpha: 0.6),
-                                const ui.Color(0xFFBDA206).withValues(alpha: 0.1),
-                              ],
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                            ),
-                            markerSettings: const MarkerSettings(
-                              isVisible: true,
-                              shape: DataMarkerType.circle,
-                              borderWidth: 2,
-                              borderColor: ui.Color(0xFFBDA206),
-                              color: Colors.white,
-                              width: 8,
-                              height: 8,
-                            ),
-                          ),
-                        ],
+                    SizedBox(width: spacing),
+                    Expanded(
+                      child: StatCard(
+                        title: 'Clientes',
+                        value: '156',
+                        icon: Icons.people_outline,
+                        isDark: isDark,
                       ),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 40), // Más espacio
-              
-              // Sección de actividad reciente
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.all(20), // Más padding interno
-                decoration: BoxDecoration(
-                  color: isLight ? Colors.white.withValues(alpha: 0.95) : Theme.of(context).cardColor,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: const ui.Color(0xFFBDA206).withValues(alpha: 0.3),
-                    width: 1,
-                  ),
-                  boxShadow: isLight ? [
-                    BoxShadow(
-                      color: Colors.grey.withValues(alpha: 0.15),
-                      spreadRadius: 1,
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ] : null,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                SizedBox(height: spacing),
+                Row(
                   children: [
-                    const Text(
-                      'Actividad Reciente',
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    Expanded(
+                      child: StatCard(
+                        title: 'Próxima',
+                        value: '2:30 PM',
+                        icon: Icons.schedule,
+                        isDark: isDark,
+                      ),
                     ),
-                    const SizedBox(height: 20), // Más espacio
-                    const ActivityTile(
-                      title: 'Cita completada',
-                      subtitle: 'Carlos Ruiz',
-                      time: '10:30',
-                    ),
-                    const Divider(height: 1),
-                    const ActivityTile(
-                      title: 'Nueva cita',
-                      subtitle: 'Ana López',
-                      time: '09:15',
-                    ),
-                    const Divider(height: 1),
-                    const ActivityTile(
-                      title: 'Cliente llegó',
-                      subtitle: 'Pedro Martín',
-                      time: '08:45',
+                    SizedBox(width: spacing),
+                    Expanded(
+                      child: StatCard(
+                        title: 'Ingresos',
+                        value: '\$12.4K',
+                        icon: Icons.trending_up,
+                        isDark: isDark,
+                      ),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 40), // Más padding al final
-            ],
+                const SizedBox(height: 32),
+                SizedBox(
+                  width: double.infinity,
+                  height: 60,
+                  child: ElevatedButton.icon(
+                    onPressed: () => Navigator.pushNamed(context, '/appointments/new'),
+                    icon: const Icon(Icons.add, color: Colors.black),
+                    label: const Text(
+                      'Nueva Cita',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const ui.Color(0xFFBDA206),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: isDark ? 8 : 4,
+                      shadowColor: const ui.Color(0xFFBDA206).withValues(alpha: 0.4),
+                    ),
+                  ),
+                ),
+                SizedBox(height: spacing + 4),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ActionCard(
+                        icon: Icons.calendar_today,
+                        label: 'Ver Citas',
+                        color: isDark ? Colors.grey[800]! : Colors.white.withValues(alpha: 0.95),
+                        textColor: const ui.Color(0xFFBDA206),
+                        isDark: isDark,
+                        onTap: () => Navigator.pushNamed(context, '/appointments'),
+                      ),
+                    ),
+                    SizedBox(width: spacing),
+                    Expanded(
+                      child: ActionCard(
+                        icon: Icons.history,
+                        label: 'Historial',
+                        color: isDark ? Colors.grey[800]! : Colors.white.withValues(alpha: 0.95),
+                        textColor: const ui.Color(0xFFBDA206),
+                        isDark: isDark,
+                        onTap: () => Navigator.pushNamed(context, '/calendar'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 40),
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.grey[850] : Colors.white.withValues(alpha: 0.95),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: const ui.Color(0xFFBDA206).withValues(alpha: 0.3),
+                      width: 1,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: isDark 
+                            ? Colors.black.withValues(alpha: 0.3)
+                            : Colors.grey.withValues(alpha: 0.15),
+                        spreadRadius: 1,
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Ingresos de la Semana',
+                        style: TextStyle(
+                          fontSize: 20, 
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        height: 220,
+                        child: SfCartesianChart(
+                          plotAreaBorderWidth: 0,
+                          backgroundColor: Colors.transparent,
+                          primaryXAxis: CategoryAxis(
+                            majorGridLines: const MajorGridLines(width: 0),
+                            axisLine: const AxisLine(width: 0),
+                            majorTickLines: const MajorTickLines(size: 0),
+                            labelStyle: TextStyle(
+                              color: isDark ? Colors.white70 : Colors.black87,
+                            ),
+                          ),
+                          primaryYAxis: NumericAxis(
+                            majorGridLines: MajorGridLines(
+                              width: 0.5,
+                              color: isDark ? Colors.grey[700] : Colors.grey[300],
+                              dashArray: const [5, 5],
+                            ),
+                            axisLine: const AxisLine(width: 0),
+                            majorTickLines: const MajorTickLines(size: 0),
+                            labelFormat: '\${value}K',
+                            labelStyle: TextStyle(
+                              color: isDark ? Colors.white70 : Colors.black87,
+                            ),
+                          ),
+                          tooltipBehavior: TooltipBehavior(
+                            enable: true,
+                            canShowMarker: true,
+                            header: '',
+                            format: 'point.x: \$point.yK',
+                          ),
+                          series: <CartesianSeries>[
+                            SplineAreaSeries<_SalesData, String>(
+                              dataSource: [
+                                _SalesData('Lun', 5.2),
+                                _SalesData('Mar', 7.8),
+                                _SalesData('Mié', 6.4),
+                                _SalesData('Jue', 9.1),
+                                _SalesData('Vie', 8.7),
+                                _SalesData('Sáb', 12.4),
+                                _SalesData('Dom', 4.2),
+                              ],
+                              xValueMapper: (_SalesData data, _) => data.day,
+                              yValueMapper: (_SalesData data, _) => data.amount,
+                              splineType: SplineType.natural,
+                              cardinalSplineTension: 0.9,
+                              borderWidth: 3,
+                              borderColor: const ui.Color(0xFFBDA206),
+                              gradient: LinearGradient(
+                                colors: [
+                                  const ui.Color(0xFFBDA206).withValues(alpha: 0.6),
+                                  const ui.Color(0xFFBDA206).withValues(alpha: 0.1),
+                                ],
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                              ),
+                              markerSettings: const MarkerSettings(
+                                isVisible: true,
+                                shape: DataMarkerType.circle,
+                                borderWidth: 2,
+                                borderColor: ui.Color(0xFFBDA206),
+                                color: Colors.white,
+                                width: 8,
+                                height: 8,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 40),
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.grey[850] : Colors.white.withValues(alpha: 0.95),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: const ui.Color(0xFFBDA206).withValues(alpha: 0.3),
+                      width: 1,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: isDark 
+                            ? Colors.black.withValues(alpha: 0.3)
+                            : Colors.grey.withValues(alpha: 0.15),
+                        spreadRadius: 1,
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Actividad Reciente',
+                        style: TextStyle(
+                          fontSize: 20, 
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      ActivityTile(
+                        title: 'Cita completada',
+                        subtitle: 'Carlos Ruiz',
+                        time: '10:30',
+                        isDark: isDark,
+                      ),
+                      Divider(
+                        height: 1,
+                        color: isDark ? Colors.grey[700] : Colors.grey[300],
+                      ),
+                      ActivityTile(
+                        title: 'Nueva cita',
+                        subtitle: 'Ana López',
+                        time: '09:15',
+                        isDark: isDark,
+                      ),
+                      Divider(
+                        height: 1,
+                        color: isDark ? Colors.grey[700] : Colors.grey[300],
+                      ),
+                      ActivityTile(
+                        title: 'Cliente llegó',
+                        subtitle: 'Pedro Martín',
+                        time: '08:45',
+                        isDark: isDark,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 40),
+              ],
+            ),
           ),
         ),
       ),
@@ -470,37 +542,39 @@ class MainContent extends StatelessWidget {
 class StatCard extends StatelessWidget {
   final String title, value;
   final IconData icon;
+  final bool isDark;
 
   const StatCard({
     super.key,
     required this.title,
     required this.value,
     required this.icon,
+    required this.isDark,
   });
 
   @override
   Widget build(BuildContext context) {
-    final bool isLight = Theme.of(context).brightness == Brightness.light;
-    
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       height: 100,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isLight ? Colors.white.withValues(alpha: 0.95) : Colors.grey[850],
+        color: isDark ? Colors.grey[850] : Colors.white.withValues(alpha: 0.95),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: const ui.Color(0xFFBDA206).withValues(alpha: 0.3),
           width: 1,
         ),
-        boxShadow: isLight ? [
+        boxShadow: [
           BoxShadow(
-            color: Colors.grey.withValues(alpha: 0.15),
+            color: isDark 
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.grey.withValues(alpha: 0.15),
             spreadRadius: 1,
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
-        ] : null,
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -513,7 +587,7 @@ class StatCard extends StatelessWidget {
                 title,
                 style: TextStyle(
                   fontSize: 14,
-                  color: isLight ? Colors.grey[700] : Colors.grey[400],
+                  color: isDark ? Colors.grey[400] : Colors.grey[700],
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -543,6 +617,7 @@ class ActionCard extends StatelessWidget {
   final String label;
   final Color color;
   final Color textColor;
+  final bool isDark;
   final VoidCallback onTap;
 
   const ActionCard({
@@ -551,13 +626,12 @@ class ActionCard extends StatelessWidget {
     required this.label,
     required this.color,
     required this.textColor,
+    required this.isDark,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final bool isLight = Theme.of(context).brightness == Brightness.light;
-    
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       height: 60,
@@ -575,8 +649,10 @@ class ActionCard extends StatelessWidget {
         style: ElevatedButton.styleFrom(
           backgroundColor: color,
           foregroundColor: textColor,
-          elevation: isLight ? 3 : 0,
-          shadowColor: isLight ? Colors.grey.withValues(alpha: 0.4) : null,
+          elevation: isDark ? 6 : 3,
+          shadowColor: isDark 
+              ? Colors.black.withValues(alpha: 0.5)
+              : Colors.grey.withValues(alpha: 0.4),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
             side: BorderSide(
@@ -592,18 +668,18 @@ class ActionCard extends StatelessWidget {
 
 class ActivityTile extends StatelessWidget {
   final String title, subtitle, time;
+  final bool isDark;
 
   const ActivityTile({
     super.key,
     required this.title,
     required this.subtitle,
     required this.time,
+    required this.isDark,
   });
 
   @override
   Widget build(BuildContext context) {
-    final bool isLight = Theme.of(context).brightness == Brightness.light;
-    
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
       child: Row(
@@ -614,13 +690,16 @@ class ActivityTile extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
                 ),
                 Text(
                   subtitle,
                   style: TextStyle(
-                    color: isLight ? Colors.grey[700] : Colors.grey[600], 
-                    fontSize: 14
+                    color: isDark ? Colors.grey[400] : Colors.grey[700],
+                    fontSize: 14,
                   ),
                 ),
               ],

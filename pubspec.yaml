@@ -15,6 +15,8 @@ dependencies:
   # Backend y autenticación
   supabase_flutter: ^2.9.1
 
+  shared_preferences: ^2.2.2
+
   #Graficos
   syncfusion_flutter_charts: 29.2.11
 

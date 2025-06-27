@@ -1,6 +1,7 @@
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'loading_screen.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -119,7 +120,7 @@ class _LoginPageState extends State<LoginPage>
               _setError('Contraseña incorrecta para el usuario: $credential');
               return;
             }
-            rethrow; // Reemplazamos throw authError por rethrow
+            rethrow;
           }
         } else {
           _setError('Usuario no encontrado. Verifica que el nombre de usuario sea correcto.');
@@ -148,13 +149,19 @@ class _LoginPageState extends State<LoginPage>
   Future<void> _checkAndRedirect(User user) async {
     final profileExists = await Supabase.instance.client
         .from('employees')
-        .select('id')
+        .select('id, username')
         .eq('id', user.id)
         .maybeSingle();
     
     if (mounted) {
       if (profileExists != null) {
-        Navigator.pushReplacementNamed(context, '/dashboard');
+        final userName = profileExists['username'] as String? ?? user.email!.split('@')[0];
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => LoadingScreen(userName: userName),
+          ),
+        );
       } else {
         Navigator.pushReplacementNamed(context, '/complete_profile');
       }
