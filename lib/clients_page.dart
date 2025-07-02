@@ -16,6 +16,7 @@ const Color hintColor = Colors.white70;
 const Color errorColor = Color(0xFFCF6679);
 const Color successColor = Color(0xFF4CAF50);
 const double borderRadius = 12.0;
+const Duration themeAnimationDuration = Duration(milliseconds: 300);
 
 class ClientsPage extends StatefulWidget {
   const ClientsPage({super.key});
@@ -51,11 +52,11 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
     super.initState();
     _loadUserData = _fetchUserData();
     _errorAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 300),
+      duration: themeAnimationDuration,
       vsync: this,
     );
     _successAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 300),
+      duration: themeAnimationDuration,
       vsync: this,
     );
     _searchCtrl.addListener(_filterClients);
@@ -541,53 +542,59 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
   }
 
   Widget _buildHeader(bool isDark) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Mis Clientes',
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                color: isDark ? textColor : Colors.black87,
+    return AnimatedContainer(
+      duration: themeAnimationDuration,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AnimatedDefaultTextStyle(
+                duration: themeAnimationDuration,
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? textColor : Colors.black87,
+                ),
+                child: const Text('Mis Clientes'),
               ),
-            ),
-            Text(
-              '${_filteredClients.length} de ${_clients.length} clientes mostrados',
-              style: TextStyle(
-                fontSize: 16,
-                color: isDark ? hintColor : Colors.grey[600],
+              AnimatedDefaultTextStyle(
+                duration: themeAnimationDuration,
+                style: TextStyle(
+                  fontSize: 16,
+                  color: isDark ? hintColor : Colors.grey[600],
+                ),
+                child: Text('${_filteredClients.length} de ${_clients.length} clientes mostrados'),
               ),
-            ),
-          ],
-        ),
-        ElevatedButton.icon(
-          onPressed: _loading ? null : _openCreateClientPopup,
-          icon: const Icon(Icons.add, color: Colors.black),
-          label: const Text(
-            'Nuevo Cliente',
-            style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+            ],
           ),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: primaryColor,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(borderRadius),
+          ElevatedButton.icon(
+            onPressed: _loading ? null : _openCreateClientPopup,
+            icon: const Icon(Icons.add, color: Colors.black),
+            label: const Text(
+              'Nuevo Cliente',
+              style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
             ),
-            elevation: 4,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryColor,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(borderRadius),
+              ),
+              elevation: 4,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
   Widget _buildSearchBar(bool isDark) {
     return Column(
       children: [
-        Container(
+        AnimatedContainer(
+          duration: themeAnimationDuration,
           decoration: BoxDecoration(
             color: isDark ? Colors.grey[800] : Colors.white,
             borderRadius: BorderRadius.circular(borderRadius),
@@ -632,7 +639,8 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Container(
+            AnimatedContainer(
+              duration: themeAnimationDuration,
               decoration: BoxDecoration(
                 color: _showInactiveClients 
                     ? (isDark ? Colors.grey[800] : Colors.white)
@@ -663,10 +671,8 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
                             : primaryColor,
                       ),
                       const SizedBox(width: 6),
-                      Text(
-                        _showInactiveClients 
-                            ? 'Mostrar todos' 
-                            : 'Solo activos',
+                      AnimatedDefaultTextStyle(
+                        duration: themeAnimationDuration,
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w500,
@@ -674,6 +680,7 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
                               ? (isDark ? hintColor : Colors.grey[600])
                               : primaryColor,
                         ),
+                        child: Text(_showInactiveClients ? 'Mostrar todos' : 'Solo activos'),
                       ),
                     ],
                   ),
@@ -692,7 +699,8 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
     final activeClients = _clients.where((client) => client['status'] ?? true).length;
     final inactiveClients = _clients.length - activeClients;
     
-    return Container(
+    return AnimatedContainer(
+      duration: themeAnimationDuration,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: isDark ? Colors.grey[800] : Colors.white,
@@ -715,13 +723,14 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
                 ),
               ),
               const SizedBox(width: 4),
-              Text(
-                '$activeClients',
+              AnimatedDefaultTextStyle(
+                duration: themeAnimationDuration,
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                   color: isDark ? textColor : Colors.black87,
                 ),
+                child: Text('$activeClients'),
               ),
             ],
           ),
@@ -739,13 +748,14 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
                 ),
               ),
               const SizedBox(width: 4),
-              Text(
-                '$inactiveClients',
+              AnimatedDefaultTextStyle(
+                duration: themeAnimationDuration,
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                   color: isDark ? textColor : Colors.black87,
                 ),
+                child: Text('$inactiveClients'),
               ),
             ],
           ),
@@ -790,20 +800,24 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
                 color: isDark ? hintColor : Colors.grey[400],
               ),
               const SizedBox(height: 16),
-              Text(
-                emptyMessage,
+              AnimatedDefaultTextStyle(
+                duration: themeAnimationDuration,
                 style: TextStyle(
                   fontSize: 18,
                   color: isDark ? hintColor : Colors.grey[600],
                 ),
+                child: Text(emptyMessage),
               ),
               const SizedBox(height: 8),
-              Text(
-                emptySubmessage,
-                textAlign: TextAlign.center,
+              AnimatedDefaultTextStyle(
+                duration: themeAnimationDuration,
                 style: TextStyle(
                   fontSize: 14,
                   color: isDark ? hintColor : Colors.grey[500],
+                ),
+                child: Text(
+                  emptySubmessage,
+                  textAlign: TextAlign.center,
                 ),
               ),
             ],
@@ -892,14 +906,19 @@ class ClientCard extends StatelessWidget {
     final notes = client['notes'] ?? 'Sin notas';
     final bool isWide = MediaQuery.of(context).size.width >= 800;
 
-    return Container(
+    return AnimatedContainer(
+      duration: themeAnimationDuration,
       decoration: BoxDecoration(
         color: isDark ? Colors.grey[800] : Colors.white,
         borderRadius: BorderRadius.circular(borderRadius),
+        border: Border.all(
+          color: isDark ? Colors.grey[700]! : Colors.grey[200]!,
+          width: 0.5,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black12,
-            blurRadius: 4,
+            color: isDark ? Colors.black26 : Colors.black.withValues(alpha: 0.08),
+            blurRadius: isDark ? 6 : 4,
             offset: const Offset(0, 2),
           ),
         ],
@@ -943,15 +962,18 @@ class ClientCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        client['name'] ?? 'Sin nombre',
+                      AnimatedDefaultTextStyle(
+                        duration: themeAnimationDuration,
                         style: TextStyle(
                           color: isDark ? textColor : Colors.black87,
                           fontWeight: FontWeight.w600,
                           fontSize: 15,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                        child: Text(
+                          client['name'] ?? 'Sin nombre',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                       const SizedBox(height: 2),
                       Row(
@@ -965,13 +987,14 @@ class ClientCard extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(width: 4),
-                          Text(
-                            isActive ? 'Activo' : 'Inactivo',
+                          AnimatedDefaultTextStyle(
+                            duration: themeAnimationDuration,
                             style: TextStyle(
                               color: isActive ? successColor : Colors.grey,
                               fontSize: 11,
                               fontWeight: FontWeight.w500,
                             ),
+                            child: Text(isActive ? 'Activo' : 'Inactivo'),
                           ),
                         ],
                       ),
@@ -982,11 +1005,14 @@ class ClientCard extends StatelessWidget {
                   message: isActive ? 'Desactivar cliente' : 'Activar cliente',
                   child: Transform.scale(
                     scale: 0.7,
-                    child: Switch(
-                      value: isActive,
-                      onChanged: isLoading ? null : (_) => onToggleStatus(),
-                      activeColor: primaryColor,
-                      inactiveThumbColor: Colors.grey,
+                    child: AnimatedContainer(
+                      duration: themeAnimationDuration,
+                      child: Switch(
+                        value: isActive,
+                        onChanged: isLoading ? null : (_) => onToggleStatus(),
+                        activeColor: primaryColor,
+                        inactiveThumbColor: Colors.grey,
+                      ),
                     ),
                   ),
                 ),
@@ -997,7 +1023,8 @@ class ClientCard extends StatelessWidget {
             
             // Información del cliente
             if (client['email'] != null || client['phone'] != null || preferredContact != 'No especificado' || notes != 'Sin notas') ...[
-              Container(
+              AnimatedContainer(
+                duration: themeAnimationDuration,
                 width: double.infinity,
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
@@ -1099,14 +1126,17 @@ class ClientCard extends StatelessWidget {
         ),
         const SizedBox(width: 6),
         Expanded(
-          child: Text(
-            text,
+          child: AnimatedDefaultTextStyle(
+            duration: themeAnimationDuration,
             style: TextStyle(
               color: isDark ? hintColor : Colors.grey[600],
               fontSize: 14,
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ),
       ],
@@ -1806,23 +1836,21 @@ class BlurredBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Positioned.fill(
+    return AnimatedContainer(
+      duration: themeAnimationDuration,
       child: Container(
         decoration: const BoxDecoration(
           image: DecorationImage(
             image: AssetImage('assets/images/logo.png'),
             fit: BoxFit.cover,
-            colorFilter: ColorFilter.mode(
-              Color.fromRGBO(0, 0, 0, 0.7),
-              BlendMode.dstATop,
-            ),
           ),
         ),
         child: BackdropFilter(
           filter: ui.ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-          child: Container(
+          child: AnimatedContainer(
+            duration: themeAnimationDuration,
             color: isDark
-                ? const Color.fromRGBO(0, 0, 0, 0.3)
+                ? const Color.fromRGBO(0, 0, 0, 0.7)
                 : Colors.white.withValues(alpha: 0.85),
           ),
         ),

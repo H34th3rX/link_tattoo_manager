@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'theme_provider.dart';
 
+const Duration themeAnimationDuration = Duration(milliseconds: 300);
+
 class NavPanel extends StatefulWidget {
   final User user;
   final VoidCallback onLogout;
@@ -49,7 +51,7 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
     const ui.Color secondaryAccent = ui.Color(0xFF00D4FF);
 
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
+      duration: themeAnimationDuration,
       decoration: BoxDecoration(
         gradient: themeProvider.isDark
             ? const LinearGradient(
@@ -93,7 +95,7 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
 
   Widget _buildModernHeader(ThemeProvider themeProvider, ui.Color accent) {
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
+      duration: themeAnimationDuration,
       margin: const EdgeInsets.symmetric(horizontal: 8),
       padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
       decoration: BoxDecoration(
@@ -195,7 +197,7 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
               _hoverController.reverse();
             },
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
+              duration: themeAnimationDuration,
               margin: const EdgeInsets.symmetric(horizontal: 4),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
@@ -236,7 +238,7 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
               child: ListTile(
                 contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
                 leading: AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
+                  duration: themeAnimationDuration,
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: isSelected
@@ -256,8 +258,8 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
                     size: 24,
                   ),
                 ),
-                title: Text(
-                  item['label'] as String,
+                title: AnimatedDefaultTextStyle(
+                  duration: themeAnimationDuration,
                   style: TextStyle(
                     fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                     color: isSelected
@@ -267,6 +269,7 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
                             : Colors.black87,
                     fontSize: 16,
                   ),
+                  child: Text(item['label'] as String),
                 ),
                 trailing: isSelected
                     ? Container(
@@ -296,7 +299,7 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
 
   Widget _buildBottomSection(ThemeData theme, ThemeProvider themeProvider, ui.Color accent) {
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
+      duration: themeAnimationDuration,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         border: Border(
@@ -318,7 +321,7 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
 
   Widget _buildThemeSwitcher(ThemeData theme, ThemeProvider themeProvider, ui.Color accent) {
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
+      duration: themeAnimationDuration,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
         color: themeProvider.isDark
@@ -334,58 +337,62 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
             size: 20,
           ),
           const SizedBox(width: 12),
-          Text(
-            'Modo Oscuro',
+          AnimatedDefaultTextStyle(
+            duration: themeAnimationDuration,
             style: TextStyle(
               color: themeProvider.isDark ? Colors.white : Colors.black87,
               fontSize: 14,
               fontWeight: FontWeight.w500,
             ),
+            child: const Text('Modo Oscuro'),
           ),
           const Spacer(),
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            width: 50,
-            height: 26,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(13),
-              gradient: themeProvider.isDark
-                  ? const LinearGradient(colors: [Color(0xFFBDA206), Color(0xFF3A3A3A)])
-                  : LinearGradient(colors: [Colors.grey.shade300, Colors.grey.shade400]),
-            ),
-            child: Stack(
-              children: [
-                AnimatedPositioned(
-                  duration: const Duration(milliseconds: 300),
-                  left: themeProvider.isDark ? 26 : 2,
-                  top: 2,
-                  child: Container(
-                    width: 22,
-                    height: 22,
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black12,
-                          blurRadius: 4,
-                          offset: Offset(0, 2),
-                        ),
-                      ],
+          GestureDetector(
+            onTap: () => themeProvider.toggle(),
+            child: AnimatedContainer(
+              duration: themeAnimationDuration,
+              width: 50,
+              height: 26,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(13),
+                gradient: themeProvider.isDark
+                    ? const LinearGradient(colors: [Color(0xFFBDA206), Color(0xFF3A3A3A)])
+                    : LinearGradient(colors: [Colors.grey.shade300, Colors.grey.shade400]),
+              ),
+              child: Stack(
+                children: [
+                  AnimatedPositioned(
+                    duration: themeAnimationDuration,
+                    left: themeProvider.isDark ? 26 : 2,
+                    top: 2,
+                    child: Container(
+                      width: 22,
+                      height: 22,
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black12,
+                            blurRadius: 4,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],
       ),
-    ).onTap(() => themeProvider.toggle());
+    );
   }
 
   Widget _buildLogoutButton(ui.Color accent) {
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
+      duration: themeAnimationDuration,
       width: double.infinity,
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -428,15 +435,6 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
           ),
         ),
       ),
-    );
-  }
-}
-
-extension on Widget {
-  Widget onTap(VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: this,
     );
   }
 }

@@ -4,10 +4,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 class ThemeProvider extends ChangeNotifier {
   static const String _themeKey = 'theme_mode';
   ThemeMode _mode = ThemeMode.light;
+  bool _isInitialized = false;
   
   ThemeMode get mode => _mode;
   bool get isDark => _mode == ThemeMode.dark;
   bool get isLight => _mode == ThemeMode.light;
+  bool get isInitialized => _isInitialized;
   
   ThemeProvider() {
     _loadTheme();
@@ -36,10 +38,13 @@ class ThemeProvider extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       final themeIndex = prefs.getInt(_themeKey) ?? 0;
       _mode = ThemeMode.values[themeIndex];
+      _isInitialized = true;
       notifyListeners();
     } catch (e) {
       // Si hay error, mantener tema por defecto
       _mode = ThemeMode.light;
+      _isInitialized = true;
+      notifyListeners();
     }
   }
   

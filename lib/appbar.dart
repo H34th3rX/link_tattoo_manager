@@ -5,6 +5,7 @@ import 'theme_provider.dart';
 // Constantes para el AppBar
 const Color primaryColor = Color(0xFFBDA206);
 const Color textColor = Colors.white;
+const Duration themeAnimationDuration = Duration(milliseconds: 300);
 
 class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
@@ -24,43 +25,59 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
       builder: (context, themeProvider, child) {
         final bool isDark = themeProvider.isDark;
         
-        return AppBar(
-          backgroundColor: isDark ? Colors.grey[900] : primaryColor,
-          elevation: 0,
-          title: Text(
-            title,
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: textColor,
-            ),
+        return AnimatedContainer(
+          duration: themeAnimationDuration,
+          decoration: BoxDecoration(
+            color: isDark ? Colors.grey[900] : primaryColor,
           ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.notifications),
-              onPressed: onNotificationPressed,
-              tooltip: 'Notificaciones',
-              color: isDark ? textColor : Colors.black87,
+          child: AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            title: AnimatedDefaultTextStyle(
+              duration: themeAnimationDuration,
+              style: const TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: textColor,
+              ),
+              child: Text(title),
             ),
-            IconButton(
-              icon: const Icon(Icons.account_circle),
-              onPressed: () {},
-              tooltip: 'Perfil',
-              color: isDark ? textColor : Colors.black87,
-            ),
-            const SizedBox(width: 8),
-          ],
-          leading: isWide
-              ? null
-              : Builder(
-                  builder: (ctx) {
-                    return IconButton(
-                      icon: const Icon(Icons.menu),
-                      onPressed: () => Scaffold.of(ctx).openDrawer(),
-                      color: isDark ? textColor : Colors.black87,
-                    );
-                  },
+            actions: [
+              AnimatedContainer(
+                duration: themeAnimationDuration,
+                child: IconButton(
+                  icon: const Icon(Icons.notifications),
+                  onPressed: onNotificationPressed,
+                  tooltip: 'Notificaciones',
+                  color: isDark ? textColor : Colors.black87,
                 ),
+              ),
+              AnimatedContainer(
+                duration: themeAnimationDuration,
+                child: IconButton(
+                  icon: const Icon(Icons.account_circle),
+                  onPressed: () {},
+                  tooltip: 'Perfil',
+                  color: isDark ? textColor : Colors.black87,
+                ),
+              ),
+              const SizedBox(width: 8),
+            ],
+            leading: isWide
+                ? null
+                : Builder(
+                    builder: (ctx) {
+                      return AnimatedContainer(
+                        duration: themeAnimationDuration,
+                        child: IconButton(
+                          icon: const Icon(Icons.menu),
+                          onPressed: () => Scaffold.of(ctx).openDrawer(),
+                          color: isDark ? textColor : Colors.black87,
+                        ),
+                      );
+                    },
+                  ),
+          ),
         );
       },
     );
@@ -75,71 +92,78 @@ class NotificationsBottomSheet extends StatelessWidget {
   
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    const Color cardColor = Color.fromRGBO(15, 19, 21, 0.9);
-    const double borderRadius = 12.0;
-    
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? cardColor : Colors.white,
-        borderRadius: const BorderRadius.vertical(
-          top: Radius.circular(borderRadius),
-        ),
-      ),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 40,
-            height: 4,
-            margin: const EdgeInsets.only(bottom: 16),
-            decoration: BoxDecoration(
-              color: Colors.grey[400],
-              borderRadius: BorderRadius.circular(2),
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        final bool isDark = themeProvider.isDark;
+        const Color cardColor = Color.fromRGBO(15, 19, 21, 0.9);
+        const double borderRadius = 12.0;
+        
+        return AnimatedContainer(
+          duration: themeAnimationDuration,
+          decoration: BoxDecoration(
+            color: isDark ? cardColor : Colors.white,
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(borderRadius),
             ),
           ),
-          const Text(
-            'Notificaciones',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: textColor,
-            ),
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: Colors.grey[400],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              AnimatedDefaultTextStyle(
+                duration: themeAnimationDuration,
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? textColor : Colors.black87,
+                ),
+                child: const Text('Notificaciones'),
+              ),
+              const SizedBox(height: 16),
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: 3,
+                itemBuilder: (context, index) {
+                  return NotificationTile(
+                    icon: index == 0
+                        ? Icons.event_available
+                        : index == 1
+                            ? Icons.person_add
+                            : Icons.schedule,
+                    title: index == 0
+                        ? 'Próxima cita en 30 minutos'
+                        : index == 1
+                            ? 'Nuevo cliente registrado'
+                            : 'Recordatorio',
+                    subtitle: index == 0
+                        ? 'Ana López - 2:30 PM'
+                        : index == 1
+                            ? 'Carlos Mendoza'
+                            : 'Revisar citas de mañana',
+                    time: index == 0
+                        ? '2:00 PM'
+                        : index == 1
+                            ? '1:45 PM'
+                            : '12:00 PM',
+                    isDark: isDark,
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
+            ],
           ),
-          const SizedBox(height: 16),
-          ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: 3,
-            itemBuilder: (context, index) {
-              return NotificationTile(
-                icon: index == 0
-                    ? Icons.event_available
-                    : index == 1
-                        ? Icons.person_add
-                        : Icons.schedule,
-                title: index == 0
-                    ? 'Próxima cita en 30 minutos'
-                    : index == 1
-                        ? 'Nuevo cliente registrado'
-                        : 'Recordatorio',
-                subtitle: index == 0
-                    ? 'Ana López - 2:30 PM'
-                    : index == 1
-                        ? 'Carlos Mendoza'
-                        : 'Revisar citas de mañana',
-                time: index == 0
-                    ? '2:00 PM'
-                    : index == 1
-                        ? '1:45 PM'
-                        : '12:00 PM',
-              );
-            },
-          ),
-          const SizedBox(height: 16),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -149,6 +173,7 @@ class NotificationTile extends StatelessWidget {
   final String title;
   final String subtitle;
   final String time;
+  final bool isDark;
 
   const NotificationTile({
     super.key,
@@ -156,36 +181,45 @@ class NotificationTile extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.time,
+    required this.isDark,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     const Color hintColor = Colors.white70;
     
-    return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: primaryColor.withValues(alpha: 0.1),
-        child: Icon(icon, color: primaryColor),
-      ),
-      title: Text(
-        title,
-        style: TextStyle(
-          fontWeight: FontWeight.w600,
-          color: isDark ? textColor : Colors.black87,
+    return AnimatedContainer(
+      duration: themeAnimationDuration,
+      child: ListTile(
+        leading: AnimatedContainer(
+          duration: themeAnimationDuration,
+          child: CircleAvatar(
+            backgroundColor: primaryColor.withValues(alpha: 0.1),
+            child: Icon(icon, color: primaryColor),
+          ),
         ),
-      ),
-      subtitle: Text(
-        subtitle,
-        style: TextStyle(
-          color: isDark ? hintColor : Colors.grey[600],
+        title: AnimatedDefaultTextStyle(
+          duration: themeAnimationDuration,
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            color: isDark ? textColor : Colors.black87,
+          ),
+          child: Text(title),
         ),
-      ),
-      trailing: Text(
-        time,
-        style: TextStyle(
-          color: isDark ? hintColor : Colors.grey[600],
-          fontSize: 12,
+        subtitle: AnimatedDefaultTextStyle(
+          duration: themeAnimationDuration,
+          style: TextStyle(
+            color: isDark ? hintColor : Colors.grey[600],
+          ),
+          child: Text(subtitle),
+        ),
+        trailing: AnimatedDefaultTextStyle(
+          duration: themeAnimationDuration,
+          style: TextStyle(
+            color: isDark ? hintColor : Colors.grey[600],
+            fontSize: 12,
+          ),
+          child: Text(time),
         ),
       ),
     );
