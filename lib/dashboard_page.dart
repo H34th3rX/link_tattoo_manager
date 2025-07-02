@@ -3,8 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:intl/intl.dart';
 import 'nav_panel.dart';
 import 'theme_provider.dart';
+import 'appbar.dart';
+import './integrations/clients_service.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -43,56 +46,12 @@ class _DashboardPageState extends State<DashboardPage> {
     nav.pushNamedAndRemoveUntil('/login', (_) => false);
   }
 
-  void _showNotifications(BuildContext context) {
+  void _showNotifications() {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).scaffoldBackgroundColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(top: 12),
-              decoration: BoxDecoration(
-                color: Colors.grey[400],
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Text(
-                'Notificaciones',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-            ),
-            const NotificationTile(
-              icon: Icons.event_available,
-              title: 'Próxima cita en 30 minutos',
-              subtitle: 'Ana López - 2:30 PM',
-              time: '2:00 PM',
-            ),
-            const NotificationTile(
-              icon: Icons.person_add,
-              title: 'Nuevo cliente registrado',
-              subtitle: 'Carlos Mendoza',
-              time: '1:45 PM',
-            ),
-            const NotificationTile(
-              icon: Icons.schedule,
-              title: 'Recordatorio',
-              subtitle: 'Revisar citas de mañana',
-              time: '12:00 PM',
-            ),
-            const SizedBox(height: 20),
-          ],
-        ),
-      ),
+      isScrollControlled: true,
+      builder: (context) => const NotificationsBottomSheet(),
     );
   }
 
@@ -100,42 +59,18 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget build(BuildContext context) {
     final bool isWide = MediaQuery.of(context).size.width >= 800;
     final user = Supabase.instance.client.auth.currentUser!;
-    final themeProvider = Provider.of<ThemeProvider>(context);
-    final bool isDark = themeProvider.isDark;
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final bool initialIsDark = themeProvider.isDark;
 
     return FutureBuilder(
       future: _loadUserData,
       builder: (context, snapshot) {
         return Scaffold(
-          backgroundColor: isDark ? null : Colors.grey.shade50,
-          appBar: AppBar(
-            backgroundColor: isDark 
-                ? const Color(0xFF2A2A2A)
-                : const ui.Color(0xFFBDA206),
-            title: Text('Dashboard',
-                style: TextStyle(
-                  color: isDark ? Colors.white : Colors.black, 
-                  fontWeight: FontWeight.bold
-                )),
-            iconTheme: IconThemeData(color: isDark ? Colors.white : Colors.black),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.notifications_outlined),
-                onPressed: () => _showNotifications(context),
-              ),
-              IconButton(
-                icon: const Icon(Icons.person_outline),
-                onPressed: () {},
-              ),
-            ],
-            leading: isWide
-                ? null
-                : Builder(builder: (ctx) {
-                    return IconButton(
-                      icon: const Icon(Icons.menu),
-                      onPressed: () => Scaffold.of(ctx).openDrawer(),
-                    );
-                  }),
+          backgroundColor: initialIsDark ? null : Colors.grey.shade50,
+          appBar: CustomAppBar(
+            title: 'Dashboard',
+            onNotificationPressed: _showNotifications,
+            isWide: isWide,
           ),
           drawer: isWide
               ? null
@@ -146,7 +81,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
           body: Stack(
             children: [
-              BlurredBackground(isDark: isDark),
+              BlurredBackground(isDark: initialIsDark),
               isWide
                   ? Row(
                       children: [
@@ -162,11 +97,11 @@ class _DashboardPageState extends State<DashboardPage> {
                         ),
                         const VerticalDivider(width: 1),
                         Expanded(
-                          child: MainContent(isDark: isDark),
+                          child: MainContent(user: user, initialIsDark: initialIsDark),
                         ),
                       ],
                     )
-                  : MainContent(isDark: isDark),
+                  : MainContent(user: user, initialIsDark: initialIsDark),
             ],
           ),
         );
@@ -175,41 +110,9 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 }
 
-class NotificationTile extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final String time;
-
-  const NotificationTile({
-    super.key,
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.time,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      leading: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: const ui.Color(0xFFBDA206).withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Icon(icon, color: const ui.Color(0xFFBDA206)),
-      ),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-      subtitle: Text(subtitle),
-      trailing: Text(time, style: TextStyle(color: Colors.grey[600], fontSize: 12)),
-    );
-  }
-}
-
 class BlurredBackground extends StatelessWidget {
   final bool isDark;
-  
+
   const BlurredBackground({super.key, required this.isDark});
 
   @override
@@ -239,10 +142,112 @@ class BlurredBackground extends StatelessWidget {
   }
 }
 
-class MainContent extends StatelessWidget {
-  final bool isDark;
-  
-  const MainContent({super.key, required this.isDark});
+class AnimatedAppearance extends StatefulWidget {
+  final Widget child;
+  final int delay;
+  final Duration duration;
+
+  const AnimatedAppearance({
+    super.key,
+    required this.child,
+    this.delay = 0,
+    this.duration = const Duration(milliseconds: 600),
+  });
+
+  @override
+  State<AnimatedAppearance> createState() => _AnimatedAppearanceState();
+}
+
+class _AnimatedAppearanceState extends State<AnimatedAppearance>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: widget.duration,
+      vsync: this,
+    );
+
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutCubic,
+    ));
+
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.5), // 30px más abajo (proporcional)
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutCubic,
+    ));
+
+    // Iniciar animación con delay
+    Future.delayed(Duration(milliseconds: widget.delay), () {
+      if (mounted) _controller.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: SlideTransition(
+        position: _slideAnimation,
+        child: widget.child,
+      ),
+    );
+  }
+}
+
+class MainContent extends StatefulWidget {
+  final User user;
+  final bool initialIsDark;
+
+  const MainContent({super.key, required this.user, required this.initialIsDark});
+
+  @override
+  State<MainContent> createState() => _MainContentState();
+}
+
+class _MainContentState extends State<MainContent> {
+  late Future<List<dynamic>> _activityData;
+  late Future<int> _clientCount;
+
+  @override
+  void initState() {
+    super.initState();
+    final userId = widget.user.id;
+    _activityData = Future.wait([
+      ClientsService.getLatestClient(userId),
+      ClientsService.getLatestAppointment(userId),
+      ClientsService.getLastThreeAppointments(userId),
+    ]).then((data) async {
+      final latestAppointment = data[1] as Map?;
+      final lastThreeAppointments = data[2] as List<Map>;
+      if (latestAppointment != null) {
+        final clientName = await ClientsService.getClientName(latestAppointment['client_id']);
+        latestAppointment['clientName'] = clientName ?? 'Cliente desconocido';
+      }
+      for (var appointment in lastThreeAppointments) {
+        appointment['clientName'] = await ClientsService.getClientName(appointment['client_id']);
+      }
+      return data;
+    });
+    _clientCount = ClientsService.getClientCountByEmployee(userId);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -265,268 +270,329 @@ class MainContent extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: StatCard(
-                        title: 'Citas Hoy',
-                        value: '8',
-                        icon: Icons.event_available,
-                        isDark: isDark,
+                // Stats Cards con animación (delay: 0ms y 150ms)
+                AnimatedAppearance(
+                  delay: 0,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: StatCard(
+                          title: 'Citas Hoy',
+                          value: '8',
+                          icon: Icons.event_available,
+                          isDark: widget.initialIsDark,
+                        ),
                       ),
-                    ),
-                    SizedBox(width: spacing),
-                    Expanded(
-                      child: StatCard(
-                        title: 'Clientes',
-                        value: '156',
-                        icon: Icons.people_outline,
-                        isDark: isDark,
+                      SizedBox(width: spacing),
+                      Expanded(
+                        child: StatCard(
+                          title: 'Clientes',
+                          valueFuture: _clientCount,
+                          icon: Icons.people_outline,
+                          isDark: widget.initialIsDark,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
                 SizedBox(height: spacing),
-                Row(
-                  children: [
-                    Expanded(
-                      child: StatCard(
-                        title: 'Próxima',
-                        value: '2:30 PM',
-                        icon: Icons.schedule,
-                        isDark: isDark,
+                AnimatedAppearance(
+                  delay: 150,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: StatCard(
+                          title: 'Próxima',
+                          value: '2:30 PM',
+                          icon: Icons.schedule,
+                          isDark: widget.initialIsDark,
+                        ),
                       ),
-                    ),
-                    SizedBox(width: spacing),
-                    Expanded(
-                      child: StatCard(
-                        title: 'Ingresos',
-                        value: '\$12.4K',
-                        icon: Icons.trending_up,
-                        isDark: isDark,
+                      SizedBox(width: spacing),
+                      Expanded(
+                        child: StatCard(
+                          title: 'Ingresos',
+                          value: '\$12.4K',
+                          icon: Icons.trending_up,
+                          isDark: widget.initialIsDark,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 32),
-                SizedBox(
-                  width: double.infinity,
-                  height: 60,
-                  child: ElevatedButton.icon(
-                    onPressed: () => Navigator.pushNamed(context, '/appointments/new'),
-                    icon: const Icon(Icons.add, color: Colors.black),
-                    label: const Text(
-                      'Nueva Cita',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black,
+                // Botón Nueva Cita (delay: 300ms)
+                AnimatedAppearance(
+                  delay: 300,
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 60,
+                    child: ElevatedButton.icon(
+                      onPressed: () => Navigator.pushNamed(context, '/appointments/new'),
+                      icon: const Icon(Icons.add, color: Colors.black),
+                      label: const Text(
+                        'Nueva Cita',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black,
+                        ),
                       ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const ui.Color(0xFFBDA206),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const ui.Color(0xFFBDA206),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: widget.initialIsDark ? 8 : 4,
+                        shadowColor: const ui.Color(0xFFBDA206).withValues(alpha: 0.4),
                       ),
-                      elevation: isDark ? 8 : 4,
-                      shadowColor: const ui.Color(0xFFBDA206).withValues(alpha: 0.4),
                     ),
                   ),
                 ),
                 SizedBox(height: spacing + 4),
-                Row(
-                  children: [
-                    Expanded(
-                      child: ActionCard(
-                        icon: Icons.calendar_today,
-                        label: 'Ver Citas',
-                        color: isDark ? Colors.grey[800]! : Colors.white.withValues(alpha: 0.95),
-                        textColor: const ui.Color(0xFFBDA206),
-                        isDark: isDark,
-                        onTap: () => Navigator.pushNamed(context, '/appointments'),
+                // Action Cards (delay: 450ms)
+                AnimatedAppearance(
+                  delay: 450,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: ActionCard(
+                          icon: Icons.history,
+                          label: 'Ver Citas',
+                          color: widget.initialIsDark ? Colors.grey[800]! : Colors.white.withValues(alpha: 0.95),
+                          textColor: const ui.Color(0xFFBDA206),
+                          isDark: widget.initialIsDark,
+                          onTap: () => Navigator.pushNamed(context, '/appointments'),
+                        ),
                       ),
-                    ),
-                    SizedBox(width: spacing),
-                    Expanded(
-                      child: ActionCard(
-                        icon: Icons.history,
-                        label: 'Historial',
-                        color: isDark ? Colors.grey[800]! : Colors.white.withValues(alpha: 0.95),
-                        textColor: const ui.Color(0xFFBDA206),
-                        isDark: isDark,
-                        onTap: () => Navigator.pushNamed(context, '/calendar'),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 40),
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: isDark ? Colors.grey[850] : Colors.white.withValues(alpha: 0.95),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: const ui.Color(0xFFBDA206).withValues(alpha: 0.3),
-                      width: 1,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: isDark 
-                            ? Colors.black.withValues(alpha: 0.3)
-                            : Colors.grey.withValues(alpha: 0.15),
-                        spreadRadius: 1,
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
+                      SizedBox(width: spacing),
+                      Expanded(
+                        child: ActionCard(
+                          icon: Icons.calendar_today,
+                          label: 'Calendario',
+                          color: widget.initialIsDark ? Colors.grey[800]! : Colors.white.withValues(alpha: 0.95),
+                          textColor: const ui.Color(0xFFBDA206),
+                          isDark: widget.initialIsDark,
+                          onTap: () => Navigator.pushNamed(context, '/calendar'),
+                        ),
                       ),
                     ],
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Ingresos de la Semana',
-                        style: TextStyle(
-                          fontSize: 20, 
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? Colors.white : Colors.black87,
-                        ),
+                ),
+                const SizedBox(height: 40),
+                // Gráfico de ingresos (delay: 600ms)
+                AnimatedAppearance(
+                  delay: 600,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: widget.initialIsDark ? Colors.grey[850] : Colors.white.withValues(alpha: 0.95),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: const ui.Color(0xFFBDA206).withValues(alpha: 0.3),
+                        width: 1,
                       ),
-                      const SizedBox(height: 20),
-                      SizedBox(
-                        height: 220,
-                        child: SfCartesianChart(
-                          plotAreaBorderWidth: 0,
-                          backgroundColor: Colors.transparent,
-                          primaryXAxis: CategoryAxis(
-                            majorGridLines: const MajorGridLines(width: 0),
-                            axisLine: const AxisLine(width: 0),
-                            majorTickLines: const MajorTickLines(size: 0),
-                            labelStyle: TextStyle(
-                              color: isDark ? Colors.white70 : Colors.black87,
-                            ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: widget.initialIsDark 
+                              ? Colors.black.withValues(alpha: 0.3)
+                              : Colors.grey.withValues(alpha: 0.15),
+                          spreadRadius: 1,
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Ingresos de la Semana',
+                          style: TextStyle(
+                            fontSize: 20, 
+                            fontWeight: FontWeight.bold,
+                            color: widget.initialIsDark ? Colors.white : Colors.black87,
                           ),
-                          primaryYAxis: NumericAxis(
-                            majorGridLines: MajorGridLines(
-                              width: 0.5,
-                              color: isDark ? Colors.grey[700] : Colors.grey[300],
-                              dashArray: const [5, 5],
+                        ),
+                        const SizedBox(height: 20),
+                        SizedBox(
+                          height: 220,
+                          child: SfCartesianChart(
+                            plotAreaBorderWidth: 0,
+                            backgroundColor: Colors.transparent,
+                            primaryXAxis: CategoryAxis(
+                              majorGridLines: const MajorGridLines(width: 0),
+                              axisLine: const AxisLine(width: 0),
+                              majorTickLines: const MajorTickLines(size: 0),
+                              labelStyle: TextStyle(
+                                color: widget.initialIsDark ? Colors.white70 : Colors.black87,
+                              ),
                             ),
-                            axisLine: const AxisLine(width: 0),
-                            majorTickLines: const MajorTickLines(size: 0),
-                            labelFormat: '\${value}K',
-                            labelStyle: TextStyle(
-                              color: isDark ? Colors.white70 : Colors.black87,
+                            primaryYAxis: NumericAxis(
+                              majorGridLines: MajorGridLines(
+                                width: 0.5,
+                                color: widget.initialIsDark ? Colors.grey[700] : Colors.grey[300],
+                                dashArray: const [5, 5],
+                              ),
+                              axisLine: const AxisLine(width: 0),
+                              majorTickLines: const MajorTickLines(size: 0),
+                              labelFormat: '\${value}K',
+                              labelStyle: TextStyle(
+                                color: widget.initialIsDark ? Colors.white70 : Colors.black87,
+                              ),
                             ),
-                          ),
-                          tooltipBehavior: TooltipBehavior(
-                            enable: true,
-                            canShowMarker: true,
-                            header: '',
-                            format: 'point.x: \$point.yK',
-                          ),
-                          series: <CartesianSeries>[
-                            SplineAreaSeries<_SalesData, String>(
-                              dataSource: [
-                                _SalesData('Lun', 5.2),
-                                _SalesData('Mar', 7.8),
-                                _SalesData('Mié', 6.4),
-                                _SalesData('Jue', 9.1),
-                                _SalesData('Vie', 8.7),
-                                _SalesData('Sáb', 12.4),
-                                _SalesData('Dom', 4.2),
-                              ],
-                              xValueMapper: (_SalesData data, _) => data.day,
-                              yValueMapper: (_SalesData data, _) => data.amount,
-                              splineType: SplineType.natural,
-                              cardinalSplineTension: 0.9,
-                              borderWidth: 3,
-                              borderColor: const ui.Color(0xFFBDA206),
-                              gradient: LinearGradient(
-                                colors: [
-                                  const ui.Color(0xFFBDA206).withValues(alpha: 0.6),
-                                  const ui.Color(0xFFBDA206).withValues(alpha: 0.1),
+                            tooltipBehavior: TooltipBehavior(
+                              enable: true,
+                              canShowMarker: true,
+                              header: '',
+                              format: 'point.x: \$point.yK',
+                            ),
+                            series: <CartesianSeries>[
+                              SplineAreaSeries<_SalesData, String>(
+                                dataSource: [
+                                  _SalesData('Lun', 5.2),
+                                  _SalesData('Mar', 7.8),
+                                  _SalesData('Mié', 6.4),
+                                  _SalesData('Jue', 9.1),
+                                  _SalesData('Vie', 8.7),
+                                  _SalesData('Sáb', 12.4),
+                                  _SalesData('Dom', 4.2),
                                 ],
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
+                                xValueMapper: (_SalesData data, _) => data.day,
+                                yValueMapper: (_SalesData data, _) => data.amount,
+                                splineType: SplineType.natural,
+                                cardinalSplineTension: 0.9,
+                                borderWidth: 3,
+                                borderColor: const ui.Color(0xFFBDA206),
+                                gradient: LinearGradient(
+                                  colors: [
+                                    const ui.Color(0xFFBDA206).withValues(alpha: 0.6),
+                                    const ui.Color(0xFFBDA206).withValues(alpha: 0.1),
+                                  ],
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                ),
+                                markerSettings: const MarkerSettings(
+                                  isVisible: true,
+                                  shape: DataMarkerType.circle,
+                                  borderWidth: 2,
+                                  borderColor: ui.Color(0xFFBDA206),
+                                  color: Colors.white,
+                                  width: 8,
+                                  height: 8,
+                                ),
                               ),
-                              markerSettings: const MarkerSettings(
-                                isVisible: true,
-                                shape: DataMarkerType.circle,
-                                borderWidth: 2,
-                                borderColor: ui.Color(0xFFBDA206),
-                                color: Colors.white,
-                                width: 8,
-                                height: 8,
-                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 40),
+                // Actividad Reciente (delay: 750ms)
+                AnimatedAppearance(
+                  delay: 750,
+                  child: FutureBuilder(
+                    future: _activityData,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      if (snapshot.hasError) {
+                        return Text('Error: ${snapshot.error}');
+                      }
+                      final latestClient = snapshot.data![0] as Map?;
+                      final latestAppointmentData = snapshot.data![1] as Map?;
+                      final lastThreeAppointments = snapshot.data![2] as List<Map>;
+                      return Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: widget.initialIsDark ? Colors.grey[850] : Colors.white.withValues(alpha: 0.95),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: const ui.Color(0xFFBDA206).withValues(alpha: 0.3),
+                            width: 1,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: widget.initialIsDark 
+                                  ? Colors.black.withValues(alpha: 0.3)
+                                  : Colors.grey.withValues(alpha: 0.15),
+                              spreadRadius: 1,
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
                             ),
                           ],
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 40),
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: isDark ? Colors.grey[850] : Colors.white.withValues(alpha: 0.95),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: const ui.Color(0xFFBDA206).withValues(alpha: 0.3),
-                      width: 1,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: isDark 
-                            ? Colors.black.withValues(alpha: 0.3)
-                            : Colors.grey.withValues(alpha: 0.15),
-                        spreadRadius: 1,
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Actividad Reciente',
-                        style: TextStyle(
-                          fontSize: 20, 
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? Colors.white : Colors.black87,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Actividad Reciente',
+                              style: TextStyle(
+                                fontSize: 20, 
+                                fontWeight: FontWeight.bold,
+                                color: widget.initialIsDark ? Colors.white : Colors.black87,
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            if (isWide)
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    child: ActivityCard(
+                                      title: 'Último Cliente',
+                                      content: _buildLatestClient(latestClient, widget.initialIsDark),
+                                      isDark: widget.initialIsDark,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: ActivityCard(
+                                      title: 'Última Cita Registrada',
+                                      content: _buildLatestAppointment(latestAppointmentData, widget.initialIsDark),
+                                      isDark: widget.initialIsDark,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: ActivityCard(
+                                      title: 'Últimas 3 Citas',
+                                      content: _buildLastThreeAppointments(lastThreeAppointments, widget.initialIsDark),
+                                      isDark: widget.initialIsDark,
+                                    ),
+                                  ),
+                                ],
+                              )
+                            else
+                              Column(
+                                children: [
+                                  ActivityCard(
+                                    title: 'Último Cliente',
+                                    content: _buildLatestClient(latestClient, widget.initialIsDark),
+                                    isDark: widget.initialIsDark,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  ActivityCard(
+                                    title: 'Última Cita Registrada',
+                                    content: _buildLatestAppointment(latestAppointmentData, widget.initialIsDark),
+                                    isDark: widget.initialIsDark,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  ActivityCard(
+                                    title: 'Últimas 3 Citas',
+                                    content: _buildLastThreeAppointments(lastThreeAppointments, widget.initialIsDark),
+                                    isDark: widget.initialIsDark,
+                                  ),
+                                ],
+                              ),
+                          ],
                         ),
-                      ),
-                      const SizedBox(height: 20),
-                      ActivityTile(
-                        title: 'Cita completada',
-                        subtitle: 'Carlos Ruiz',
-                        time: '10:30',
-                        isDark: isDark,
-                      ),
-                      Divider(
-                        height: 1,
-                        color: isDark ? Colors.grey[700] : Colors.grey[300],
-                      ),
-                      ActivityTile(
-                        title: 'Nueva cita',
-                        subtitle: 'Ana López',
-                        time: '09:15',
-                        isDark: isDark,
-                      ),
-                      Divider(
-                        height: 1,
-                        color: isDark ? Colors.grey[700] : Colors.grey[300],
-                      ),
-                      ActivityTile(
-                        title: 'Cliente llegó',
-                        subtitle: 'Pedro Martín',
-                        time: '08:45',
-                        isDark: isDark,
-                      ),
-                    ],
+                      );
+                    },
                   ),
                 ),
                 const SizedBox(height: 40),
@@ -537,17 +603,135 @@ class MainContent extends StatelessWidget {
       ),
     );
   }
+
+  Widget _buildLatestClient(Map? client, bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 8),
+        if (client != null)
+          ActivityTile(
+            title: client['name'],
+            subtitle: '',
+            time: DateFormat('dd/MM/yyyy').format(DateTime.parse(client['registration_date']).toLocal()),
+            isDark: isDark,
+          )
+        else
+          Text(
+            'No hay clientes registrados',
+            style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[700]),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildLatestAppointment(Map? appointmentData, bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 8),
+        if (appointmentData != null)
+          ActivityTile(
+            title: appointmentData['clientName'] ?? 'Cliente desconocido',
+            subtitle: 'Hora: ${DateTime.parse(appointmentData['start_time']).toLocal().toString().split(' ')[1].substring(0, 5)}',
+            time: appointmentData['status'] ?? 'Sin estado',
+            isDark: isDark,
+          )
+        else
+          Text(
+            'No hay citas registradas',
+            style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[700]),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildLastThreeAppointments(List<Map> appointments, bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 8),
+        if (appointments.isNotEmpty)
+          Column(
+            children: appointments.map((appointment) {
+              return ActivityTile(
+                title: appointment['clientName'] ?? 'Cliente desconocido',
+                subtitle: 'Hora: ${DateTime.parse(appointment['start_time']).toLocal().toString().split(' ')[1].substring(0, 5)}',
+                time: appointment['status'] ?? 'Sin estado',
+                isDark: isDark,
+              );
+            }).toList(),
+          )
+        else
+          Text(
+            'No hay citas registradas',
+            style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[700]),
+          ),
+      ],
+    );
+  }
+}
+
+class ActivityCard extends StatelessWidget {
+  final String title;
+  final Widget content;
+  final bool isDark;
+
+  const ActivityCard({super.key, required this.title, required this.content, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.grey[800] : Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: const ui.Color(0xFFBDA206).withValues(alpha: 0.3),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: isDark ? Colors.black.withValues(alpha: 0.3) : Colors.grey.withValues(alpha: 0.15),
+            spreadRadius: 1,
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: const ui.Color(0xFFBDA206),
+              decoration: TextDecoration.underline,
+              decorationColor: const ui.Color(0xFFBDA206),
+            ),
+          ),
+          const SizedBox(height: 8),
+          content,
+        ],
+      ),
+    );
+  }
 }
 
 class StatCard extends StatelessWidget {
-  final String title, value;
+  final String title;
+  final String? value;
+  final Future<int>? valueFuture;
   final IconData icon;
   final bool isDark;
 
   const StatCard({
     super.key,
     required this.title,
-    required this.value,
+    this.value,
+    this.valueFuture,
     required this.icon,
     required this.isDark,
   });
@@ -598,14 +782,51 @@ class StatCard extends StatelessWidget {
               ),
             ],
           ),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: ui.Color(0xFFBDA206),
+          if (value != null)
+            Text(
+              value!,
+              style: const TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: ui.Color(0xFFBDA206),
+              ),
+            )
+          else if (valueFuture != null)
+            Expanded(
+              child: FutureBuilder<int>(
+                future: valueFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Text(
+                      '',
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: ui.Color(0xFFBDA206),
+                      ),
+                    );
+                  }
+                  if (snapshot.hasError) {
+                    return const Text(
+                      '0',
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: ui.Color(0xFFBDA206),
+                      ),
+                    );
+                  }
+                  return Text(
+                    '${snapshot.data ?? 0}',
+                    style: const TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: ui.Color(0xFFBDA206),
+                    ),
+                  );
+                },
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -681,7 +902,7 @@ class ActivityTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
           Expanded(
@@ -695,24 +916,26 @@ class ActivityTile extends StatelessWidget {
                     color: isDark ? Colors.white : Colors.black87,
                   ),
                 ),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    color: isDark ? Colors.grey[400] : Colors.grey[700],
-                    fontSize: 14,
+                if (subtitle.isNotEmpty)
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      color: isDark ? Colors.grey[400] : Colors.grey[700],
+                      fontSize: 14,
+                    ),
                   ),
-                ),
               ],
             ),
           ),
-          Text(
-            time,
-            style: const TextStyle(
-              color: ui.Color(0xFFBDA206),
-              fontWeight: FontWeight.w600,
-              fontSize: 14,
+          if (time.isNotEmpty)
+            Text(
+              time,
+              style: const TextStyle(
+                color: ui.Color(0xFFBDA206),
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
             ),
-          ),
         ],
       ),
     );

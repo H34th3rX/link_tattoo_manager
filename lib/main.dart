@@ -10,7 +10,7 @@ import 'dashboard_page.dart' show DashboardPage;
 import 'complete_profile_page.dart' show CompleteProfilePage;
 //import 'appointments_list_page.dart';
 //import 'appointment_edit_page.dart';
-//import 'clients_page.dart';
+import 'clients_page.dart' show ClientsPage;
 //import 'reports_page.dart';
 //import 'calendar_page.dart';
 
@@ -60,7 +60,7 @@ class MyApp extends StatelessWidget {
             '/dashboard': (_) => DashboardPage(),
             //'/appointments': (_) => AppointmentsListPage(),
             //'/appointments/new': (_) => AppointmentEditPage(),
-            //'/clients': (_) => ClientsPage(),
+            '/clients': (_) => ClientsPage(),
             //'/reports': (_) => ReportsPage(),
             //'/calendar': (_) => CalendarPage(),
           },
