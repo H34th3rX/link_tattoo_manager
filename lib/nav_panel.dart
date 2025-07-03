@@ -74,7 +74,7 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
               ),
         boxShadow: [
           BoxShadow(
-            color: themeProvider.isDark ? Colors.black26 : Colors.grey.withValues(alpha: 0.1),
+            color: themeProvider.isDark ? Colors.black26 : Colors.grey.withValues(alpha:0.1), // Fixed
             blurRadius: 20,
             offset: const Offset(2, 0),
           ),
@@ -108,7 +108,7 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
             const Color(0xFF3A3A3A),
           ] : [
             accent,
-            accent.withValues(alpha: 0.8),
+            accent.withValues(alpha:0.8), // Fixed
           ],
         ),
         borderRadius: const BorderRadius.all(Radius.circular(20)),
@@ -128,7 +128,7 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.white.withValues(alpha: 0.3 + 0.2 * _pulseController.value),
+                      color: Colors.white.withValues(alpha:0.3 + 0.2 * _pulseController.value), // Fixed
                       blurRadius: 20,
                       spreadRadius: 2,
                     ),
@@ -175,6 +175,7 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
       {'icon': Icons.calendar_month_rounded, 'label': 'Calendario', 'route': '/calendar'},
       {'icon': Icons.people_rounded, 'label': 'Clientes', 'route': '/clients'},
       {'icon': Icons.picture_as_pdf_rounded, 'label': 'Reportes', 'route': '/reports'},
+      {'icon': Icons.person_rounded, 'label': 'Mi Perfil', 'route': '/profile'}, // Added profile route
     ];
 
     return ListView.builder(
@@ -204,31 +205,31 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
                 gradient: isSelected
                     ? LinearGradient(
                         colors: themeProvider.isDark ? [
-                          const Color(0xFFBDA206).withValues(alpha: 0.3),
-                          const Color(0xFF3A3A3A).withValues(alpha: 0.2),
+                          const Color(0xFFBDA206).withValues(alpha:0.3), // Fixed
+                          const Color(0xFF3A3A3A).withValues(alpha:0.2), // Fixed
                         ] : [
-                          primaryAccent.withValues(alpha: 0.2),
-                          secondaryAccent.withValues(alpha: 0.1),
+                          primaryAccent.withValues(alpha:0.2), // Fixed
+                          secondaryAccent.withValues(alpha:0.1), // Fixed
                         ],
                       )
                     : isHovered
                         ? LinearGradient(
                             colors: themeProvider.isDark ? [
-                              const Color(0xFFBDA206).withValues(alpha: 0.15),
+                              const Color(0xFFBDA206).withValues(alpha:0.15), // Fixed
                               Colors.transparent,
                             ] : [
-                              primaryAccent.withValues(alpha: 0.1),
+                              primaryAccent.withValues(alpha:0.1), // Fixed
                               Colors.transparent,
                             ],
                           )
                         : null,
                 border: isSelected
-                    ? Border.all(color: primaryAccent.withValues(alpha: 0.5), width: 1)
+                    ? Border.all(color: primaryAccent.withValues(alpha:0.5), width: 1) // Fixed
                     : null,
                 boxShadow: isSelected
                     ? [
                         BoxShadow(
-                          color: primaryAccent.withValues(alpha: 0.3),
+                          color: primaryAccent.withValues(alpha:0.3), // Fixed
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),
@@ -242,9 +243,9 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: isSelected
-                        ? primaryAccent.withValues(alpha: 0.2)
+                        ? primaryAccent.withValues(alpha:0.2) // Fixed
                         : isHovered
-                            ? primaryAccent.withValues(alpha: 0.1)
+                            ? primaryAccent.withValues(alpha:0.1) // Fixed
                             : Colors.transparent,
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -253,8 +254,8 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
                     color: isSelected
                         ? primaryAccent
                         : themeProvider.isDark
-                            ? Colors.white.withValues(alpha: 0.7)
-                            : Colors.black.withValues(alpha: 0.7),
+                            ? Colors.white.withValues(alpha:0.7) // Fixed
+                            : Colors.black.withValues(alpha:0.7), // Fixed
                     size: 24,
                   ),
                 ),
@@ -280,7 +281,7 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: primaryAccent.withValues(alpha: 0.5),
+                              color: primaryAccent.withValues(alpha:0.5), // Fixed
                               blurRadius: 4,
                               spreadRadius: 1,
                             ),
@@ -325,8 +326,8 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
         color: themeProvider.isDark
-            ? Colors.grey[800]!.withValues(alpha: 0.5)
-            : Colors.white.withValues(alpha: 0.5),
+            ? Colors.grey[800]!.withValues(alpha:0.5) // Fixed
+            : Colors.white.withValues(alpha:0.5), // Fixed
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -404,7 +405,7 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.red.withValues(alpha: 0.3),
+            color: Colors.red.withValues(alpha:0.3), // Fixed
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),

@@ -56,7 +56,10 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                 duration: themeAnimationDuration,
                 child: IconButton(
                   icon: const Icon(Icons.account_circle),
-                  onPressed: () {},
+                  onPressed: () {
+                    // Navigate to the profile page
+                    Navigator.of(context).pushNamed('/profile'); // Ensure you have a route named '/profile' for ProfilePage
+                  },
                   tooltip: 'Perfil',
                   color: isDark ? textColor : Colors.black87,
                 ),
@@ -194,7 +197,7 @@ class NotificationTile extends StatelessWidget {
         leading: AnimatedContainer(
           duration: themeAnimationDuration,
           child: CircleAvatar(
-            backgroundColor: primaryColor.withValues(alpha: 0.1),
+            backgroundColor: primaryColor.withValues(alpha:0.1), // Fixed
             child: Icon(icon, color: primaryColor),
           ),
         ),

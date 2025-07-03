@@ -181,14 +181,13 @@ class _AnimatedAppearanceState extends State<AnimatedAppearance>
     ));
 
     _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.5), // 30px más abajo (proporcional)
+      begin: const Offset(0, 0.5),
       end: Offset.zero,
     ).animate(CurvedAnimation(
       parent: _controller,
       curve: Curves.easeOutCubic,
     ));
 
-    // Iniciar animación con delay
     Future.delayed(Duration(milliseconds: widget.delay), () {
       if (mounted) _controller.forward();
     });
@@ -321,14 +320,19 @@ class _MainContentState extends State<MainContent> {
                   ),
                 ),
                 const SizedBox(height: 32),
-                // Botón Nueva Cita (delay: 300ms)
+                // Botón Nueva Cita (delay: 300ms) - Updated to navigate to appointments with popup
                 AnimatedAppearance(
                   delay: 300,
                   child: SizedBox(
                     width: double.infinity,
                     height: 60,
                     child: ElevatedButton.icon(
-                      onPressed: () => Navigator.pushNamed(context, '/appointments/new'),
+                      onPressed: () {
+                        Navigator.pushNamed(context, '/appointments').then((_) {
+                          // Trigger the popup to open when returning from appointments page
+                          // This will be handled in the appointments page
+                        });
+                      },
                       icon: const Icon(Icons.add, color: Colors.black),
                       label: const Text(
                         'Nueva Cita',
@@ -491,7 +495,7 @@ class _MainContentState extends State<MainContent> {
                   ),
                 ),
                 const SizedBox(height: 40),
-                // Actividad Reciente (delay: 750ms)
+                // Actividad Reciente (delay: 750ms) - Improved design
                 AnimatedAppearance(
                   delay: 750,
                   child: FutureBuilder(
@@ -507,37 +511,54 @@ class _MainContentState extends State<MainContent> {
                       final latestAppointmentData = snapshot.data![1] as Map?;
                       final lastThreeAppointments = snapshot.data![2] as List<Map>;
                       return Container(
-                        padding: const EdgeInsets.all(20),
+                        padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
                           color: widget.initialIsDark ? Colors.grey[850] : Colors.white.withValues(alpha: 0.95),
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(16),
                           border: Border.all(
-                            color: const ui.Color(0xFFBDA206).withValues(alpha: 0.3),
+                            color: const ui.Color(0xFFBDA206).withValues(alpha: 0.2),
                             width: 1,
                           ),
                           boxShadow: [
                             BoxShadow(
                               color: widget.initialIsDark 
                                   ? Colors.black.withValues(alpha: 0.3)
-                                  : Colors.grey.withValues(alpha: 0.15),
+                                  : Colors.grey.withValues(alpha: 0.1),
                               spreadRadius: 1,
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
                             ),
                           ],
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              'Actividad Reciente',
-                              style: TextStyle(
-                                fontSize: 20, 
-                                fontWeight: FontWeight.bold,
-                                color: widget.initialIsDark ? Colors.white : Colors.black87,
-                              ),
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: const ui.Color(0xFFBDA206).withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Icon(
+                                    Icons.timeline,
+                                    color: ui.Color(0xFFBDA206),
+                                    size: 20,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Text(
+                                  'Actividad Reciente',
+                                  style: TextStyle(
+                                    fontSize: 22, 
+                                    fontWeight: FontWeight.bold,
+                                    color: widget.initialIsDark ? Colors.white : Colors.black87,
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 20),
+                            const SizedBox(height: 24),
                             if (isWide)
                               Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -545,6 +566,7 @@ class _MainContentState extends State<MainContent> {
                                   Expanded(
                                     child: ActivityCard(
                                       title: 'Último Cliente',
+                                      icon: Icons.person_add,
                                       content: _buildLatestClient(latestClient, widget.initialIsDark),
                                       isDark: widget.initialIsDark,
                                     ),
@@ -552,7 +574,8 @@ class _MainContentState extends State<MainContent> {
                                   const SizedBox(width: 16),
                                   Expanded(
                                     child: ActivityCard(
-                                      title: 'Última Cita Registrada',
+                                      title: 'Última Cita',
+                                      icon: Icons.event,
                                       content: _buildLatestAppointment(latestAppointmentData, widget.initialIsDark),
                                       isDark: widget.initialIsDark,
                                     ),
@@ -560,7 +583,8 @@ class _MainContentState extends State<MainContent> {
                                   const SizedBox(width: 16),
                                   Expanded(
                                     child: ActivityCard(
-                                      title: 'Últimas 3 Citas',
+                                      title: 'Próximas Citas',
+                                      icon: Icons.schedule,
                                       content: _buildLastThreeAppointments(lastThreeAppointments, widget.initialIsDark),
                                       isDark: widget.initialIsDark,
                                     ),
@@ -572,18 +596,21 @@ class _MainContentState extends State<MainContent> {
                                 children: [
                                   ActivityCard(
                                     title: 'Último Cliente',
+                                    icon: Icons.person_add,
                                     content: _buildLatestClient(latestClient, widget.initialIsDark),
                                     isDark: widget.initialIsDark,
                                   ),
                                   const SizedBox(height: 16),
                                   ActivityCard(
-                                    title: 'Última Cita Registrada',
+                                    title: 'Última Cita',
+                                    icon: Icons.event,
                                     content: _buildLatestAppointment(latestAppointmentData, widget.initialIsDark),
                                     isDark: widget.initialIsDark,
                                   ),
                                   const SizedBox(height: 16),
                                   ActivityCard(
-                                    title: 'Últimas 3 Citas',
+                                    title: 'Próximas Citas',
+                                    icon: Icons.schedule,
                                     content: _buildLastThreeAppointments(lastThreeAppointments, widget.initialIsDark),
                                     isDark: widget.initialIsDark,
                                   ),
@@ -612,9 +639,10 @@ class _MainContentState extends State<MainContent> {
         if (client != null)
           ActivityTile(
             title: client['name'],
-            subtitle: '',
+            subtitle: 'Registrado',
             time: DateFormat('dd/MM/yyyy').format(DateTime.parse(client['registration_date']).toLocal()),
             isDark: isDark,
+            icon: Icons.person,
           )
         else
           Text(
@@ -636,6 +664,7 @@ class _MainContentState extends State<MainContent> {
             subtitle: 'Hora: ${DateTime.parse(appointmentData['start_time']).toLocal().toString().split(' ')[1].substring(0, 5)}',
             time: appointmentData['status'] ?? 'Sin estado',
             isDark: isDark,
+            icon: Icons.event,
           )
         else
           Text(
@@ -653,12 +682,16 @@ class _MainContentState extends State<MainContent> {
         const SizedBox(height: 8),
         if (appointments.isNotEmpty)
           Column(
-            children: appointments.map((appointment) {
-              return ActivityTile(
-                title: appointment['clientName'] ?? 'Cliente desconocido',
-                subtitle: 'Hora: ${DateTime.parse(appointment['start_time']).toLocal().toString().split(' ')[1].substring(0, 5)}',
-                time: appointment['status'] ?? 'Sin estado',
-                isDark: isDark,
+            children: appointments.take(2).map((appointment) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: ActivityTile(
+                  title: appointment['clientName'] ?? 'Cliente desconocido',
+                  subtitle: 'Hora: ${DateTime.parse(appointment['start_time']).toLocal().toString().split(' ')[1].substring(0, 5)}',
+                  time: appointment['status'] ?? 'Sin estado',
+                  isDark: isDark,
+                  icon: Icons.schedule,
+                ),
               );
             }).toList(),
           )
@@ -674,45 +707,59 @@ class _MainContentState extends State<MainContent> {
 
 class ActivityCard extends StatelessWidget {
   final String title;
+  final IconData icon;
   final Widget content;
   final bool isDark;
 
-  const ActivityCard({super.key, required this.title, required this.content, required this.isDark});
+  const ActivityCard({
+    super.key, 
+    required this.title, 
+    required this.icon,
+    required this.content, 
+    required this.isDark
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDark ? Colors.grey[800] : Colors.white,
-        borderRadius: BorderRadius.circular(8),
+        color: isDark ? Colors.grey[800] : Colors.grey[50],
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: const ui.Color(0xFFBDA206).withValues(alpha: 0.3),
+          color: const ui.Color(0xFFBDA206).withValues(alpha: 0.2),
           width: 1,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: isDark ? Colors.black.withValues(alpha: 0.3) : Colors.grey.withValues(alpha: 0.15),
-            spreadRadius: 1,
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: const ui.Color(0xFFBDA206),
-              decoration: TextDecoration.underline,
-              decorationColor: const ui.Color(0xFFBDA206),
-            ),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const ui.Color(0xFFBDA206).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Icon(
+                  icon,
+                  size: 16,
+                  color: const ui.Color(0xFFBDA206),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           content,
         ],
       ),
@@ -890,6 +937,7 @@ class ActionCard extends StatelessWidget {
 class ActivityTile extends StatelessWidget {
   final String title, subtitle, time;
   final bool isDark;
+  final IconData icon;
 
   const ActivityTile({
     super.key,
@@ -897,14 +945,36 @@ class ActivityTile extends StatelessWidget {
     required this.subtitle,
     required this.time,
     required this.isDark,
+    required this.icon,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.grey[700]?.withValues(alpha: 0.3) : Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: isDark ? Colors.grey[600]! : Colors.grey[200]!,
+          width: 0.5,
+        ),
+      ),
       child: Row(
         children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: const ui.Color(0xFFBDA206).withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Icon(
+              icon,
+              size: 16,
+              color: const ui.Color(0xFFBDA206),
+            ),
+          ),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -913,6 +983,7 @@ class ActivityTile extends StatelessWidget {
                   title,
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
+                    fontSize: 14,
                     color: isDark ? Colors.white : Colors.black87,
                   ),
                 ),
@@ -920,20 +991,27 @@ class ActivityTile extends StatelessWidget {
                   Text(
                     subtitle,
                     style: TextStyle(
-                      color: isDark ? Colors.grey[400] : Colors.grey[700],
-                      fontSize: 14,
+                      color: isDark ? Colors.grey[400] : Colors.grey[600],
+                      fontSize: 12,
                     ),
                   ),
               ],
             ),
           ),
           if (time.isNotEmpty)
-            Text(
-              time,
-              style: const TextStyle(
-                color: ui.Color(0xFFBDA206),
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: const ui.Color(0xFFBDA206).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                time,
+                style: const TextStyle(
+                  color: ui.Color(0xFFBDA206),
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                ),
               ),
             ),
         ],

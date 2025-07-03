@@ -875,9 +875,43 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
   }
 
   double _getChildAspectRatio(double width) {
-  if (width < 600) return 1.6;   // Más alto para móviles (era 1.5)
-  if (width < 900) return 1.4;   // Tablets pequeños
-  return 1.1;                    // Web - más compacto (era 1.6)
+    if (width < 600) return 1.6;   // Más alto para móviles (era 1.5)
+    if (width < 900) return 1.4;   // Tablets pequeños
+    return 1.1;                    // Web - más compacto (era 1.6)
+  }
+}
+
+class NotificationsBottomSheet extends StatelessWidget {
+  const NotificationsBottomSheet({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+            'Notificaciones',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 20),
+          const Text('No hay notificaciones nuevas'),
+          const SizedBox(height: 20),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cerrar'),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -1068,7 +1102,33 @@ class ClientCard extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
-                      width: isWide ? 36 : 32, // Más grande en web
+                      width: isWide ? 36 : 32,
+                      height: isWide ? 36 : 32,
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: Colors.blue.withValues(alpha: 0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: IconButton(
+                        padding: EdgeInsets.zero,
+                        icon: Icon(Icons.visibility, size: isWide ? 20 : 18),
+                        color: Colors.blue,
+                        onPressed: isLoading ? null : () {
+                          Navigator.pushNamed(
+                            context, 
+                            '/client_profile',
+                            arguments: client,
+                          );
+                        },
+                        tooltip: 'Ver perfil',
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      width: isWide ? 36 : 32,
                       height: isWide ? 36 : 32,
                       decoration: BoxDecoration(
                         color: primaryColor.withValues(alpha: 0.1),
@@ -1080,7 +1140,7 @@ class ClientCard extends StatelessWidget {
                       ),
                       child: IconButton(
                         padding: EdgeInsets.zero,
-                        icon: Icon(Icons.edit, size: isWide ? 20 : 18), // Más grande en web
+                        icon: Icon(Icons.edit, size: isWide ? 20 : 18),
                         color: primaryColor,
                         onPressed: isLoading ? null : onEdit,
                         tooltip: 'Editar',
@@ -1088,7 +1148,7 @@ class ClientCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 6),
                     Container(
-                      width: isWide ? 36 : 32, // Más grande en web
+                      width: isWide ? 36 : 32,
                       height: isWide ? 36 : 32,
                       decoration: BoxDecoration(
                         color: Colors.red.withValues(alpha: 0.1),
@@ -1100,7 +1160,7 @@ class ClientCard extends StatelessWidget {
                       ),
                       child: IconButton(
                         padding: EdgeInsets.zero,
-                        icon: Icon(Icons.delete, size: isWide ? 20 : 18), // Más grande en web
+                        icon: Icon(Icons.delete, size: isWide ? 20 : 18),
                         color: Colors.red,
                         onPressed: isLoading ? null : onDelete,
                         tooltip: 'Eliminar',
@@ -1250,7 +1310,7 @@ class _ClientPopupState extends State<ClientPopup>
     if (value.length < 2 || value.length > 50) {
       return 'El nombre debe tener entre 2 y 50 caracteres';
     }
-    if (!RegExp(r'^[a-zA-ZÀ-ÿ\u00f1\u00d1\s]+$').hasMatch(value)) {
+    if (!RegExp(r'^[a-zA-ZÀ-ÿñÑ\s]+$').hasMatch(value)) {
       return 'El nombre solo puede contener letras y espacios';
     }
     return null;
@@ -1258,7 +1318,7 @@ class _ClientPopupState extends State<ClientPopup>
 
   String? _validatePhone(String? value) {
     if (value == null || value.isEmpty) return 'El teléfono es requerido';
-    if (!RegExp(r'^\+?[\d\s\-\(\)]{7,15}$').hasMatch(value)) {
+    if (!RegExp(r'^\+?[\d\s\-()]{7,15}$').hasMatch(value)) {
       return 'Formato de teléfono no válido';
     }
     return null;
@@ -1285,7 +1345,7 @@ class _ClientPopupState extends State<ClientPopup>
       animation: _animationController,
       builder: (context, child) {
         return Container(
-          color: Colors.black.withValues(alpha: 0.5 * _opacityAnimation.value),
+          color: Colors.black.withValues(alpha: (0.5 * _opacityAnimation.value).clamp(0.0, 1.0)),
           child: Center(
             child: SlideTransition(
               position: _slideAnimation,

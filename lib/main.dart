@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
+import 'profile_page.dart';
 import 'supabase_service.dart';
 import 'theme_provider.dart';
 import 'login_page.dart' show LoginPage;
 import 'register_page.dart' show RegisterPage;
 import 'dashboard_page.dart' show DashboardPage;
 import 'complete_profile_page.dart' show CompleteProfilePage;
-//import 'appointments_list_page.dart';
-//import 'appointment_edit_page.dart';
+import 'appointments_page.dart' show AppointmentsPage;
 import 'clients_page.dart' show ClientsPage;
 //import 'reports_page.dart';
-//import 'calendar_page.dart';
+import 'client_profile_page.dart' show ClientProfilePage;
+import 'calendar_page.dart' show CalendarPage;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -41,7 +41,7 @@ Future<void> main() async {
 class MyApp extends StatelessWidget {
   final String initialRoute;
   const MyApp({required this.initialRoute, super.key});
-
+  
   @override
   Widget build(BuildContext context) {
     return Consumer<ThemeProvider>(
@@ -54,15 +54,19 @@ class MyApp extends StatelessWidget {
           darkTheme: _buildDarkTheme(),
           initialRoute: initialRoute,
           routes: {
-            '/login': (_) => LoginPage(),
-            '/register': (_) => RegisterPage(),
-            '/complete_profile': (_) => CompleteProfilePage(),
-            '/dashboard': (_) => DashboardPage(),
-            //'/appointments': (_) => AppointmentsListPage(),
-            //'/appointments/new': (_) => AppointmentEditPage(),
-            '/clients': (_) => ClientsPage(),
+            '/login': (_) => const LoginPage(),
+            '/register': (_) => const RegisterPage(),
+            '/complete_profile': (_) => const CompleteProfilePage(),
+            '/dashboard': (_) => const DashboardPage(),
+            '/profile': (context) => const ProfilePage(),
+            '/appointments': (_) => const AppointmentsPage(),
+            '/clients': (_) => const ClientsPage(),
             //'/reports': (_) => ReportsPage(),
-            //'/calendar': (_) => CalendarPage(),
+             '/client_profile': (context) {
+          final client = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+          return ClientProfilePage(client: client);
+        },
+            '/calendar': (_) => const CalendarPage(),
           },
         );
       },
