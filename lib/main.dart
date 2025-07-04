@@ -12,6 +12,7 @@ import 'appointments_page.dart' show AppointmentsPage;
 import 'clients_page.dart' show ClientsPage;
 import 'reports_page.dart';
 import 'client_profile_page.dart' show ClientProfilePage;
+import 'client_history_page.dart' show ClientHistoryPage;
 import 'calendar_page.dart' show CalendarPage;
 
 Future<void> main() async {
@@ -62,10 +63,14 @@ class MyApp extends StatelessWidget {
             '/appointments': (_) => const AppointmentsPage(),
             '/clients': (_) => const ClientsPage(),
             '/reports': (_) => ReportsPage(),
-             '/client_profile': (context) {
-          final client = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
-          return ClientProfilePage(client: client);
-        },
+            '/client_profile': (context) {
+              final client = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+              return ClientProfilePage(client: client);
+            },
+            '/client_history': (context) {
+              final client = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+              return ClientHistoryPage(client: client);
+            },
             '/calendar': (_) => const CalendarPage(),
           },
         );

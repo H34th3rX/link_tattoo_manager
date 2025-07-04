@@ -26,13 +26,13 @@ class ClientsService {
   }
 
   // Obtener todos los clientes de un empleado
-  static Future<List<Map>> getClients(String employeeId) async {
+  static Future<List<Map<String, dynamic>>> getClients(String employeeId) async { // Changed return type
     final response = await client
         .from('clients')
         .select()
         .eq('employee_id', employeeId)
         .order('registration_date', ascending: false);
-    return response;
+    return List<Map<String, dynamic>>.from(response); // Ensure correct type
   }
 
   // Actualizar un cliente existente

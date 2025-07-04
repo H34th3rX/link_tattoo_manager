@@ -175,7 +175,7 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
       {'icon': Icons.calendar_month_rounded, 'label': 'Calendario', 'route': '/calendar'},
       {'icon': Icons.people_rounded, 'label': 'Clientes', 'route': '/clients'},
       {'icon': Icons.picture_as_pdf_rounded, 'label': 'Reportes', 'route': '/reports'},
-      {'icon': Icons.person_rounded, 'label': 'Mi Perfil', 'route': '/profile'}, // Added profile route
+      {'icon': Icons.person_rounded, 'label': 'Mi Perfil', 'route': '/profile'},
     ];
 
     return ListView.builder(

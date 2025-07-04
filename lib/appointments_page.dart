@@ -7,6 +7,7 @@ import 'theme_provider.dart';
 import 'appbar.dart';
 import 'package:intl/intl.dart';
 import 'dart:collection'; // For LinkedHashMap
+import './integrations/clients_service.dart'; // Importar el servicio de clientes
 
 // Constantes globales para la página de citas
 const Color primaryColor = Color(0xFFBDA206);
@@ -24,6 +25,7 @@ const double borderRadius = 12.0;
 const Duration themeAnimationDuration = Duration(milliseconds: 300);
 
 class AppointmentsPage extends StatefulWidget {
+  // Eliminar el argumento del constructor aquí, ya que se obtendrá de las rutas
   const AppointmentsPage({super.key});
 
   @override
@@ -47,6 +49,14 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
   late AnimationController _errorAnimationController;
   late AnimationController _successAnimationController;
 
+  // Added for edit mode
+  Map<String, dynamic>? _appointmentToEdit;
+  // Nuevo: para precargar datos de cliente en una nueva cita
+  Map<String, dynamic>? _initialClientForNewAppointment;
+
+  // Nuevo flag para asegurar que el popup se abra solo una vez
+  bool _hasProcessedInitialPopup = false;
+
   @override
   void initState() {
     super.initState();
@@ -61,7 +71,28 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
     );
     _searchCtrl.addListener(_filterAppointments);
 
-    _fetchAppointments();
+    _fetchAppointments(); // Cargar citas inicialmente
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Verificar si el popup debe abrirse basándose en los argumentos de la ruta
+    if (!_hasProcessedInitialPopup) {
+      final args = ModalRoute.of(context)?.settings.arguments;
+      if (args != null && args is Map<String, dynamic>) {
+        if (args['openNewAppointmentPopup'] == true) {
+          _hasProcessedInitialPopup = true; // Marcar como procesado
+          _initialClientForNewAppointment = args['initialClientData']; // Obtener datos del cliente
+          // Programar la apertura del popup después de que el frame actual se haya construido
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              _openCreateAppointmentPopup(clientData: _initialClientForNewAppointment);
+            }
+          });
+        }
+      }
+    }
   }
 
   @override
@@ -304,16 +335,28 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
     );
   }
 
-  void _openCreateAppointmentPopup() {
-    setState(() => _isPopupOpen = true);
+  void _openCreateAppointmentPopup({Map<String, dynamic>? clientData}) {
+    setState(() {
+      _appointmentToEdit = null; // Clear any previous edit data
+      _initialClientForNewAppointment = clientData; // Set client data for new appointment
+      _isPopupOpen = true;
+    });
   }
 
   void _openEditAppointmentPopup(Map<String, dynamic> appointment) {
-    setState(() => _isPopupOpen = true);
+    setState(() {
+      _appointmentToEdit = appointment; // Set appointment data for editing
+      _initialClientForNewAppointment = null; // Clear client data for new appointment
+      _isPopupOpen = true;
+    });
   }
 
   void _closePopup() {
-    setState(() => _isPopupOpen = false);
+    setState(() {
+      _isPopupOpen = false;
+      _appointmentToEdit = null; // Clear edit data when closing
+      _initialClientForNewAppointment = null; // Clear initial client data when closing
+    });
   }
 
   void _viewAppointmentDetails(Map<String, dynamic> appointment) {
@@ -395,6 +438,9 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
                       child: AppointmentPopup(
                         onClose: _closePopup,
                         isDark: isDark,
+                        employeeId: user.id, // Pass employeeId to the popup
+                        initialAppointment: _appointmentToEdit, // Pass appointment for editing
+                        initialClientData: _initialClientForNewAppointment, // Pass initial client data for new appointment
                       ),
                     ),
                   // Mensajes de error y éxito (centered)
@@ -503,8 +549,8 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
           constraints: const BoxConstraints(maxWidth: 1200),
           child: Padding(
             padding: EdgeInsets.symmetric(
-              horizontal: isWide ? 40 : 24,
-              vertical: 16,
+              horizontal: isWide ? 24 : 16, // Ajustado para menos padding
+              vertical: 16, // Ajustado para menos padding
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -769,7 +815,6 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
             color: isSelected 
                 ? chipColor
                 : (isDark ? Colors.grey[600]! : Colors.grey[300]!),
-            width: 1,
           ),
         ),
         child: Text(
@@ -1259,11 +1304,17 @@ class AppointmentCard extends StatelessWidget {
 class AppointmentPopup extends StatefulWidget {
   final VoidCallback onClose;
   final bool isDark;
+  final String employeeId;
+  final Map<String, dynamic>? initialAppointment; // Added for edit mode
+  final Map<String, dynamic>? initialClientData; // Nuevo: para precargar datos de cliente
 
   const AppointmentPopup({
     super.key,
     required this.onClose,
     required this.isDark,
+    required this.employeeId,
+    this.initialAppointment, // Optional
+    this.initialClientData, // Optional
   });
 
   @override
@@ -1288,6 +1339,9 @@ class _AppointmentPopupState extends State<AppointmentPopup>
   TimeOfDay _selectedTime = TimeOfDay.now();
   int _selectedDuration = 60;
   String _selectedStatus = 'pending';
+  
+  Map<String, dynamic>? _selectedClient; // To store selected client data
+  bool _isClientSelectionPopupOpen = false; // Control visibility of client selection popup
 
   @override
   void initState() {
@@ -1323,6 +1377,33 @@ class _AppointmentPopupState extends State<AppointmentPopup>
     ));
 
     _animationController.forward();
+
+    // Populate fields if in edit mode
+    if (widget.initialAppointment != null) {
+      _clientNameCtrl.text = widget.initialAppointment!['client_name'] ?? '';
+      _clientPhoneCtrl.text = widget.initialAppointment!['client_phone'] ?? '';
+      _clientEmailCtrl.text = widget.initialAppointment!['client_email'] ?? '';
+      _serviceCtrl.text = widget.initialAppointment!['service'] ?? '';
+      _notesCtrl.text = widget.initialAppointment!['notes'] ?? '';
+      
+      _selectedDate = DateTime.parse(widget.initialAppointment!['start_time']);
+      _selectedTime = TimeOfDay.fromDateTime(_selectedDate);
+      _selectedDuration = widget.initialAppointment!['duration'] ?? 60;
+      _selectedStatus = widget.initialAppointment!['status'] ?? 'pending';
+
+      // Simulate setting selected client if client data is available
+      _selectedClient = {
+        'id': widget.initialAppointment!['client_id'], // Assuming client_id exists
+        'name': widget.initialAppointment!['client_name'],
+        'phone': widget.initialAppointment!['client_phone'],
+        'email': widget.initialAppointment!['client_email'],
+      };
+    } else if (widget.initialClientData != null) { // Nuevo: precargar datos de cliente para nueva cita
+      _clientNameCtrl.text = widget.initialClientData!['name'] ?? '';
+      _clientPhoneCtrl.text = widget.initialClientData!['phone'] ?? '';
+      _clientEmailCtrl.text = widget.initialClientData!['email'] ?? '';
+      _selectedClient = widget.initialClientData;
+    }
   }
 
   @override
@@ -1341,6 +1422,33 @@ class _AppointmentPopupState extends State<AppointmentPopup>
     widget.onClose();
   }
 
+  void _selectClient() {
+    setState(() {
+      _isClientSelectionPopupOpen = true;
+    });
+  }
+
+  void _onClientSelected(Map<String, dynamic>? client) {
+    setState(() {
+      _selectedClient = client;
+      if (client != null) {
+        _clientNameCtrl.text = client['name'] ?? '';
+        _clientPhoneCtrl.text = client['phone'] ?? '';
+        _clientEmailCtrl.text = client['email'] ?? '';
+      }
+      _isClientSelectionPopupOpen = false; // Close the client selection popup
+    });
+  }
+
+  void _clearSelectedClient() {
+    setState(() {
+      _selectedClient = null;
+      _clientNameCtrl.clear();
+      _clientPhoneCtrl.clear();
+      _clientEmailCtrl.clear();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -1355,42 +1463,54 @@ class _AppointmentPopupState extends State<AppointmentPopup>
                 scale: _scaleAnimation,
                 child: Opacity(
                   opacity: _opacityAnimation.value,
-                  child: Container(
-                    width: MediaQuery.of(context).size.width * 0.95,
-                    constraints: const BoxConstraints(maxWidth: 600),
-                    margin: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: widget.isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.3),
-                          blurRadius: 20,
-                          offset: const Offset(0, 10),
+                  child: Stack( // Use Stack to overlay the client selection popup
+                    children: [
+                      Container(
+                        width: MediaQuery.of(context).size.width * 0.95,
+                        constraints: const BoxConstraints(maxWidth: 600),
+                        margin: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: widget.isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.3),
+                              blurRadius: 20,
+                              offset: const Offset(0, 10),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                    child: SingleChildScrollView(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Form(
-                          key: _formKey,
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildHeader(),
-                              const SizedBox(height: 24),
-                              _buildClientSection(),
-                              const SizedBox(height: 20),
-                              _buildAppointmentSection(),
-                              const SizedBox(height: 24),
-                              _buildActionButtons(),
-                            ],
+                        child: SingleChildScrollView(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Form(
+                              key: _formKey,
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _buildHeader(),
+                                  const SizedBox(height: 24),
+                                  _buildClientSection(),
+                                  const SizedBox(height: 20),
+                                  _buildAppointmentSection(),
+                                  const SizedBox(height: 24),
+                                  _buildActionButtons(),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
                       ),
-                    ),
+                      if (_isClientSelectionPopupOpen)
+                        Positioned.fill(
+                          child: ClientSelectionDialog(
+                            isDark: widget.isDark,
+                            employeeId: widget.employeeId,
+                            onClientSelected: _onClientSelected, // Pass callback
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ),
@@ -1402,6 +1522,9 @@ class _AppointmentPopupState extends State<AppointmentPopup>
   }
 
   Widget _buildHeader() {
+    final String title = widget.initialAppointment != null ? 'Editar Cita' : 'Nueva Cita';
+    final String subtitle = widget.initialAppointment != null ? 'Modifica los detalles de la cita' : 'Programa una nueva cita con el cliente';
+
     return Row(
       children: [
         Container(
@@ -1427,7 +1550,7 @@ class _AppointmentPopupState extends State<AppointmentPopup>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Nueva Cita',
+                title,
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
@@ -1435,7 +1558,7 @@ class _AppointmentPopupState extends State<AppointmentPopup>
                 ),
               ),
               Text(
-                'Programa una nueva cita con el cliente',
+                subtitle,
                 style: TextStyle(
                   fontSize: 14,
                   color: widget.isDark ? hintColor : Colors.grey[600],
@@ -1464,20 +1587,53 @@ class _AppointmentPopupState extends State<AppointmentPopup>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Icon(
-              Icons.person,
-              color: primaryColor,
-              size: 20,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'Información del Cliente',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: widget.isDark ? textColor : Colors.black87,
+            Expanded( // <--- MODIFICACIÓN CLAVE AQUÍ: Envuelve el Row con Expanded
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.person,
+                    color: primaryColor,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Inf. Cliente',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: widget.isDark ? textColor : Colors.black87,
+                    ),
+                  ),
+                ],
               ),
+            ),
+            Row(
+              children: [
+                if (_selectedClient != null)
+                  IconButton(
+                    icon: Icon(Icons.clear, color: widget.isDark ? hintColor : Colors.grey[600]),
+                    onPressed: _clearSelectedClient,
+                    tooltip: 'Deseleccionar cliente',
+                  ),
+                ElevatedButton.icon(
+                  onPressed: _selectClient,
+                  icon: Icon(Icons.search, color: Colors.black, size: 18),
+                  label: Text(
+                    _selectedClient != null ? 'Cambiar Cliente' : 'Buscar Cliente',
+                    style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryColor,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    elevation: 2,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -1486,6 +1642,7 @@ class _AppointmentPopupState extends State<AppointmentPopup>
           controller: _clientNameCtrl,
           style: TextStyle(color: widget.isDark ? textColor : Colors.black87),
           decoration: _buildInputDecoration('Nombre completo *', Icons.person_outline),
+          readOnly: _selectedClient != null, // Make read-only if client selected
           validator: (value) {
             if (value == null || value.isEmpty) {
               return 'El nombre es requerido';
@@ -1502,12 +1659,13 @@ class _AppointmentPopupState extends State<AppointmentPopup>
                 style: TextStyle(color: widget.isDark ? textColor : Colors.black87),
                 decoration: _buildInputDecoration('Teléfono', Icons.phone_outlined),
                 keyboardType: TextInputType.phone,
+                readOnly: _selectedClient != null, // Make read-only if client selected
                 validator: (value) {
                   if (value != null && value.isNotEmpty && !RegExp(r'^\+?[0-9]{7,15}$').hasMatch(value)) {
                     return 'Ingresa un número de teléfono válido';
                   }
                   return null;
-                },
+                  },
               ),
             ),
             const SizedBox(width: 16),
@@ -1517,6 +1675,7 @@ class _AppointmentPopupState extends State<AppointmentPopup>
                 style: TextStyle(color: widget.isDark ? textColor : Colors.black87),
                 decoration: _buildInputDecoration('Email', Icons.email_outlined),
                 keyboardType: TextInputType.emailAddress,
+                readOnly: _selectedClient != null, // Make read-only if client selected
                 validator: (value) {
                   if (value != null && value.isNotEmpty && !RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) {
                     return 'Ingresa un email válido';
@@ -1684,6 +1843,8 @@ class _AppointmentPopupState extends State<AppointmentPopup>
                   const DropdownMenuItem(value: 'pending', child: Text('Pendiente')),
                   const DropdownMenuItem(value: 'confirmed', child: Text('Confirmada')),
                   const DropdownMenuItem(value: 'in_progress', child: Text('En Proceso')),
+                  // ADDED: DropdownMenuItem for 'cancelled' status
+                  const DropdownMenuItem(value: 'cancelled', child: Text('Cancelada')),
                 ],
                 onChanged: (value) => setState(() => _selectedStatus = value!),
               ),
@@ -1752,95 +1913,100 @@ class _AppointmentPopupState extends State<AppointmentPopup>
   }
 
   Widget _buildActionButtons() {
+    final String buttonText = widget.initialAppointment != null ? 'Actualizar Cita' : 'Guardar Cita';
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        Container(
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: widget.isDark ? Colors.grey[600]! : Colors.grey[300]!,
-            ),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: TextButton(
-            onPressed: _closeWithAnimation,
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+        Expanded( // Envuelve el primer botón con Expanded
+          child: Container(
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: widget.isDark ? Colors.grey[600]! : Colors.grey[300]!,
               ),
+              borderRadius: BorderRadius.circular(10),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.close,
-                  size: 18,
-                  color: widget.isDark ? textColor : Colors.black87,
+            child: TextButton(
+              onPressed: _closeWithAnimation,
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12), // Padding reducido
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                const SizedBox(width: 6),
-                Text(
-                  'Cancelar',
-                  style: TextStyle(
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.close,
+                    size: 18,
                     color: widget.isDark ? textColor : Colors.black87,
-                    fontWeight: FontWeight.w500,
                   ),
-                ),
-              ],
+                  const SizedBox(width: 6),
+                  Text(
+                    'Cancelar',
+                    style: TextStyle(
+                      color: widget.isDark ? textColor : Colors.black87,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
         const SizedBox(width: 12),
-        Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                primaryColor,
-                primaryColor.withValues(alpha: 0.8),
+        Expanded( // Envuelve el segundo botón con Expanded
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  primaryColor,
+                  primaryColor.withValues(alpha: 0.8),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: [
+                BoxShadow(
+                  color: primaryColor.withValues(alpha: 0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
               ],
             ),
-            borderRadius: BorderRadius.circular(10),
-            boxShadow: [
-              BoxShadow(
-                color: primaryColor.withValues(alpha: 0.3),
-                blurRadius: 8,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: ElevatedButton(
-            onPressed: () {
-              if (_formKey.currentState!.validate()) {
-                // Aquí iría la lógica para guardar la cita
-                _closeWithAnimation();
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.transparent,
-              shadowColor: Colors.transparent,
-              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.save,
-                  color: Colors.black,
-                  size: 18,
+            child: ElevatedButton(
+              onPressed: () {
+                if (_formKey.currentState!.validate()) {
+                  // Aquí iría la lógica para guardar/actualizar la cita
+                  _closeWithAnimation();
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.transparent,
+                shadowColor: Colors.transparent,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12), // Padding reducido
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                SizedBox(width: 8),
-                Text(
-                  'Guardar Cita',
-                  style: TextStyle(
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.save,
                     color: Colors.black,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
+                    size: 18,
                   ),
-                ),
-              ],
+                  SizedBox(width: 8),
+                  Text(
+                    buttonText,
+                    style: const TextStyle(
+                      color: Colors.black,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -1895,7 +2061,7 @@ class AppointmentDetailsDialog extends StatelessWidget {
           color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
-            BoxShadow(
+            BoxShadow( // Corregido de BoxBoxShadow a BoxShadow
               color: Colors.black.withValues(alpha: 0.3),
               blurRadius: 20,
               offset: const Offset(0, 10),
@@ -2165,12 +2331,6 @@ class _AnimatedAppearanceState extends State<AnimatedAppearance>
   }
 
   @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return SlideTransition(
       position: _slideAnimation,
@@ -2205,6 +2365,235 @@ class BlurredBackground extends StatelessWidget {
             color: isDark
                 ? const Color.fromRGBO(0, 0, 0, 0.7)
                 : Colors.white.withValues(alpha: 0.85),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// NEW WIDGET: ClientSelectionDialog
+class ClientSelectionDialog extends StatefulWidget {
+  final bool isDark;
+  final String employeeId;
+  final Function(Map<String, dynamic>?) onClientSelected; // Callback to return selected client
+
+  const ClientSelectionDialog({
+    super.key,
+    required this.isDark,
+    required this.employeeId,
+    required this.onClientSelected,
+  });
+
+  @override
+  State<ClientSelectionDialog> createState() => _ClientSelectionDialogState();
+}
+
+class _ClientSelectionDialogState extends State<ClientSelectionDialog> {
+  List<Map<String, dynamic>> _allClients = [];
+  List<Map<String, dynamic>> _filteredClients = [];
+  final TextEditingController _searchController = TextEditingController();
+  bool _loadingClients = false;
+  String? _errorClients;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(_filterClients);
+    _fetchClients();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchClients() async {
+    setState(() {
+      _loadingClients = true;
+      _errorClients = null;
+    });
+    try {
+      final clients = await ClientsService.getClients(widget.employeeId);
+      // Filtrar clientes activos (asumiendo que 'status' es un campo booleano en tu tabla de clientes)
+      final activeClients = clients.where((client) => client['status'] == true).toList();
+      if (mounted) {
+        setState(() {
+          _allClients = activeClients; // Asignar solo clientes activos
+          _filterClients();
+          _loadingClients = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorClients = 'Error al cargar clientes: $e';
+          _loadingClients = false;
+        });
+      }
+    }
+  }
+
+  void _filterClients() {
+    final query = _searchController.text.toLowerCase();
+    setState(() {
+      _filteredClients = _allClients.where((client) {
+        final name = client['name']?.toString().toLowerCase() ?? '';
+        final email = client['email']?.toString().toLowerCase() ?? '';
+        final phone = client['phone']?.toString().toLowerCase() ?? '';
+        return name.contains(query) || email.contains(query) || phone.contains(query);
+      }).toList();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container( // Changed from Dialog to Container for Stack positioning
+      color: Colors.black.withValues(alpha: 0.5), // Dark overlay for the background
+      child: Center(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 600, maxHeight: 700),
+          margin: const EdgeInsets.all(20), // Margin to keep it within bounds
+          decoration: BoxDecoration(
+            color: widget.isDark ? const Color(0xFF1E1E1E) : Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.3),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Seleccionar Cliente',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: widget.isDark ? textColor : Colors.black87,
+                      ),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.close, color: widget.isDark ? textColor : Colors.black87),
+                      onPressed: () => widget.onClientSelected(null), // Pass null on close
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                child: TextField(
+                  controller: _searchController,
+                  style: TextStyle(color: widget.isDark ? textColor : Colors.black87),
+                  decoration: InputDecoration(
+                    hintText: 'Buscar por nombre, email o teléfono...',
+                    hintStyle: TextStyle(color: widget.isDark ? hintColor : Colors.grey[600]),
+                    prefixIcon: Icon(Icons.search, color: widget.isDark ? hintColor : Colors.grey[600]),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: widget.isDark ? Colors.grey[600]! : Colors.grey[300]!),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: widget.isDark ? Colors.grey[600]! : Colors.grey[300]!),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: primaryColor, width: 2),
+                    ),
+                    filled: true,
+                    fillColor: widget.isDark ? Colors.grey[800]?.withValues(alpha: 0.5) : Colors.grey[50],
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: _loadingClients
+                    ? const Center(child: CircularProgressIndicator(color: primaryColor))
+                    : _errorClients != null
+                        ? Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(20),
+                              child: Text(
+                                _errorClients!,
+                                style: TextStyle(color: errorColor, fontSize: 16),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          )
+                        : _filteredClients.isEmpty
+                            ? Center(
+                                child: Text(
+                                  'No se encontraron clientes.',
+                                  style: TextStyle(color: widget.isDark ? hintColor : Colors.grey[600]),
+                                ),
+                              )
+                            : ListView.builder(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                                itemCount: _filteredClients.length,
+                                itemBuilder: (context, index) {
+                                  final client = _filteredClients[index];
+                                  return Card(
+                                    color: widget.isDark ? Colors.grey[800] : Colors.white,
+                                    margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      side: BorderSide(
+                                        color: primaryColor.withValues(alpha: 0.2),
+                                        width: 1,
+                                      ),
+                                    ),
+                                    elevation: 2,
+                                    child: ListTile(
+                                      contentPadding: const EdgeInsets.all(16),
+                                      leading: CircleAvatar(
+                                        backgroundColor: primaryColor.withValues(alpha: 0.2),
+                                        child: Text(
+                                          client['name'] != null && client['name'].isNotEmpty
+                                              ? client['name'][0].toUpperCase()
+                                              : '?',
+                                          style: const TextStyle(color: primaryColor, fontWeight: FontWeight.bold),
+                                        ),
+                                      ),
+                                      title: Text(
+                                        client['name'] ?? 'Nombre Desconocido',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: widget.isDark ? textColor : Colors.black87,
+                                        ),
+                                      ),
+                                      subtitle: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          if (client['email'] != null && client['email'].isNotEmpty)
+                                            Text(
+                                              client['email'],
+                                              style: TextStyle(color: widget.isDark ? hintColor : Colors.grey[600]),
+                                            ),
+                                          if (client['phone'] != null && client['phone'].isNotEmpty)
+                                            Text(
+                                              client['phone'],
+                                              style: TextStyle(color: widget.isDark ? hintColor : Colors.grey[600]),
+                                            ),
+                                        ],
+                                      ),
+                                      onTap: () {
+                                        widget.onClientSelected(client); // Pass selected client back
+                                      },
+                                    ),
+                                  );
+                                },
+                              ),
+              ),
+            ],
           ),
         ),
       ),

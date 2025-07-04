@@ -1,9 +1,11 @@
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'nav_panel.dart';
+import 'appbar.dart';
 
 import 'theme_provider.dart';
-
 
 // Constantes globales para la página de perfil del cliente
 const Color primaryColor = Color(0xFFBDA206);
@@ -34,6 +36,10 @@ class _ClientProfilePageState extends State<ClientProfilePage> with TickerProvid
   late Map<String, dynamic> _clientStats;
   late List<Map<String, dynamic>> _recentTattoos;
 
+  // Added for NavPanel integration
+  String? _userName;
+  late Future<void> _loadUserData;
+
   @override
   void initState() {
     super.initState();
@@ -60,6 +66,7 @@ class _ClientProfilePageState extends State<ClientProfilePage> with TickerProvid
     ));
 
     _initializeClientData();
+    _loadUserData = _fetchUserData(); // Initialize user data loading
     _animationController.forward();
   }
 
@@ -67,7 +74,7 @@ class _ClientProfilePageState extends State<ClientProfilePage> with TickerProvid
     // Simulated client statistics
     _clientStats = {
       'tattoos_count': 3,
-      'total_spent': 550,
+      'total_spent': 550, // Ensure this is a single number for consistent display
       'pending_appointments': 1,
     };
 
@@ -90,6 +97,39 @@ class _ClientProfilePageState extends State<ClientProfilePage> with TickerProvid
         'status': 'Completado',
       },
     ];
+  }
+
+  // Added for NavPanel integration
+  Future<void> _fetchUserData() async {
+    try {
+      final user = Supabase.instance.client.auth.currentUser!;
+      final snapshot = await Supabase.instance.client
+          .from('employees')
+          .select('username')
+          .eq('id', user.id)
+          .maybeSingle();
+      if (mounted) {
+        setState(() {
+          _userName = snapshot?['username'] as String? ?? user.email!.split('@')[0];
+        });
+      }
+    } catch (e) {
+      // Consider using a logging framework or showing a user-friendly message
+      // print('Error al cargar datos del usuario: $e');
+    }
+  }
+
+  // Added for NavPanel integration
+  Future<void> _logout() async {
+    try {
+      await Supabase.instance.client.auth.signOut();
+      if (mounted) {
+        Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+      }
+    } catch (e) {
+      // Consider using a logging framework or showing a user-friendly message
+      // print('Error al cerrar sesión: $e');
+    }
   }
 
   @override
@@ -127,76 +167,97 @@ class _ClientProfilePageState extends State<ClientProfilePage> with TickerProvid
     final themeProvider = Provider.of<ThemeProvider>(context);
     final bool isDark = themeProvider.isDark;
     final bool isWide = MediaQuery.of(context).size.width >= 800;
+    final user = Supabase.instance.client.auth.currentUser!; // Get current user for NavPanel
 
-    return Scaffold(
-      backgroundColor: isDark ? backgroundColor : Colors.grey[100],
-      appBar: AppBar(
-        backgroundColor: isDark ? backgroundColor : Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(
-            Icons.arrow_back,
-            color: isDark ? textColor : Colors.black87,
+    return FutureBuilder(
+      future: _loadUserData,
+      builder: (context, snapshot) {
+        return Scaffold(
+          backgroundColor: isDark ? backgroundColor : Colors.grey[100],
+          appBar: CustomAppBar(
+            title: 'Perfil Cliente',
+            onNotificationPressed: () { /* Implement notification logic if needed */ },
+            isWide: isWide,
           ),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          'Perfil Cliente',
-          style: TextStyle(
-            color: primaryColor,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: Icon(
-              Icons.edit,
-              color: isDark ? textColor : Colors.black87,
-            ),
-            onPressed: () {
-              //  Navigate to edit client page
-            },
-          ),
-        ],
-      ),
-      body: Stack(
-        children: [
-          BlurredBackground(isDark: isDark),
-          FadeTransition(
-            opacity: _fadeAnimation,
-            child: SlideTransition(
-              position: _slideAnimation,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 800),
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isWide ? 40 : 24,
-                        vertical: 24,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildClientInfoCard(isDark),
-                          const SizedBox(height: 24),
-                          _buildStatsCards(isDark),
-                          const SizedBox(height: 32),
-                          _buildRecentTattoosSection(isDark),
-                          const SizedBox(height: 32),
-                          _buildActionButtons(isDark),
-                          const SizedBox(height: 40),
-                        ],
+          drawer: isWide
+              ? null
+              : Drawer(
+                  child: _userName != null
+                      ? NavPanel(
+                          user: user,
+                          onLogout: _logout,
+                          userName: _userName!,
+                        )
+                      : const Center(child: CircularProgressIndicator()),
+                ),
+          body: Stack(
+            children: [
+              BlurredBackground(isDark: isDark),
+              isWide
+                  ? Row(
+                      children: [
+                        SizedBox(
+                          width: 280,
+                          child: _userName != null
+                              ? NavPanel(
+                                  user: user,
+                                  onLogout: _logout,
+                                  userName: _userName!,
+                                )
+                              : const Center(child: CircularProgressIndicator()),
+                        ),
+                        const VerticalDivider(width: 1),
+                        Expanded(
+                          child: FadeTransition(
+                            opacity: _fadeAnimation,
+                            child: SlideTransition(
+                              position: _slideAnimation,
+                              child: _buildMainContent(isDark, isWide),
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  : FadeTransition(
+                      opacity: _fadeAnimation,
+                      child: SlideTransition(
+                        position: _slideAnimation,
+                        child: _buildMainContent(isDark, isWide),
                       ),
                     ),
-                  ),
-                ),
-              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMainContent(bool isDark, bool isWide) {
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 800),
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: isWide ? 24 : 16, // Ajustado para menos padding
+              vertical: 16, // Ajustado para menos padding
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildClientInfoCard(isDark),
+                const SizedBox(height: 16), // Espaciado reducido
+                _buildStatsCards(isDark),
+                const SizedBox(height: 24), // Espaciado reducido
+                _buildRecentTattoosSection(isDark),
+                const SizedBox(height: 24), // Espaciado reducido
+                _buildActionButtons(isDark),
+                const SizedBox(height: 24), // Espaciado reducido
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -324,7 +385,7 @@ class _ClientProfilePageState extends State<ClientProfilePage> with TickerProvid
         const SizedBox(width: 16),
         Expanded(
           child: _buildStatCard(
-            '\$${_clientStats['total_spent']}',
+            '\$${_clientStats['total_spent']}', // Ensure this is a single line string
             'Gastado',
             Icons.attach_money,
             isDark,
@@ -359,11 +420,13 @@ class _ClientProfilePageState extends State<ClientProfilePage> with TickerProvid
         children: [
           Text(
             value,
-            style: TextStyle(
+            style: const TextStyle( // Made const for performance
               fontSize: 32,
               fontWeight: FontWeight.bold,
               color: primaryColor,
             ),
+            softWrap: false, // Prevent text from wrapping
+            overflow: TextOverflow.ellipsis, // Show ellipsis if text overflows
           ),
           const SizedBox(height: 8),
           Text(
@@ -506,7 +569,15 @@ class _ClientProfilePageState extends State<ClientProfilePage> with TickerProvid
           height: 56,
           child: ElevatedButton.icon(
             onPressed: () {
-              Navigator.pushNamed(context, '/appointments');
+              // Navegar a la página de citas y pasar los datos del cliente
+              Navigator.pushNamed(
+                context,
+                '/appointments',
+                arguments: {
+                  'openNewAppointmentPopup': true,
+                  'initialClientData': widget.client, // Pasa el objeto cliente completo
+                },
+              );
             },
             icon: const Icon(Icons.calendar_today, color: Colors.black),
             label: const Text(
@@ -532,7 +603,11 @@ class _ClientProfilePageState extends State<ClientProfilePage> with TickerProvid
           height: 56,
           child: OutlinedButton.icon(
             onPressed: () {
-              // Navigate to full history
+              Navigator.pushNamed(
+                context, 
+                '/client_history',
+                arguments: widget.client,
+              );
             },
             icon: Icon(
               Icons.history,

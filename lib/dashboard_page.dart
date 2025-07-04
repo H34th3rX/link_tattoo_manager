@@ -112,7 +112,6 @@ class _DashboardPageState extends State<DashboardPage> {
 
 class BlurredBackground extends StatelessWidget {
   final bool isDark;
-
   const BlurredBackground({super.key, required this.isDark});
 
   @override
@@ -146,7 +145,6 @@ class AnimatedAppearance extends StatefulWidget {
   final Widget child;
   final int delay;
   final Duration duration;
-
   const AnimatedAppearance({
     super.key,
     required this.child,
@@ -214,7 +212,6 @@ class _AnimatedAppearanceState extends State<AnimatedAppearance>
 class MainContent extends StatefulWidget {
   final User user;
   final bool initialIsDark;
-
   const MainContent({super.key, required this.user, required this.initialIsDark});
 
   @override
@@ -320,7 +317,7 @@ class _MainContentState extends State<MainContent> {
                   ),
                 ),
                 const SizedBox(height: 32),
-                // Botón Nueva Cita (delay: 300ms) - Updated to navigate to appointments with popup
+                // Botón Nueva Cita
                 AnimatedAppearance(
                   delay: 300,
                   child: SizedBox(
@@ -328,10 +325,12 @@ class _MainContentState extends State<MainContent> {
                     height: 60,
                     child: ElevatedButton.icon(
                       onPressed: () {
-                        Navigator.pushNamed(context, '/appointments').then((_) {
-                          // Trigger the popup to open when returning from appointments page
-                          // This will be handled in the appointments page
-                        });
+                        // Navegar a la página de citas y pasar un argumento para abrir el popup
+                        Navigator.pushNamed(
+                          context,
+                          '/appointments',
+                          arguments: {'openNewAppointmentPopup': true},
+                        );
                       },
                       icon: const Icon(Icons.add, color: Colors.black),
                       label: const Text(
@@ -710,7 +709,6 @@ class ActivityCard extends StatelessWidget {
   final IconData icon;
   final Widget content;
   final bool isDark;
-
   const ActivityCard({
     super.key, 
     required this.title, 
@@ -773,7 +771,6 @@ class StatCard extends StatelessWidget {
   final Future<int>? valueFuture;
   final IconData icon;
   final bool isDark;
-
   const StatCard({
     super.key,
     required this.title,
@@ -887,7 +884,6 @@ class ActionCard extends StatelessWidget {
   final Color textColor;
   final bool isDark;
   final VoidCallback onTap;
-
   const ActionCard({
     super.key,
     required this.icon,
@@ -938,7 +934,6 @@ class ActivityTile extends StatelessWidget {
   final String title, subtitle, time;
   final bool isDark;
   final IconData icon;
-
   const ActivityTile({
     super.key,
     required this.title,
