@@ -155,7 +155,7 @@ class _ClientProfilePageState extends State<ClientProfilePage> with TickerProvid
               color: isDark ? textColor : Colors.black87,
             ),
             onPressed: () {
-              // TODO: Navigate to edit client page
+              //  Navigate to edit client page
             },
           ),
         ],
@@ -506,7 +506,6 @@ class _ClientProfilePageState extends State<ClientProfilePage> with TickerProvid
           height: 56,
           child: ElevatedButton.icon(
             onPressed: () {
-              // TODO: Navigate to appointment creation
               Navigator.pushNamed(context, '/appointments');
             },
             icon: const Icon(Icons.calendar_today, color: Colors.black),
@@ -533,7 +532,7 @@ class _ClientProfilePageState extends State<ClientProfilePage> with TickerProvid
           height: 56,
           child: OutlinedButton.icon(
             onPressed: () {
-              // TODO: Navigate to full history
+              // Navigate to full history
             },
             icon: Icon(
               Icons.history,

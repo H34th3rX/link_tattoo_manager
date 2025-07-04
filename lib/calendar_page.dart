@@ -349,117 +349,134 @@ class _CalendarPageState extends State<CalendarPage> with TickerProviderStateMix
     return months[month - 1];
   }
 
-  Widget _buildCalendarGrid(bool isDark) {
-    final daysInMonth = DateTime(_focusedDay.year, _focusedDay.month + 1, 0).day;
-    final firstDayOfMonth = DateTime(_focusedDay.year, _focusedDay.month, 1);
-    final weekdayOfFirstDay = firstDayOfMonth.weekday == 7 ? 0 : firstDayOfMonth.weekday; // Adjust for Sunday = 0
+ Widget _buildCalendarGrid(bool isDark) {
+  final daysInMonth = DateTime(_focusedDay.year, _focusedDay.month + 1, 0).day;
+  final firstDayOfMonth = DateTime(_focusedDay.year, _focusedDay.month, 1);
+  final weekdayOfFirstDay = firstDayOfMonth.weekday == 7 ? 0 : firstDayOfMonth.weekday; // Adjust for Sunday = 0
 
-    final List<String> weekdays = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+  final List<String> weekdays = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
-    return Column(
-      children: [
-        // Weekday headers
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: weekdays.map((day) {
-            return Expanded(
-              child: Center(
-                child: Text(
-                  day,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? hintColor : Colors.grey[600],
-                  ),
+  return Column(
+    children: [
+      // Weekday headers
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: weekdays.map((day) {
+          return Expanded(
+            child: Center(
+              child: Text(
+                day,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? hintColor : Colors.grey[600],
                 ),
               ),
-            );
-          }).toList(),
-        ),
-        const SizedBox(height: 8),
-        // Calendar days
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 7,
-            childAspectRatio: 1.0,
-            mainAxisSpacing: 4,
-            crossAxisSpacing: 4,
-          ),
-          itemCount: daysInMonth + weekdayOfFirstDay,
-          itemBuilder: (context, index) {
-            if (index < weekdayOfFirstDay) {
-              return Container(); // Empty cells for days before the 1st
-            }
-            final day = index - weekdayOfFirstDay + 1;
-            final date = DateTime(_focusedDay.year, _focusedDay.month, day);
-            final isToday = date.year == DateTime.now().year &&
-                            date.month == DateTime.now().month &&
-                            date.day == DateTime.now().day;
-            final hasAppointment = _datesWithAppointments.contains(date);
-            final isSelected = date.year == _selectedDay.year &&
-                               date.month == _selectedDay.month &&
-                               date.day == _selectedDay.day;
+            ),
+          );
+        }).toList(),
+      ),
+      const SizedBox(height: 8),
+      // Calendar days
+      LayoutBuilder(
+        builder: (context, constraints) {
+          final screenWidth = constraints.maxWidth;
+          double aspectRatio;
+          double spacing;
 
-            return GestureDetector(
-              onTap: () {
-                setState(() {
-                  _selectedDay = date;
-                  // Optionally filter appointments for selected day
-                });
-              },
-              child: AnimatedContainer(
-                duration: themeAnimationDuration,
-                decoration: BoxDecoration(
-                  color: hasAppointment
-                      ? primaryColor.withValues(alpha: 0.2)
-                      : (isToday
-                          ? (isDark ? Colors.grey[700] : Colors.grey[200])
-                          : (isDark ? Colors.grey[800] : Colors.white)),
-                  borderRadius: BorderRadius.circular(borderRadius / 2),
-                  border: Border.all(
-                    color: isSelected
-                        ? primaryColor
-                        : (isDark ? Colors.grey[700]! : Colors.grey[300]!),
-                    width: isSelected ? 2 : 1,
-                  ),
-                ),
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Text(
-                      '$day',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                        color: hasAppointment
-                            ? primaryColor
-                            : (isDark ? textColor : Colors.black87),
-                      ),
+          if (screenWidth >= 800) {
+            // Web: más compacto
+            aspectRatio = 1.9; // Ajusta la altura relativa al ancho
+            spacing = 2.0; // Espaciado reducido para web
+          } else {
+            // Móvil/Tablet: mantiene proporción cuadrada o ligeramente más alta
+            aspectRatio = 1.0;
+            spacing = 4.0; // Espaciado estándar para pantallas pequeñas
+          }
+
+          return GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 7,
+              childAspectRatio: aspectRatio,
+              mainAxisSpacing: spacing,
+              crossAxisSpacing: spacing,
+            ),
+            itemCount: daysInMonth + weekdayOfFirstDay,
+            itemBuilder: (context, index) {
+              if (index < weekdayOfFirstDay) {
+                return Container(); // Empty cells for days before the 1st
+              }
+              final day = index - weekdayOfFirstDay + 1;
+              final date = DateTime(_focusedDay.year, _focusedDay.month, day);
+              final isToday = date.year == DateTime.now().year &&
+                              date.month == DateTime.now().month &&
+                              date.day == DateTime.now().day;
+              final hasAppointment = _datesWithAppointments.contains(date);
+              final isSelected = date.year == _selectedDay.year &&
+                                 date.month == _selectedDay.month &&
+                                 date.day == _selectedDay.day;
+
+              return GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _selectedDay = date;
+                    // Optionally filter appointments for selected day
+                  });
+                },
+                child: AnimatedContainer(
+                  duration: themeAnimationDuration,
+                  decoration: BoxDecoration(
+                    color: hasAppointment
+                        ? primaryColor.withValues(alpha: 0.2)
+                        : (isToday
+                            ? (isDark ? Colors.grey[700] : Colors.grey[200])
+                            : (isDark ? Colors.grey[800] : Colors.white)),
+                    borderRadius: BorderRadius.circular(borderRadius / 2),
+                    border: Border.all(
+                      color: isSelected
+                          ? primaryColor
+                          : (isDark ? Colors.grey[700]! : Colors.grey[300]!),
+                      width: isSelected ? 2 : 1,
                     ),
-                    if (hasAppointment)
-                      Positioned(
-                        top: 4,
-                        right: 4,
-                        child: Container(
-                          width: 6,
-                          height: 6,
-                          decoration: const BoxDecoration(
-                            color: Colors.red, // Red dot for appointments
-                            shape: BoxShape.circle,
-                          ),
+                  ),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Text(
+                        '$day',
+                        style: TextStyle(
+                          fontSize: 14, // Reducido de 16 a 14 para web
+                          fontWeight: FontWeight.w500,
+                          color: hasAppointment
+                              ? primaryColor
+                              : (isDark ? textColor : Colors.black87),
                         ),
                       ),
-                  ],
+                      if (hasAppointment)
+                        Positioned(
+                          top: 2,
+                          right: 2,
+                          child: Container(
+                            width: 6,
+                            height: 6,
+                            decoration: const BoxDecoration(
+                              color: Colors.red, // Red dot for appointments
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
-              ),
-            );
-          },
-        ),
-      ],
-    );
-  }
-
+              );
+            },
+          );
+        },
+      ),
+    ],
+  );
+}
   Widget _buildAppointmentsListHeader(bool isDark) {
     return AnimatedDefaultTextStyle(
       duration: themeAnimationDuration,
