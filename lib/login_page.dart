@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'loading_screen.dart';
 
+//[-------------PÁGINA DE INICIO DE SESIÓN--------------]
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
@@ -10,24 +11,23 @@ class LoginPage extends StatefulWidget {
   State<LoginPage> createState() => _LoginPageState();
 }
 
-class _LoginPageState extends State<LoginPage>
-    with SingleTickerProviderStateMixin {
-  // Controllers
+class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMixin {
+  // Controladores para los campos de texto del formulario
   final _credentialCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   
-  // Animation
+  // Controladores y animaciones para efectos de entrada
   late AnimationController _animationController;
   late Animation<Offset> _slideAnimation;
   late Animation<double> _fadeAnimation;
   
-  // State variables
+  // Variables de estado para manejar carga, visibilidad de contraseña y errores
   bool _loading = false;
   bool _obscurePassword = true;
   String? _error;
 
-  // Constants
+  // Constantes de estilo para mantener consistencia visual
   static const Color _accentColor = Color(0xFFBDA206);
   static const Color _backgroundColor = Colors.black;
   static const Color _cardColor = Color.fromRGBO(15, 19, 21, 0.9);
@@ -37,9 +37,12 @@ class _LoginPageState extends State<LoginPage>
   @override
   void initState() {
     super.initState();
+    // Inicializa las animaciones al cargar la página
     _initializeAnimations();
   }
 
+  //[-------------CONFIGURACIÓN DE ANIMACIONES--------------]
+  // Configura las animaciones de deslizamiento y fundido para la entrada del formulario
   void _initializeAnimations() {
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 800),
@@ -67,6 +70,8 @@ class _LoginPageState extends State<LoginPage>
     });
   }
 
+  //[-------------LÓGICA DE INICIO DE SESIÓN--------------]
+  // Maneja el proceso de autenticación con Supabase, permite login con email o nombre de usuario
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -79,11 +84,11 @@ class _LoginPageState extends State<LoginPage>
       final credential = _credentialCtrl.text.trim();
       final password = _passCtrl.text.trim();
 
-      // Determinar si el credential es un email o username
+      // Verifica si la credencial es un email
       final bool isEmail = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(credential);
       
       if (isEmail) {
-        // Si es email, intentar login directo
+        // Login directo con email
         final response = await Supabase.instance.client.auth.signInWithPassword(
           email: credential,
           password: password,
@@ -94,7 +99,7 @@ class _LoginPageState extends State<LoginPage>
           return;
         }
       } else {
-        // Si es username, buscar el email asociado
+        // Busca el email asociado al nombre de usuario
         final userResponse = await Supabase.instance.client
             .from('employees')
             .select('email, username, id')
@@ -104,7 +109,7 @@ class _LoginPageState extends State<LoginPage>
         if (userResponse != null && userResponse['email'] != null) {
           final loginEmail = userResponse['email'] as String;
           
-          // Intentar login con el email encontrado
+          // Intenta login con el email encontrado
           try {
             final response = await Supabase.instance.client.auth.signInWithPassword(
               email: loginEmail,
@@ -128,7 +133,6 @@ class _LoginPageState extends State<LoginPage>
         }
       }
 
-      // Si llegamos aquí, el login falló
       _setError('Credenciales inválidas. Verifica tu email o nombre de usuario y contraseña.');
 
     } catch (e) {
@@ -146,6 +150,8 @@ class _LoginPageState extends State<LoginPage>
     }
   }
 
+  //[-------------REDIRECCIÓN POST-LOGIN--------------]
+  // Verifica si el usuario tiene un perfil completo y redirige apropiadamente
   Future<void> _checkAndRedirect(User user) async {
     final profileExists = await Supabase.instance.client
         .from('employees')
@@ -168,6 +174,8 @@ class _LoginPageState extends State<LoginPage>
     }
   }
 
+  //[-------------MANEJO DE ERRORES--------------]
+  // Establece un mensaje de error y lo elimina tras 5 segundos
   void _setError(String error) {
     setState(() => _error = error);
     Future.delayed(const Duration(seconds: 5), () {
@@ -177,6 +185,7 @@ class _LoginPageState extends State<LoginPage>
     });
   }
 
+  // Valida el campo de email o nombre de usuario
   String? _validateEmailOrUsername(String? value) {
     if (value == null || value.isEmpty) {
       return 'El email o nombre de usuario es requerido';
@@ -192,6 +201,7 @@ class _LoginPageState extends State<LoginPage>
     return null;
   }
 
+  // Traduce errores de autenticación a mensajes amigables
   String _getLocalizedAuthError(String? message) {
     if (message == null) return 'Error de autenticación';
     
@@ -210,6 +220,7 @@ class _LoginPageState extends State<LoginPage>
     return 'Error de autenticación: $message';
   }
 
+  // Valida el campo de contraseña
   String? _validatePassword(String? value) {
     if (value == null || value.isEmpty) {
       return 'La contraseña es requerida';
@@ -220,6 +231,7 @@ class _LoginPageState extends State<LoginPage>
     return null;
   }
 
+  //[-------------CONSTRUCCIÓN DE LA INTERFAZ--------------]
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -233,6 +245,7 @@ class _LoginPageState extends State<LoginPage>
     );
   }
 
+  // Construye el fondo difuminado con el logo
   Widget _buildBackground() {
     return Positioned.fill(
       child: Container(
@@ -256,6 +269,7 @@ class _LoginPageState extends State<LoginPage>
     );
   }
 
+  // Construye el formulario de login con animaciones
   Widget _buildLoginForm() {
     return Center(
       child: SingleChildScrollView(
@@ -299,6 +313,7 @@ class _LoginPageState extends State<LoginPage>
     );
   }
 
+  // Contenido del formulario
   Widget _buildFormContent() {
     return Form(
       key: _formKey,
@@ -324,6 +339,7 @@ class _LoginPageState extends State<LoginPage>
     );
   }
 
+  // Logo de la aplicación
   Widget _buildLogo() {
     return ClipRRect(
       borderRadius: BorderRadius.circular(15),
@@ -335,6 +351,7 @@ class _LoginPageState extends State<LoginPage>
     );
   }
 
+  // Título de la página
   Widget _buildTitle() {
     return Text(
       'LinkTattoo Manager',
@@ -353,6 +370,7 @@ class _LoginPageState extends State<LoginPage>
     );
   }
 
+  // Mensaje de error animado
   Widget _buildErrorMessage() {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
@@ -386,6 +404,7 @@ class _LoginPageState extends State<LoginPage>
     );
   }
 
+  // Campo para email o nombre de usuario
   Widget _buildEmailOrUsernameField() {
     return TextFormField(
       controller: _credentialCtrl,
@@ -399,6 +418,7 @@ class _LoginPageState extends State<LoginPage>
     );
   }
 
+  // Campo para la contraseña con opción de visibilidad
   Widget _buildPasswordField() {
     return TextFormField(
       controller: _passCtrl,
@@ -419,6 +439,7 @@ class _LoginPageState extends State<LoginPage>
     );
   }
 
+  // Decoración común para los campos de texto
   InputDecoration _buildInputDecoration({
     required String label,
     required IconData icon,
@@ -450,6 +471,7 @@ class _LoginPageState extends State<LoginPage>
     );
   }
 
+  // Enlace para recuperar contraseña (en desarrollo)
   Widget _buildForgotPasswordLink() {
     return Align(
       alignment: Alignment.centerRight,
@@ -475,6 +497,7 @@ class _LoginPageState extends State<LoginPage>
     );
   }
 
+  // Botón de inicio de sesión
   Widget _buildLoginButton() {
     return SizedBox(
       width: double.infinity,
@@ -510,6 +533,7 @@ class _LoginPageState extends State<LoginPage>
     );
   }
 
+  // Enlace para registrarse
   Widget _buildRegisterLink() {
     return TextButton(
       onPressed: () => Navigator.pushNamed(context, '/register'),
@@ -534,6 +558,7 @@ class _LoginPageState extends State<LoginPage>
 
   @override
   void dispose() {
+    // Liberar recursos al destruir el widget
     _credentialCtrl.dispose();
     _passCtrl.dispose();
     _animationController.dispose();

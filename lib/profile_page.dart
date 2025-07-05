@@ -7,19 +7,20 @@ import 'theme_provider.dart';
 import 'appbar.dart';
 import './integrations/clients_service.dart';
 import './integrations/employee_service.dart';
-import 'package:intl/intl.dart'; // Import for date formatting
+import 'package:intl/intl.dart'; 
 
-// Constantes globales para la página de perfil
+// Constantes globales para estilos y animaciones
 const Color primaryColor = Color(0xFFBDA206);
-const Color backgroundColor = Colors.black; // Assuming dark mode background
-const Color cardColor = Color.fromRGBO(15, 19, 21, 0.9); // Dark card color
-const Color textColor = Colors.white; // Dark mode text color
-const Color hintColor = Colors.white70; // Dark mode hint text color
+const Color backgroundColor = Colors.black;
+const Color cardColor = Color.fromRGBO(15, 19, 21, 0.9);
+const Color textColor = Colors.white;
+const Color hintColor = Colors.white70;
 const Color errorColor = Color(0xFFCF6679);
 const Color successColor = Color(0xFF4CAF50);
 const double borderRadius = 12.0;
 const Duration themeAnimationDuration = Duration(milliseconds: 300);
 
+//[-------------PÁGINA DE PERFIL--------------]
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
 
@@ -28,6 +29,7 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin {
+  // Variables para datos del perfil y estado
   String? _userName;
   Map<String, dynamic>? _employeeProfile;
   late Future<void> _loadProfileDataFuture;
@@ -45,18 +47,19 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
   late AnimationController _errorAnimationController;
   late AnimationController _successAnimationController;
 
-  // Stats data
+  // Estadísticas del empleado
   int _yearsOfExperience = 0;
   int _totalClients = 0;
   int _appointmentsThisMonth = 0;
 
-  late Future<Map<String, dynamic>?> _nextAppointmentFuture; // New: Future for next appointment
+  late Future<Map<String, dynamic>?> _nextAppointmentFuture;
 
   @override
   void initState() {
     super.initState();
-    _nextAppointmentFuture = Future.value(null); // Initialize with a default value
+    _nextAppointmentFuture = Future.value(null);
     _loadProfileDataFuture = _fetchProfileData();
+    // Controladores para animaciones de mensajes de error y éxito
     _errorAnimationController = AnimationController(
       duration: themeAnimationDuration,
       vsync: this,
@@ -69,6 +72,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
 
   @override
   void dispose() {
+    // Liberar recursos
     _usernameCtrl.dispose();
     _phoneCtrl.dispose();
     _emailCtrl.dispose();
@@ -79,6 +83,8 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
     super.dispose();
   }
 
+  //[-------------CARGA DE DATOS DEL PERFIL--------------]
+  // Obtiene los datos del perfil del empleado desde Supabase
   Future<void> _fetchProfileData() async {
     setState(() {
       _loading = true;
@@ -92,24 +98,18 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
         setState(() {
           _employeeProfile = profile;
           _userName = profile?['username'] as String? ?? user.email!.split('@')[0];
-
-          if (profile != null && profile['start_date'] != null) {
-            _yearsOfExperience = EmployeeService.getYearsOfExperience(
-                DateTime.parse(profile['start_date']));
-          } else {
-            _yearsOfExperience = 0;
-          }
+          _yearsOfExperience = profile != null && profile['start_date'] != null
+              ? EmployeeService.getYearsOfExperience(DateTime.parse(profile['start_date']))
+              : 0;
         });
 
-        // Fetch dynamic stats
+        // Carga estadísticas dinámicas
         _totalClients = await ClientsService.getClientCountByEmployee(user.id);
         _appointmentsThisMonth = await EmployeeService.getAppointmentsThisMonth(user.id);
-        _nextAppointmentFuture = EmployeeService.getNextAppointment(user.id); // Fetch next appointment
+        _nextAppointmentFuture = EmployeeService.getNextAppointment(user.id);
 
         if (mounted) {
-          setState(() {
-            _loading = false;
-          });
+          setState(() => _loading = false);
         }
       }
     } catch (e) {
@@ -118,13 +118,12 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
       }
     } finally {
       if (mounted) {
-        setState(() {
-          _loading = false;
-        });
+        setState(() => _loading = false);
       }
     }
   }
 
+  // Muestra mensaje de error con animación
   void _showError(String message) {
     setState(() {
       _error = message;
@@ -140,6 +139,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
     });
   }
 
+  // Muestra mensaje de éxito con animación
   void _showSuccess(String message) {
     setState(() => _successMessage = message);
     _successAnimationController.forward().then((_) {
@@ -152,6 +152,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
     });
   }
 
+  // Cierra sesión y redirige a la pantalla de login
   Future<void> _logout() async {
     try {
       await Supabase.instance.client.auth.signOut();
@@ -163,6 +164,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
     }
   }
 
+  // Muestra hoja inferior de notificaciones
   void _showNotifications() {
     showModalBottomSheet(
       context: context,
@@ -172,6 +174,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
     );
   }
 
+  // Abre el popup para editar el perfil
   void _openEditProfilePopup() {
     if (_employeeProfile != null) {
       _usernameCtrl.text = _employeeProfile!['username'] ?? '';
@@ -183,11 +186,13 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
     setState(() => _isPopupOpen = true);
   }
 
+  // Cierra el popup y reinicia el formulario
   void _closePopup() {
     setState(() => _isPopupOpen = false);
     _resetForm();
   }
 
+  // Reinicia los campos del formulario
   void _resetForm() {
     _formKey.currentState?.reset();
     _usernameCtrl.clear();
@@ -197,6 +202,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
     _notesCtrl.clear();
   }
 
+  // Guarda los cambios del perfil en Supabase
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -215,7 +221,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
       if (mounted) {
         _showSuccess('Perfil actualizado exitosamente');
         _closePopup();
-        await _fetchProfileData(); // Re-fetch data to update UI
+        await _fetchProfileData();
       }
     } catch (e) {
       if (mounted) {
@@ -228,6 +234,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
     }
   }
 
+  //[-------------CONSTRUCCIÓN DE LA INTERFAZ--------------]
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
@@ -281,10 +288,9 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                           ],
                         )
                       : _buildMainContent(isDark, isWide),
-                  // Popup centrado en el contenido principal
                   if (_isPopupOpen)
                     Positioned.fill(
-                      left: isWide ? 280 : 0, // Offset para el nav panel en web
+                      left: isWide ? 280 : 0,
                       child: ProfileEditPopup(
                         onClose: _closePopup,
                         formKey: _formKey,
@@ -297,14 +303,13 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                         error: _error,
                         saveProfile: _saveProfile,
                         isDark: isDark,
-                        initialSpecialty: _employeeProfile?['specialty'] as String?, // Pass initial specialty
+                        initialSpecialty: _employeeProfile?['specialty'] as String?,
                       ),
                     ),
-                  // Mensajes de error y éxito
                   if (_error != null)
                     Positioned(
                       bottom: 20,
-                      left: isWide ? 296 : 16, // Offset para el nav panel
+                      left: isWide ? 296 : 16,
                       right: 16,
                       child: SlideTransition(
                         position: Tween<Offset>(
@@ -345,7 +350,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                   if (_successMessage != null)
                     Positioned(
                       bottom: 20,
-                      left: isWide ? 296 : 16, // Offset para el nav panel
+                      left: isWide ? 296 : 16,
                       right: 16,
                       child: SlideTransition(
                         position: Tween<Offset>(
@@ -392,6 +397,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
     );
   }
 
+  // Construye el contenido principal de la página
   Widget _buildMainContent(bool isDark, bool isWide) {
     if (_loading && _employeeProfile == null) {
       return const Center(child: CircularProgressIndicator(color: primaryColor));
@@ -428,7 +434,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
       physics: const AlwaysScrollableScrollPhysics(),
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1200), // Adjusted to match dashboard
+          constraints: const BoxConstraints(maxWidth: 1200),
           child: Padding(
             padding: EdgeInsets.symmetric(
               horizontal: isWide ? 40 : 24,
@@ -437,7 +443,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 8), // Added spacing to match dashboard
+                const SizedBox(height: 8),
                 AnimatedAppearance(
                   delay: 0,
                   child: _buildProfileHeader(isDark),
@@ -482,6 +488,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
     );
   }
 
+  // Construye el encabezado del perfil con información del empleado
   Widget _buildProfileHeader(bool isDark) {
     final String initials = (_employeeProfile?['username'] as String? ?? 'UN')
         .split(' ')
@@ -559,7 +566,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(height: 12), // Added spacing for new info
+                    const SizedBox(height: 12),
                     if (_employeeProfile?['phone'] != null && _employeeProfile!['phone'].isNotEmpty)
                       _buildInfoRow(Icons.phone, _employeeProfile!['phone'], isDark),
                     if (_employeeProfile?['email'] != null && _employeeProfile!['email'].isNotEmpty)
@@ -583,6 +590,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
     );
   }
 
+  // Construye filas de información (teléfono, email)
   Widget _buildInfoRow(IconData icon, String text, bool isDark) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2.0),
@@ -609,6 +617,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
     );
   }
 
+  // Construye las tarjetas de estadísticas
   Widget _buildStatCards(bool isDark) {
     return GridView.count(
       shrinkWrap: true,
@@ -616,7 +625,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
       crossAxisCount: MediaQuery.of(context).size.width < 600 ? 2 : 4,
       crossAxisSpacing: 16,
       mainAxisSpacing: 16,
-      childAspectRatio: 1.0, // Make cards square
+      childAspectRatio: 1.0,
       children: [
         ProfileStatCard(
           icon: Icons.emoji_events_outlined,
@@ -628,8 +637,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
         ),
         ProfileStatCard(
           icon: Icons.people_alt_outlined,
-          // ignore: unnecessary_brace_in_string_interps
-          value: '${_totalClients}+',
+          value: '$_totalClients+',
           label: 'Clientes',
           isDark: isDark,
           iconColor: Colors.green.shade600,
@@ -643,7 +651,6 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
           iconColor: Colors.orange.shade600,
           valueColor: Colors.orange.shade600,
         ),
-        // Replaced Rating card with Next Appointment card
         FutureBuilder<Map<String, dynamic>?>(
           future: _nextAppointmentFuture,
           builder: (context, snapshot) {
@@ -658,7 +665,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
               final appointment = snapshot.data!;
               final startTime = DateTime.parse(appointment['start_time']).toLocal();
               nextAppointmentText = DateFormat('HH:mm').format(startTime);
-              nextAppointmentColor = Colors.purple.shade600; // Use a distinct color for active appointment
+              nextAppointmentColor = Colors.purple.shade600;
             }
             return ProfileStatCard(
               icon: Icons.schedule_outlined,
@@ -675,6 +682,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
   }
 }
 
+//[-------------TARJETA DE ESTADÍSTICAS--------------]
 class ProfileStatCard extends StatelessWidget {
   final IconData icon;
   final String value;
@@ -741,6 +749,7 @@ class ProfileStatCard extends StatelessWidget {
   }
 }
 
+//[-------------POPUP DE EDICIÓN DE PERFIL--------------]
 class ProfileEditPopup extends StatefulWidget {
   final VoidCallback onClose;
   final GlobalKey<FormState> formKey;
@@ -753,7 +762,7 @@ class ProfileEditPopup extends StatefulWidget {
   final String? error;
   final Future<void> Function() saveProfile;
   final bool isDark;
-  final String? initialSpecialty; // New prop for initial specialty
+  final String? initialSpecialty;
 
   const ProfileEditPopup({
     super.key,
@@ -768,20 +777,18 @@ class ProfileEditPopup extends StatefulWidget {
     required this.error,
     required this.saveProfile,
     required this.isDark,
-    this.initialSpecialty, // Initialize new prop
+    this.initialSpecialty,
   });
 
   @override
   State<ProfileEditPopup> createState() => _ProfileEditPopupState();
 }
 
-class _ProfileEditPopupState extends State<ProfileEditPopup>
-    with TickerProviderStateMixin {
+class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
   late Animation<double> _opacityAnimation;
   late Animation<Offset> _slideAnimation;
-
   String? _selectedSpecialty;
   bool _isCustomSpecialty = false;
   final List<String> _specialties = ['Tradicional', 'Realismo', 'Acuarela', 'Minimalista', 'Neotradicional', 'Otro'];
@@ -789,12 +796,11 @@ class _ProfileEditPopupState extends State<ProfileEditPopup>
   @override
   void initState() {
     super.initState();
-
+    // Configura animaciones para el popup
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 400),
       vsync: this,
     );
-
     _scaleAnimation = Tween<double>(
       begin: 0.8,
       end: 1.0,
@@ -802,7 +808,6 @@ class _ProfileEditPopupState extends State<ProfileEditPopup>
       parent: _animationController,
       curve: Curves.elasticOut,
     ));
-
     _opacityAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
@@ -810,7 +815,6 @@ class _ProfileEditPopupState extends State<ProfileEditPopup>
       parent: _animationController,
       curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
     ));
-
     _slideAnimation = Tween<Offset>(
       begin: const Offset(0, -0.3),
       end: Offset.zero,
@@ -819,7 +823,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup>
       curve: Curves.easeOutBack,
     ));
 
-    // Initialize specialty dropdown and custom field
+    // Inicializa la especialidad según el valor inicial
     if (widget.initialSpecialty != null && widget.initialSpecialty!.isNotEmpty) {
       if (_specialties.contains(widget.initialSpecialty)) {
         _selectedSpecialty = widget.initialSpecialty;
@@ -830,7 +834,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup>
         widget.specialtyCtrl.text = widget.initialSpecialty!;
       }
     } else {
-      _selectedSpecialty = null; // Ensure no default selection if empty
+      _selectedSpecialty = null;
       _isCustomSpecialty = false;
     }
 
@@ -843,11 +847,13 @@ class _ProfileEditPopupState extends State<ProfileEditPopup>
     super.dispose();
   }
 
+  // Cierra el popup con animación
   void _closeWithAnimation() async {
     await _animationController.reverse();
     widget.onClose();
   }
 
+  // Validaciones para los campos del formulario
   String? _validateUsername(String? value) {
     if (value == null || value.isEmpty) return 'El nombre de usuario es requerido';
     if (value.length < 3 || value.length > 50) {
@@ -857,8 +863,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup>
   }
 
   String? _validatePhone(String? value) {
-    if (value == null || value.isEmpty) return null; // Optional
-    // Regex for phone number: allows +, digits, spaces, hyphens, and parentheses. Min 7, max 15 digits.
+    if (value == null || value.isEmpty) return null;
     if (!RegExp(r'^\+?[\d\s\-()]{7,15}$').hasMatch(value)) {
       return 'Formato de teléfono no válido';
     }
@@ -866,25 +871,24 @@ class _ProfileEditPopupState extends State<ProfileEditPopup>
   }
 
   String? _validateEmail(String? value) {
-    if (value == null || value.isEmpty) return null; // Optional
+    if (value == null || value.isEmpty) return null;
     if (!RegExp(r'^[\w\.-]+@[\w\.-]+\.\w+$').hasMatch(value)) {
       return 'Formato de email no válido';
     }
     return null;
   }
 
+  // Maneja el guardado del formulario
   Future<void> _handleSave() async {
-    debugPrint('Validation result: ${widget.formKey.currentState!.validate()}'); // Debug print
     if (!widget.formKey.currentState!.validate()) {
-      debugPrint('Validation failed. Not saving.'); // Debug print
+      debugPrint('Validation failed. Not saving.');
       return;
     }
 
-    // Update specialtyCtrl based on selected dropdown value
     if (_isCustomSpecialty) {
-      // specialtyCtrl already holds the custom value
+      // specialtyCtrl ya contiene el valor personalizado
     } else {
-      widget.specialtyCtrl.text = _selectedSpecialty ?? ''; // Set to selected value or empty
+      widget.specialtyCtrl.text = _selectedSpecialty ?? '';
     }
 
     await widget.saveProfile();
@@ -949,6 +953,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup>
     );
   }
 
+  // Construye el encabezado del popup
   Widget _buildHeader(bool isDark) {
     return Row(
       children: [
@@ -1007,6 +1012,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup>
     );
   }
 
+  // Construye los campos del formulario
   Widget _buildFormFields(bool isDark) {
     return Column(
       children: [
@@ -1018,10 +1024,10 @@ class _ProfileEditPopupState extends State<ProfileEditPopup>
           isDark: isDark,
           isRequired: true,
           delay: 0,
-          autovalidateMode: AutovalidateMode.onUserInteraction, // Added autovalidateMode
+          autovalidateMode: AutovalidateMode.onUserInteraction,
         ),
         const SizedBox(height: 20),
-        _buildSpecialtyField(isDark), // Use the new specialty field
+        _buildSpecialtyField(isDark),
         const SizedBox(height: 20),
         _buildAnimatedTextField(
           controller: widget.phoneCtrl,
@@ -1031,7 +1037,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup>
           validator: _validatePhone,
           isDark: isDark,
           delay: 100,
-          autovalidateMode: AutovalidateMode.onUserInteraction, // Added autovalidateMode
+          autovalidateMode: AutovalidateMode.onUserInteraction,
         ),
         const SizedBox(height: 20),
         _buildAnimatedTextField(
@@ -1042,7 +1048,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup>
           validator: _validateEmail,
           isDark: isDark,
           delay: 150,
-          autovalidateMode: AutovalidateMode.onUserInteraction, // Added autovalidateMode
+          autovalidateMode: AutovalidateMode.onUserInteraction,
         ),
         const SizedBox(height: 20),
         _buildAnimatedTextField(
@@ -1052,15 +1058,16 @@ class _ProfileEditPopupState extends State<ProfileEditPopup>
           maxLines: 3,
           isDark: isDark,
           delay: 200,
-          autovalidateMode: AutovalidateMode.onUserInteraction, // Added autovalidateMode
+          autovalidateMode: AutovalidateMode.onUserInteraction,
         ),
       ],
     );
   }
 
+  // Construye el campo de especialidad con dropdown
   Widget _buildSpecialtyField(bool isDark) {
     return TweenAnimationBuilder<double>(
-      duration: const Duration(milliseconds: 400 + 50), // Same delay as previous specialty field
+      duration: const Duration(milliseconds: 450),
       tween: Tween(begin: 0.0, end: 1.0),
       builder: (context, value, child) {
         return Transform.translate(
@@ -1083,7 +1090,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup>
                     setState(() {
                       _selectedSpecialty = value;
                       _isCustomSpecialty = value == 'Otro';
-                      if (!_isCustomSpecialty) widget.specialtyCtrl.clear(); // Clear custom field if not 'Otro'
+                      if (!_isCustomSpecialty) widget.specialtyCtrl.clear();
                     });
                   },
                   validator: (value) => value == null ? 'Selecciona una especialidad' : null,
@@ -1123,7 +1130,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup>
                     fillColor: isDark ? Colors.grey[800]?.withValues(alpha: 0.5) : Colors.grey[50],
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                   ),
-                  dropdownColor: isDark ? Colors.grey[800] : Colors.white, // Match popup background
+                  dropdownColor: isDark ? Colors.grey[800] : Colors.white,
                   style: TextStyle(color: isDark ? primaryColor : Colors.black87),
                 ),
                 if (_isCustomSpecialty) ...[
@@ -1134,8 +1141,8 @@ class _ProfileEditPopupState extends State<ProfileEditPopup>
                     icon: Icons.edit,
                     isDark: isDark,
                     validator: (value) => value == null || value.isEmpty ? 'Ingresa una especialidad personalizada' : null,
-                    delay: 250, // Add a slight delay for this field
-                    autovalidateMode: AutovalidateMode.onUserInteraction, // Added autovalidateMode
+                    delay: 250,
+                    autovalidateMode: AutovalidateMode.onUserInteraction,
                   ),
                 ],
               ],
@@ -1146,6 +1153,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup>
     );
   }
 
+  // Construye campos de texto animados
   Widget _buildAnimatedTextField({
     required TextEditingController controller,
     required String label,
@@ -1156,7 +1164,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup>
     int maxLines = 1,
     bool isRequired = false,
     int delay = 0,
-    AutovalidateMode? autovalidateMode, // Added autovalidateMode parameter
+    AutovalidateMode? autovalidateMode,
   }) {
     return TweenAnimationBuilder<double>(
       duration: Duration(milliseconds: 400 + delay),
@@ -1175,7 +1183,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup>
                 color: isDark ? primaryColor : Colors.black87,
                 fontSize: 16,
               ),
-              autovalidateMode: autovalidateMode, // Applied autovalidateMode
+              autovalidateMode: autovalidateMode,
               decoration: InputDecoration(
                 labelText: isRequired ? '$label *' : label,
                 labelStyle: TextStyle(
@@ -1230,6 +1238,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup>
     );
   }
 
+  // Construye el mensaje de error
   Widget _buildErrorMessage() {
     return Container(
       width: double.infinity,
@@ -1271,11 +1280,12 @@ class _ProfileEditPopupState extends State<ProfileEditPopup>
     );
   }
 
+  // Construye los botones de acción del popup
   Widget _buildActionButtons(bool isDark) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        Flexible( // Use Flexible to prevent overflow
+        Flexible(
           child: Container(
             decoration: BoxDecoration(
               border: Border.all(
@@ -1286,7 +1296,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup>
             child: TextButton(
               onPressed: widget.loading ? null : _closeWithAnimation,
               style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8), // Reduced padding further
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
@@ -1312,8 +1322,8 @@ class _ProfileEditPopupState extends State<ProfileEditPopup>
             ),
           ),
         ),
-        const SizedBox(width: 8), // Reduced spacing
-        Flexible( // Use Flexible to prevent overflow
+        const SizedBox(width: 8),
+        Flexible(
           child: Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -1332,11 +1342,11 @@ class _ProfileEditPopupState extends State<ProfileEditPopup>
               ],
             ),
             child: ElevatedButton(
-              onPressed: widget.loading ? null : _handleSave, // Call _handleSave
+              onPressed: widget.loading ? null : _handleSave,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.transparent,
                 shadowColor: Colors.transparent,
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8), // Reduced padding further
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
@@ -1377,6 +1387,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup>
   }
 }
 
+//[-------------ANIMACIÓN DE APARICIÓN--------------]
 class AnimatedAppearance extends StatefulWidget {
   final Widget child;
   final int delay;
@@ -1391,8 +1402,7 @@ class AnimatedAppearance extends StatefulWidget {
   State<AnimatedAppearance> createState() => _AnimatedAppearanceState();
 }
 
-class _AnimatedAppearanceState extends State<AnimatedAppearance>
-    with SingleTickerProviderStateMixin {
+class _AnimatedAppearanceState extends State<AnimatedAppearance> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _opacity;
   late Animation<Offset> _slideAnimation;
@@ -1400,11 +1410,11 @@ class _AnimatedAppearanceState extends State<AnimatedAppearance>
   @override
   void initState() {
     super.initState();
+    // Configura animaciones de opacidad y deslizamiento
     _controller = AnimationController(
       duration: const Duration(milliseconds: 600),
       vsync: this,
     );
-
     _opacity = Tween<double>(
       begin: 0.0,
       end: 1.0,
@@ -1412,7 +1422,6 @@ class _AnimatedAppearanceState extends State<AnimatedAppearance>
       parent: _controller,
       curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
     ));
-
     _slideAnimation = Tween<Offset>(
       begin: const Offset(0, 0.3),
       end: Offset.zero,
@@ -1446,6 +1455,7 @@ class _AnimatedAppearanceState extends State<AnimatedAppearance>
   }
 }
 
+//[-------------FONDO DIFUMINADO--------------]
 class BlurredBackground extends StatelessWidget {
   final bool isDark;
 
@@ -1458,7 +1468,7 @@ class BlurredBackground extends StatelessWidget {
       child: Container(
         decoration: const BoxDecoration(
           image: DecorationImage(
-            image: AssetImage('assets/images/logo.png'), // Assuming this asset exists
+            image: AssetImage('assets/images/logo.png'),
             fit: BoxFit.cover,
           ),
         ),
@@ -1476,6 +1486,7 @@ class BlurredBackground extends StatelessWidget {
   }
 }
 
+//[-------------HOJA INFERIOR DE NOTIFICACIONES--------------]
 class NotificationsBottomSheet extends StatelessWidget {
   const NotificationsBottomSheet({super.key});
 

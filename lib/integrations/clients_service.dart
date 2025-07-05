@@ -1,11 +1,11 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+//[-------------SERVICIO PARA GESTIÓN DE CLIENTES Y CITAS--------------]
 class ClientsService {
   static final client = Supabase.instance.client;
 
-  // --- CRUD para Clientes ---
-
-  // Crear un nuevo cliente
+  //[-------------OPERACIONES CRUD PARA CLIENTES--------------]
+  // Crear un nuevo cliente en la base de datos
   static Future<Map> createClient({
     required String employeeId,
     required String name,
@@ -25,17 +25,17 @@ class ClientsService {
     return response;
   }
 
-  // Obtener todos los clientes de un empleado
-  static Future<List<Map<String, dynamic>>> getClients(String employeeId) async { // Changed return type
+  // Obtener todos los clientes de un empleado, ordenados por fecha de registro
+  static Future<List<Map<String, dynamic>>> getClients(String employeeId) async { 
     final response = await client
         .from('clients')
         .select()
         .eq('employee_id', employeeId)
         .order('registration_date', ascending: false);
-    return List<Map<String, dynamic>>.from(response); // Ensure correct type
+    return List<Map<String, dynamic>>.from(response);
   }
 
-  // Actualizar un cliente existente
+  // Actualizar los datos de un cliente existente
   static Future<Map> updateClient({
     required String clientId,
     required String employeeId,
@@ -61,7 +61,7 @@ class ClientsService {
     return response;
   }
 
-  // Eliminar un cliente
+  // Eliminar un cliente de la base de datos
   static Future<void> deleteClient(String clientId, String employeeId) async {
     await client
         .from('clients')
@@ -70,25 +70,24 @@ class ClientsService {
         .eq('employee_id', employeeId);
   }
 
-// Cambiar el estado de un cliente (activar/desactivar)
-static Future<Map> toggleClientStatus({
-  required String clientId,
-  required String employeeId,
-  required bool newStatus,
-}) async {
-  final response = await client
-      .from('clients')
-      .update({'status': newStatus})
-      .eq('id', clientId)
-      .eq('employee_id', employeeId)
-      .select()
-      .single();
-  return response;
-}
-//--------------------------------------------------------------------------------------//
-  // --- Funciones para el Dashboard ---
+  // Cambiar el estado (activo/inactivo) de un cliente
+  static Future<Map> toggleClientStatus({
+    required String clientId,
+    required String employeeId,
+    required bool newStatus,
+  }) async {
+    final response = await client
+        .from('clients')
+        .update({'status': newStatus})
+        .eq('id', clientId)
+        .eq('employee_id', employeeId)
+        .select()
+        .single();
+    return response;
+  }
 
-  // Obtener el último cliente registrado
+  //[-------------FUNCIONES PARA EL DASHBOARD--------------]
+  // Obtener el cliente más reciente de un empleado
   static Future<Map?> getLatestClient(String employeeId) async {
     final response = await client
         .from('clients')
@@ -100,7 +99,7 @@ static Future<Map> toggleClientStatus({
     return response;
   }
 
-  // Obtener la última cita registrada
+  // Obtener la cita más reciente de un empleado
   static Future<Map?> getLatestAppointment(String employeeId) async {
     final response = await client
         .from('appointments')
@@ -112,7 +111,7 @@ static Future<Map> toggleClientStatus({
     return response;
   }
 
-  // Obtener las últimas 3 citas
+  // Obtener las últimas tres citas de un empleado
   static Future<List<Map>> getLastThreeAppointments(String employeeId) async {
     final response = await client
         .from('appointments')
@@ -133,7 +132,7 @@ static Future<Map> toggleClientStatus({
     return response?['name'] as String?;
   }
 
-  // Obtener el total de clientes por empleado con status = true
+  // Contar el total de clientes activos de un empleado
   static Future<int> getClientCountByEmployee(String employeeId) async {
     final response = await client
         .from('clients')

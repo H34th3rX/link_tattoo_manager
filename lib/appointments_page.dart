@@ -6,13 +6,12 @@ import 'nav_panel.dart';
 import 'theme_provider.dart';
 import 'appbar.dart';
 import 'package:intl/intl.dart';
-import 'dart:collection'; // For LinkedHashMap
-import './integrations/clients_service.dart'; // Importar el servicio de clientes
+import 'dart:collection';
+import './integrations/clients_service.dart';
 
-// Constantes globales para la página de citas
+//[------------- CONSTANTES GLOBALES DE ESTILO --------------]
 const Color primaryColor = Color(0xFFBDA206);
 const Color backgroundColor = Colors.black;
-const Color cardColor = Color.fromRGBO(15, 19, 21, 0.9);
 const Color textColor = Colors.white;
 const Color hintColor = Colors.white70;
 const Color errorColor = Color(0xFFCF6679);
@@ -25,7 +24,6 @@ const double borderRadius = 12.0;
 const Duration themeAnimationDuration = Duration(milliseconds: 300);
 
 class AppointmentsPage extends StatefulWidget {
-  // Eliminar el argumento del constructor aquí, ya que se obtendrá de las rutas
   const AppointmentsPage({super.key});
 
   @override
@@ -49,14 +47,14 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
   late AnimationController _errorAnimationController;
   late AnimationController _successAnimationController;
 
-  // Added for edit mode
+  // Datos para el modo de edición o precarga de nueva cita
   Map<String, dynamic>? _appointmentToEdit;
-  // Nuevo: para precargar datos de cliente en una nueva cita
   Map<String, dynamic>? _initialClientForNewAppointment;
 
-  // Nuevo flag para asegurar que el popup se abra solo una vez
+  // Flag para asegurar que el popup se abra solo una vez al navegar
   bool _hasProcessedInitialPopup = false;
 
+  //[------------- MÉTODOS DE CICLO DE VIDA DEL WIDGET --------------]
   @override
   void initState() {
     super.initState();
@@ -70,21 +68,20 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
       vsync: this,
     );
     _searchCtrl.addListener(_filterAppointments);
-
-    _fetchAppointments(); // Cargar citas inicialmente
+    _fetchAppointments();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Verificar si el popup debe abrirse basándose en los argumentos de la ruta
+    // Abre el popup de nueva cita si se navega con el argumento `openNewAppointmentPopup`
     if (!_hasProcessedInitialPopup) {
       final args = ModalRoute.of(context)?.settings.arguments;
       if (args != null && args is Map<String, dynamic>) {
         if (args['openNewAppointmentPopup'] == true) {
-          _hasProcessedInitialPopup = true; // Marcar como procesado
-          _initialClientForNewAppointment = args['initialClientData']; // Obtener datos del cliente
-          // Programar la apertura del popup después de que el frame actual se haya construido
+          _hasProcessedInitialPopup = true;
+          _initialClientForNewAppointment = args['initialClientData'];
+          // Programa la apertura del popup después de que el frame actual se haya construido
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) {
               _openCreateAppointmentPopup(clientData: _initialClientForNewAppointment);
@@ -103,6 +100,7 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
     super.dispose();
   }
 
+  //[------------- MÉTODOS DE DATOS Y LÓGICA DE NEGOCIO --------------]
   Future<void> _fetchUserData() async {
     try {
       final user = Supabase.instance.client.auth.currentUser!;
@@ -126,14 +124,13 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
       _loading = true;
       _error = null;
     });
-    
     try {
-      // Simulando datos de citas para el diseño
+      // Simulación de datos de citas
       await Future.delayed(const Duration(milliseconds: 500));
       if (mounted) {
         setState(() {
           _appointments = _generateSampleAppointments();
-          _filterAppointments(); // Call filter after fetching to populate _filteredAppointments and _groupedAppointments
+          _filterAppointments();
           _loading = false;
         });
       }
@@ -152,7 +149,7 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
         'client_name': 'María González',
         'service': 'Tatuaje pequeño de mariposa en muñeca con muchos detalles y colores vibrantes',
         'start_time': DateTime(now.year, now.month, now.day, 9, 0).toIso8601String(),
-        'duration': 120, // minutos
+        'duration': 120,
         'status': 'confirmed',
         'notes': 'Diseño de mariposa en muñeca, cliente prefiere colores pastel y un estilo delicado. Traer referencias.',
         'client_phone': '+1 234-567-8901',
@@ -233,17 +230,17 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
       final clientName = appointment['client_name']?.toString().toLowerCase() ?? '';
       final service = appointment['service']?.toString().toLowerCase() ?? '';
       final notes = appointment['notes']?.toString().toLowerCase() ?? '';
-      
-      final matchesSearch = clientName.contains(query) || 
-                           service.contains(query) || 
+
+      final matchesSearch = clientName.contains(query) ||
+                           service.contains(query) ||
                            notes.contains(query);
-      
+
       final matchesStatus = _selectedStatus == 'all' || appointment['status'] == _selectedStatus;
-      
+
       final appointmentDate = DateTime.parse(appointment['start_time']);
       final now = DateTime.now();
       bool matchesDateFilter = true;
-      
+
       switch (_selectedFilter) {
         case 'today':
           matchesDateFilter = appointmentDate.year == now.year &&
@@ -261,10 +258,10 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
                              appointmentDate.month == now.month;
           break;
       }
-      
+
       return matchesSearch && matchesStatus && matchesDateFilter;
     }).toList();
-    
+
     // Ordenar por fecha y hora
     tempFilteredList.sort((a, b) {
       final dateA = DateTime.parse(a['start_time']);
@@ -272,7 +269,7 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
       return dateA.compareTo(dateB);
     });
 
-    // Group by date
+    // Agrupar por fecha
     LinkedHashMap<String, List<Map<String, dynamic>>> newGroupedAppointments = LinkedHashMap();
     for (var appointment in tempFilteredList) {
       final dateKey = DateFormat('dd/MM/yyyy').format(DateTime.parse(appointment['start_time']));
@@ -335,18 +332,19 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
     );
   }
 
+  //[------------- MÉTODOS DE GESTIÓN DE POPUPS Y CITAS --------------]
   void _openCreateAppointmentPopup({Map<String, dynamic>? clientData}) {
     setState(() {
-      _appointmentToEdit = null; // Clear any previous edit data
-      _initialClientForNewAppointment = clientData; // Set client data for new appointment
+      _appointmentToEdit = null;
+      _initialClientForNewAppointment = clientData;
       _isPopupOpen = true;
     });
   }
 
   void _openEditAppointmentPopup(Map<String, dynamic> appointment) {
     setState(() {
-      _appointmentToEdit = appointment; // Set appointment data for editing
-      _initialClientForNewAppointment = null; // Clear client data for new appointment
+      _appointmentToEdit = appointment;
+      _initialClientForNewAppointment = null;
       _isPopupOpen = true;
     });
   }
@@ -354,8 +352,8 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
   void _closePopup() {
     setState(() {
       _isPopupOpen = false;
-      _appointmentToEdit = null; // Clear edit data when closing
-      _initialClientForNewAppointment = null; // Clear initial client data when closing
+      _appointmentToEdit = null;
+      _initialClientForNewAppointment = null;
     });
   }
 
@@ -370,14 +368,14 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
   }
 
   void _deleteAppointment(String id) {
-    // Placeholder for delete logic
     _showSuccess('Cita $id eliminada con éxito (simulado).');
     setState(() {
       _appointments.removeWhere((app) => app['id'] == id);
-      _filterAppointments(); // Re-filter to update the list
+      _filterAppointments();
     });
   }
 
+  //[------------- CONSTRUCCIÓN DE LA INTERFAZ DE USUARIO --------------]
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
@@ -438,12 +436,12 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
                       child: AppointmentPopup(
                         onClose: _closePopup,
                         isDark: isDark,
-                        employeeId: user.id, // Pass employeeId to the popup
-                        initialAppointment: _appointmentToEdit, // Pass appointment for editing
-                        initialClientData: _initialClientForNewAppointment, // Pass initial client data for new appointment
+                        employeeId: user.id,
+                        initialAppointment: _appointmentToEdit,
+                        initialClientData: _initialClientForNewAppointment,
                       ),
                     ),
-                  // Mensajes de error y éxito (centered)
+                  // Mensajes de error y éxito
                   if (_error != null)
                     Positioned(
                       bottom: 20,
@@ -549,8 +547,8 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
           constraints: const BoxConstraints(maxWidth: 1200),
           child: Padding(
             padding: EdgeInsets.symmetric(
-              horizontal: isWide ? 24 : 16, // Ajustado para menos padding
-              vertical: 16, // Ajustado para menos padding
+              horizontal: isWide ? 24 : 16,
+              vertical: 16,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -559,7 +557,6 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
                 const SizedBox(height: 16),
                 _buildFiltersAndSearch(isDark),
                 const SizedBox(height: 16),
-                // Adjusted height for the list to be more flexible
                 SizedBox(
                   height: isWide ? MediaQuery.of(context).size.height * 0.7 : MediaQuery.of(context).size.height * 0.6,
                   child: _buildAppointmentsList(isDark, isWide),
@@ -665,9 +662,9 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
             ),
           ),
         ),
-        
+
         const SizedBox(height: 16),
-        
+
         // Filtros
         Row(
           children: [
@@ -757,12 +754,12 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
         duration: themeAnimationDuration,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected 
+          color: isSelected
               ? primaryColor.withValues(alpha: 0.2)
               : (isDark ? Colors.grey[800] : Colors.white),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isSelected 
+            color: isSelected
                 ? primaryColor
                 : (isDark ? Colors.grey[600]! : Colors.grey[300]!),
             width: 1,
@@ -773,7 +770,7 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w500,
-            color: isSelected 
+            color: isSelected
                 ? primaryColor
                 : (isDark ? hintColor : Colors.grey[600]),
           ),
@@ -785,7 +782,7 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
   Widget _buildStatusFilterChip(String label, String value, String selectedValue, bool isDark, Function(String) onTap) {
     final isSelected = selectedValue == value;
     Color chipColor = primaryColor;
-    
+
     switch (value) {
       case 'confirmed':
         chipColor = confirmedColor;
@@ -800,19 +797,19 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
         chipColor = cancelledColor;
         break;
     }
-    
+
     return GestureDetector(
       onTap: () => onTap(value),
       child: AnimatedContainer(
         duration: themeAnimationDuration,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected 
+          color: isSelected
               ? chipColor.withValues(alpha: 0.2)
               : (isDark ? Colors.grey[800] : Colors.white),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isSelected 
+            color: isSelected
                 ? chipColor
                 : (isDark ? Colors.grey[600]! : Colors.grey[300]!),
           ),
@@ -822,7 +819,7 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w500,
-            color: isSelected 
+            color: isSelected
                 ? chipColor
                 : (isDark ? hintColor : Colors.grey[600]),
           ),
@@ -835,7 +832,7 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
     final confirmedCount = _appointments.where((a) => a['status'] == 'confirmed').length;
     final inProgressCount = _appointments.where((a) => a['status'] == 'in_progress').length;
     final pendingCount = _appointments.where((a) => a['status'] == 'pending').length;
-    
+
     return AnimatedContainer(
       duration: themeAnimationDuration,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -892,7 +889,7 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
     if (_filteredAppointments.isEmpty) {
       String emptyMessage;
       String emptySubmessage;
-      
+
       if (_searchCtrl.text.isNotEmpty) {
         emptyMessage = 'No se encontraron citas';
         emptySubmessage = 'Intenta con otros términos de búsqueda o revisa los filtros';
@@ -903,7 +900,7 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
         emptyMessage = 'No hay citas registradas';
         emptySubmessage = 'Agrega tu primera cita para comenzar';
       }
-      
+
       return Padding(
         padding: const EdgeInsets.only(top: 16),
         child: Center(
@@ -955,7 +952,7 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
                 (context, index) {
                   final dateKey = _groupedAppointments.keys.elementAt(index);
                   final appointmentsForDate = _groupedAppointments[dateKey]!;
-                  
+
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -981,10 +978,10 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
                               shrinkWrap: true,
                               physics: const NeverScrollableScrollPhysics(),
                               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 2, // Two columns for wide screens
+                                crossAxisCount: 2,
                                 crossAxisSpacing: 16,
                                 mainAxisSpacing: 16,
-                                childAspectRatio: 2.5, // Adjust as needed for card height
+                                childAspectRatio: 2.5,
                               ),
                               itemCount: appointmentsForDate.length,
                               itemBuilder: (context, appIndex) {
@@ -1037,6 +1034,7 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
   }
 }
 
+//[------------- WIDGET: AppointmentCard (Tarjeta de Cita) --------------]
 class AppointmentCard extends StatelessWidget {
   final Map<String, dynamic> appointment;
   final bool isDark;
@@ -1064,7 +1062,7 @@ class AppointmentCard extends StatelessWidget {
 
     Color statusColor = primaryColor;
     String statusText = '';
-    
+
     switch (status) {
       case 'confirmed':
         statusColor = confirmedColor;
@@ -1084,7 +1082,6 @@ class AppointmentCard extends StatelessWidget {
         break;
     }
 
-    // Dynamic background and shadow based on status
     final Color cardBgColor = isDark ? Colors.grey[800]! : Colors.white;
     final Color cardBorderColor = isDark ? Colors.grey[700]! : Colors.grey[200]!;
     final Color shadowColor = isDark ? Colors.black26 : Colors.black.withValues(alpha: 0.08);
@@ -1104,7 +1101,6 @@ class AppointmentCard extends StatelessWidget {
             blurRadius: isDark ? 6 : 4,
             offset: const Offset(0, 2),
           ),
-          // Subtle gradient based on status for variety
           BoxShadow(
             color: statusColor.withValues(alpha: isDark ? 0.05 : 0.03),
             blurRadius: 0,
@@ -1117,11 +1113,10 @@ class AppointmentCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header con hora, cliente y estado
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Hora
+                // Hora y duración
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
@@ -1153,7 +1148,7 @@ class AppointmentCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 16),
-                // Información del cliente
+                // Información del cliente y servicio
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1173,8 +1168,8 @@ class AppointmentCard extends StatelessWidget {
                           fontSize: 16,
                           color: isDark ? hintColor : Colors.grey[700],
                         ),
-                        maxLines: 2, // Added maxLines
-                        overflow: TextOverflow.ellipsis, // Added overflow
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       if (appointment['notes'] != null && appointment['notes'].isNotEmpty) ...[
                         const SizedBox(height: 4),
@@ -1191,7 +1186,7 @@ class AppointmentCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                // Estado
+                // Estado de la cita
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
@@ -1213,10 +1208,10 @@ class AppointmentCard extends StatelessWidget {
                 ),
               ],
             ),
-            
+
             const SizedBox(height: 16),
-            
-            // Información adicional y botones
+
+            // Información adicional y botones de acción
             Row(
               children: [
                 // Fecha
@@ -1250,12 +1245,12 @@ class AppointmentCard extends StatelessWidget {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Delete Button (replaces view button)
+                    // Botón de eliminar
                     Container(
                       width: isWide ? 36 : 32,
                       height: isWide ? 36 : 32,
                       decoration: BoxDecoration(
-                        color: errorColor.withValues(alpha: 0.1), // Use error color for delete
+                        color: errorColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(6),
                         border: Border.all(
                           color: errorColor.withValues(alpha: 0.3),
@@ -1264,13 +1259,14 @@ class AppointmentCard extends StatelessWidget {
                       ),
                       child: IconButton(
                         padding: EdgeInsets.zero,
-                        icon: Icon(Icons.delete, size: isWide ? 20 : 18), // Trash icon
+                        icon: Icon(Icons.delete, size: isWide ? 20 : 18),
                         color: errorColor,
-                        onPressed: isLoading ? null : onDelete, // Call onDelete
+                        onPressed: isLoading ? null : onDelete,
                         tooltip: 'Eliminar cita',
                       ),
                     ),
                     const SizedBox(width: 8),
+                    // Botón de editar
                     Container(
                       width: isWide ? 36 : 32,
                       height: isWide ? 36 : 32,
@@ -1301,20 +1297,21 @@ class AppointmentCard extends StatelessWidget {
   }
 }
 
+//[------------- WIDGET: AppointmentPopup (Popup de Creación/Edición de Cita) --------------]
 class AppointmentPopup extends StatefulWidget {
   final VoidCallback onClose;
   final bool isDark;
   final String employeeId;
-  final Map<String, dynamic>? initialAppointment; // Added for edit mode
-  final Map<String, dynamic>? initialClientData; // Nuevo: para precargar datos de cliente
+  final Map<String, dynamic>? initialAppointment;
+  final Map<String, dynamic>? initialClientData;
 
   const AppointmentPopup({
     super.key,
     required this.onClose,
     required this.isDark,
     required this.employeeId,
-    this.initialAppointment, // Optional
-    this.initialClientData, // Optional
+    this.initialAppointment,
+    this.initialClientData,
   });
 
   @override
@@ -1334,19 +1331,19 @@ class _AppointmentPopupState extends State<AppointmentPopup>
   final _clientEmailCtrl = TextEditingController();
   final _serviceCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
-  
+
   DateTime _selectedDate = DateTime.now();
   TimeOfDay _selectedTime = TimeOfDay.now();
   int _selectedDuration = 60;
   String _selectedStatus = 'pending';
-  
-  Map<String, dynamic>? _selectedClient; // To store selected client data
-  bool _isClientSelectionPopupOpen = false; // Control visibility of client selection popup
+
+  Map<String, dynamic>? _selectedClient;
+  bool _isClientSelectionPopupOpen = false;
 
   @override
   void initState() {
     super.initState();
-    
+
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 400),
       vsync: this,
@@ -1378,27 +1375,26 @@ class _AppointmentPopupState extends State<AppointmentPopup>
 
     _animationController.forward();
 
-    // Populate fields if in edit mode
+    // Rellenar campos si está en modo edición o con datos iniciales de cliente
     if (widget.initialAppointment != null) {
       _clientNameCtrl.text = widget.initialAppointment!['client_name'] ?? '';
       _clientPhoneCtrl.text = widget.initialAppointment!['client_phone'] ?? '';
       _clientEmailCtrl.text = widget.initialAppointment!['client_email'] ?? '';
       _serviceCtrl.text = widget.initialAppointment!['service'] ?? '';
       _notesCtrl.text = widget.initialAppointment!['notes'] ?? '';
-      
+
       _selectedDate = DateTime.parse(widget.initialAppointment!['start_time']);
       _selectedTime = TimeOfDay.fromDateTime(_selectedDate);
       _selectedDuration = widget.initialAppointment!['duration'] ?? 60;
       _selectedStatus = widget.initialAppointment!['status'] ?? 'pending';
 
-      // Simulate setting selected client if client data is available
       _selectedClient = {
-        'id': widget.initialAppointment!['client_id'], // Assuming client_id exists
+        'id': widget.initialAppointment!['client_id'],
         'name': widget.initialAppointment!['client_name'],
         'phone': widget.initialAppointment!['client_phone'],
         'email': widget.initialAppointment!['client_email'],
       };
-    } else if (widget.initialClientData != null) { // Nuevo: precargar datos de cliente para nueva cita
+    } else if (widget.initialClientData != null) {
       _clientNameCtrl.text = widget.initialClientData!['name'] ?? '';
       _clientPhoneCtrl.text = widget.initialClientData!['phone'] ?? '';
       _clientEmailCtrl.text = widget.initialClientData!['email'] ?? '';
@@ -1436,7 +1432,7 @@ class _AppointmentPopupState extends State<AppointmentPopup>
         _clientPhoneCtrl.text = client['phone'] ?? '';
         _clientEmailCtrl.text = client['email'] ?? '';
       }
-      _isClientSelectionPopupOpen = false; // Close the client selection popup
+      _isClientSelectionPopupOpen = false;
     });
   }
 
@@ -1463,7 +1459,7 @@ class _AppointmentPopupState extends State<AppointmentPopup>
                 scale: _scaleAnimation,
                 child: Opacity(
                   opacity: _opacityAnimation.value,
-                  child: Stack( // Use Stack to overlay the client selection popup
+                  child: Stack(
                     children: [
                       Container(
                         width: MediaQuery.of(context).size.width * 0.95,
@@ -1507,7 +1503,7 @@ class _AppointmentPopupState extends State<AppointmentPopup>
                           child: ClientSelectionDialog(
                             isDark: widget.isDark,
                             employeeId: widget.employeeId,
-                            onClientSelected: _onClientSelected, // Pass callback
+                            onClientSelected: _onClientSelected,
                           ),
                         ),
                     ],
@@ -1589,7 +1585,7 @@ class _AppointmentPopupState extends State<AppointmentPopup>
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Expanded( // <--- MODIFICACIÓN CLAVE AQUÍ: Envuelve el Row con Expanded
+            Expanded(
               child: Row(
                 children: [
                   Icon(
@@ -1642,7 +1638,7 @@ class _AppointmentPopupState extends State<AppointmentPopup>
           controller: _clientNameCtrl,
           style: TextStyle(color: widget.isDark ? textColor : Colors.black87),
           decoration: _buildInputDecoration('Nombre completo *', Icons.person_outline),
-          readOnly: _selectedClient != null, // Make read-only if client selected
+          readOnly: _selectedClient != null,
           validator: (value) {
             if (value == null || value.isEmpty) {
               return 'El nombre es requerido';
@@ -1659,13 +1655,13 @@ class _AppointmentPopupState extends State<AppointmentPopup>
                 style: TextStyle(color: widget.isDark ? textColor : Colors.black87),
                 decoration: _buildInputDecoration('Teléfono', Icons.phone_outlined),
                 keyboardType: TextInputType.phone,
-                readOnly: _selectedClient != null, // Make read-only if client selected
+                readOnly: _selectedClient != null,
                 validator: (value) {
                   if (value != null && value.isNotEmpty && !RegExp(r'^\+?[0-9]{7,15}$').hasMatch(value)) {
                     return 'Ingresa un número de teléfono válido';
                   }
                   return null;
-                  },
+                },
               ),
             ),
             const SizedBox(width: 16),
@@ -1675,7 +1671,7 @@ class _AppointmentPopupState extends State<AppointmentPopup>
                 style: TextStyle(color: widget.isDark ? textColor : Colors.black87),
                 decoration: _buildInputDecoration('Email', Icons.email_outlined),
                 keyboardType: TextInputType.emailAddress,
-                readOnly: _selectedClient != null, // Make read-only if client selected
+                readOnly: _selectedClient != null,
                 validator: (value) {
                   if (value != null && value.isNotEmpty && !RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) {
                     return 'Ingresa un email válido';
@@ -1815,7 +1811,7 @@ class _AppointmentPopupState extends State<AppointmentPopup>
         const SizedBox(height: 16),
         Row(
           children: [
-            Flexible( // Use Flexible to control width
+            Flexible(
               flex: 1,
               child: DropdownButtonFormField<int>(
                 value: _selectedDuration,
@@ -1825,26 +1821,25 @@ class _AppointmentPopupState extends State<AppointmentPopup>
                 items: [30, 60, 90, 120, 180, 240].map((duration) {
                   return DropdownMenuItem(
                     value: duration,
-                    child: Text('$duration min'), // Shorter text
+                    child: Text('$duration min'),
                   );
                 }).toList(),
                 onChanged: (value) => setState(() => _selectedDuration = value!),
               ),
             ),
             const SizedBox(width: 16),
-            Flexible( // Use Flexible to control width
+            Flexible(
               flex: 1,
               child: DropdownButtonFormField<String>(
                 value: _selectedStatus,
                 decoration: _buildInputDecoration('Estado', Icons.flag_outlined, isDropdown: true),
                 dropdownColor: widget.isDark ? Colors.grey[800] : Colors.white,
                 style: TextStyle(color: widget.isDark ? textColor : Colors.black87),
-                items: [
-                  const DropdownMenuItem(value: 'pending', child: Text('Pendiente')),
-                  const DropdownMenuItem(value: 'confirmed', child: Text('Confirmada')),
-                  const DropdownMenuItem(value: 'in_progress', child: Text('En Proceso')),
-                  // ADDED: DropdownMenuItem for 'cancelled' status
-                  const DropdownMenuItem(value: 'cancelled', child: Text('Cancelada')),
+                items: const [
+                  DropdownMenuItem(value: 'pending', child: Text('Pendiente')),
+                  DropdownMenuItem(value: 'confirmed', child: Text('Confirmada')),
+                  DropdownMenuItem(value: 'in_progress', child: Text('En Proceso')),
+                  DropdownMenuItem(value: 'cancelled', child: Text('Cancelada')),
                 ],
                 onChanged: (value) => setState(() => _selectedStatus = value!),
               ),
@@ -1869,7 +1864,7 @@ class _AppointmentPopupState extends State<AppointmentPopup>
         color: widget.isDark ? hintColor : Colors.grey[600],
         fontSize: 14,
       ),
-      prefixIcon: isDropdown ? null : Container( // Remove prefix icon for dropdowns
+      prefixIcon: isDropdown ? null : Container(
         margin: const EdgeInsets.all(12),
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
@@ -1898,11 +1893,11 @@ class _AppointmentPopupState extends State<AppointmentPopup>
         borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: primaryColor, width: 2),
       ),
-      errorBorder: OutlineInputBorder( // Added error border style
+      errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: errorColor, width: 2),
       ),
-      focusedErrorBorder: OutlineInputBorder( // Added focused error border style
+      focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: errorColor, width: 2),
       ),
@@ -1917,7 +1912,7 @@ class _AppointmentPopupState extends State<AppointmentPopup>
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        Expanded( // Envuelve el primer botón con Expanded
+        Expanded(
           child: Container(
             decoration: BoxDecoration(
               border: Border.all(
@@ -1928,7 +1923,7 @@ class _AppointmentPopupState extends State<AppointmentPopup>
             child: TextButton(
               onPressed: _closeWithAnimation,
               style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12), // Padding reducido
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
@@ -1955,7 +1950,7 @@ class _AppointmentPopupState extends State<AppointmentPopup>
           ),
         ),
         const SizedBox(width: 12),
-        Expanded( // Envuelve el segundo botón con Expanded
+        Expanded(
           child: Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -1976,14 +1971,14 @@ class _AppointmentPopupState extends State<AppointmentPopup>
             child: ElevatedButton(
               onPressed: () {
                 if (_formKey.currentState!.validate()) {
-                  // Aquí iría la lógica para guardar/actualizar la cita
+                  // Lógica para guardar/actualizar la cita
                   _closeWithAnimation();
                 }
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.transparent,
                 shadowColor: Colors.transparent,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12), // Padding reducido
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
@@ -1996,7 +1991,7 @@ class _AppointmentPopupState extends State<AppointmentPopup>
                     color: Colors.black,
                     size: 18,
                   ),
-                  SizedBox(width: 8),
+                  const SizedBox(width: 8),
                   Text(
                     buttonText,
                     style: const TextStyle(
@@ -2015,6 +2010,7 @@ class _AppointmentPopupState extends State<AppointmentPopup>
   }
 }
 
+//[------------- WIDGET: AppointmentDetailsDialog (Diálogo de Detalles de Cita) --------------]
 class AppointmentDetailsDialog extends StatelessWidget {
   final Map<String, dynamic> appointment;
   final bool isDark;
@@ -2033,7 +2029,7 @@ class AppointmentDetailsDialog extends StatelessWidget {
 
     Color statusColor = primaryColor;
     String statusText = '';
-    
+
     switch (status) {
       case 'confirmed':
         statusColor = confirmedColor;
@@ -2061,7 +2057,7 @@ class AppointmentDetailsDialog extends StatelessWidget {
           color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
-            BoxShadow( // Corregido de BoxBoxShadow a BoxShadow
+            BoxShadow(
               color: Colors.black.withValues(alpha: 0.3),
               blurRadius: 20,
               offset: const Offset(0, 10),
@@ -2074,7 +2070,7 @@ class AppointmentDetailsDialog extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header
+              // Encabezado del diálogo
               Row(
                 children: [
                   Container(
@@ -2133,10 +2129,10 @@ class AppointmentDetailsDialog extends StatelessWidget {
                   ),
                 ],
               ),
-              
+
               const SizedBox(height: 24),
-              
-              // Información de la cita
+
+              // Información detallada de la cita
               _buildDetailRow(
                 Icons.person,
                 'Cliente',
@@ -2188,9 +2184,9 @@ class AppointmentDetailsDialog extends StatelessWidget {
                   appointment['notes'],
                   isDark,
                 ),
-              
+
               const SizedBox(height: 24),
-              
+
               // Botones de acción
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
@@ -2279,6 +2275,7 @@ class AppointmentDetailsDialog extends StatelessWidget {
   }
 }
 
+//[------------- WIDGET: AnimatedAppearance (Animación de Aparición) --------------]
 class AnimatedAppearance extends StatefulWidget {
   final Widget child;
   final int delay;
@@ -2342,6 +2339,7 @@ class _AnimatedAppearanceState extends State<AnimatedAppearance>
   }
 }
 
+//[------------- WIDGET: BlurredBackground (Fondo Difuminado) --------------]
 class BlurredBackground extends StatelessWidget {
   final bool isDark;
 
@@ -2372,11 +2370,11 @@ class BlurredBackground extends StatelessWidget {
   }
 }
 
-// NEW WIDGET: ClientSelectionDialog
+//[------------- WIDGET: ClientSelectionDialog (Diálogo de Selección de Cliente) --------------]
 class ClientSelectionDialog extends StatefulWidget {
   final bool isDark;
   final String employeeId;
-  final Function(Map<String, dynamic>?) onClientSelected; // Callback to return selected client
+  final Function(Map<String, dynamic>?) onClientSelected;
 
   const ClientSelectionDialog({
     super.key,
@@ -2416,11 +2414,11 @@ class _ClientSelectionDialogState extends State<ClientSelectionDialog> {
     });
     try {
       final clients = await ClientsService.getClients(widget.employeeId);
-      // Filtrar clientes activos (asumiendo que 'status' es un campo booleano en tu tabla de clientes)
+      // Filtrar clientes activos
       final activeClients = clients.where((client) => client['status'] == true).toList();
       if (mounted) {
         setState(() {
-          _allClients = activeClients; // Asignar solo clientes activos
+          _allClients = activeClients;
           _filterClients();
           _loadingClients = false;
         });
@@ -2449,12 +2447,12 @@ class _ClientSelectionDialogState extends State<ClientSelectionDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return Container( // Changed from Dialog to Container for Stack positioning
-      color: Colors.black.withValues(alpha: 0.5), // Dark overlay for the background
+    return Container(
+      color: Colors.black.withValues(alpha: 0.5),
       child: Center(
         child: Container(
           constraints: const BoxConstraints(maxWidth: 600, maxHeight: 700),
-          margin: const EdgeInsets.all(20), // Margin to keep it within bounds
+          margin: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: widget.isDark ? const Color(0xFF1E1E1E) : Colors.white,
             borderRadius: BorderRadius.circular(20),
@@ -2483,7 +2481,7 @@ class _ClientSelectionDialogState extends State<ClientSelectionDialog> {
                     ),
                     IconButton(
                       icon: Icon(Icons.close, color: widget.isDark ? textColor : Colors.black87),
-                      onPressed: () => widget.onClientSelected(null), // Pass null on close
+                      onPressed: () => widget.onClientSelected(null),
                     ),
                   ],
                 ),
@@ -2586,7 +2584,7 @@ class _ClientSelectionDialogState extends State<ClientSelectionDialog> {
                                         ],
                                       ),
                                       onTap: () {
-                                        widget.onClientSelected(client); // Pass selected client back
+                                        widget.onClientSelected(client);
                                       },
                                     ),
                                   );

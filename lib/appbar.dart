@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'theme_provider.dart';
 
-// Constantes para el AppBar
+//[-------------CONSTANTES GLOBALES--------------]
 const Color primaryColor = Color(0xFFBDA206);
 const Color textColor = Colors.white;
 const Duration themeAnimationDuration = Duration(milliseconds: 300);
 
+//[-------------APPBAR PERSONALIZADO--------------]
 class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
   final VoidCallback onNotificationPressed;
@@ -24,7 +25,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     return Consumer<ThemeProvider>(
       builder: (context, themeProvider, child) {
         final bool isDark = themeProvider.isDark;
-        
+
         return AnimatedContainer(
           duration: themeAnimationDuration,
           decoration: BoxDecoration(
@@ -56,10 +57,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                 duration: themeAnimationDuration,
                 child: IconButton(
                   icon: const Icon(Icons.account_circle),
-                  onPressed: () {
-                    // Navigate to the profile page
-                    Navigator.of(context).pushNamed('/profile'); // Ensure you have a route named '/profile' for ProfilePage
-                  },
+                  onPressed: () => Navigator.of(context).pushNamed('/profile'),
                   tooltip: 'Perfil',
                   color: isDark ? textColor : Colors.black87,
                 ),
@@ -69,16 +67,14 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
             leading: isWide
                 ? null
                 : Builder(
-                    builder: (ctx) {
-                      return AnimatedContainer(
-                        duration: themeAnimationDuration,
-                        child: IconButton(
-                          icon: const Icon(Icons.menu),
-                          onPressed: () => Scaffold.of(ctx).openDrawer(),
-                          color: isDark ? textColor : Colors.black87,
-                        ),
-                      );
-                    },
+                    builder: (ctx) => AnimatedContainer(
+                      duration: themeAnimationDuration,
+                      child: IconButton(
+                        icon: const Icon(Icons.menu),
+                        onPressed: () => Scaffold.of(ctx).openDrawer(),
+                        color: isDark ? textColor : Colors.black87,
+                      ),
+                    ),
                   ),
           ),
         );
@@ -90,9 +86,10 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
 }
 
+//[-------------HOJA INFERIOR DE NOTIFICACIONES--------------]
 class NotificationsBottomSheet extends StatelessWidget {
   const NotificationsBottomSheet({super.key});
-  
+
   @override
   Widget build(BuildContext context) {
     return Consumer<ThemeProvider>(
@@ -100,14 +97,12 @@ class NotificationsBottomSheet extends StatelessWidget {
         final bool isDark = themeProvider.isDark;
         const Color cardColor = Color.fromRGBO(15, 19, 21, 0.9);
         const double borderRadius = 12.0;
-        
+
         return AnimatedContainer(
           duration: themeAnimationDuration,
           decoration: BoxDecoration(
             color: isDark ? cardColor : Colors.white,
-            borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(borderRadius),
-            ),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(borderRadius)),
           ),
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -171,6 +166,7 @@ class NotificationsBottomSheet extends StatelessWidget {
   }
 }
 
+//[-------------ELEMENTO DE NOTIFICACIÓN--------------]
 class NotificationTile extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -190,14 +186,14 @@ class NotificationTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const Color hintColor = Colors.white70;
-    
+
     return AnimatedContainer(
       duration: themeAnimationDuration,
       child: ListTile(
         leading: AnimatedContainer(
           duration: themeAnimationDuration,
           child: CircleAvatar(
-            backgroundColor: primaryColor.withValues(alpha:0.1), // Fixed
+            backgroundColor: primaryColor.withValues(alpha: 0.1),
             child: Icon(icon, color: primaryColor),
           ),
         ),

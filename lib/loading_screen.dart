@@ -1,96 +1,99 @@
+// Importaciones necesarias para animaciones, UI y matemáticas
 import 'dart:ui' as ui;
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
+//[-------------PANTALLA DE CARGA ANIMADA--------------]
 class LoadingScreen extends StatefulWidget {
-  final String userName;
+  final String userName; // Nombre del usuario recibido como parámetro
   const LoadingScreen({super.key, required this.userName});
 
   @override
   State<LoadingScreen> createState() => _LoadingScreenState();
 }
 
+// Estado de la pantalla de carga con animaciones
 class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateMixin {
-  late AnimationController _mainController;
-  late AnimationController _pulseController;
-  late AnimationController _rotationController;
-  late AnimationController _particleController;
-  late AnimationController _textController;
+  // Controladores de animación para diferentes efectos
+  late AnimationController _mainController; // Controla la animación principal
+  late AnimationController _pulseController; // Controla el efecto de pulso
+  late AnimationController _rotationController; // Controla la rotación de los anillos
+  late AnimationController _particleController; // Controla las partículas flotantes
+  late AnimationController _textController; // Controla la animación del texto
   
-  late Animation<double> _progressAnimation;
-  late Animation<double> _borderAnimation;
-  late Animation<double> _pulseAnimation;
-  late Animation<double> _rotationAnimation;
+  // Animaciones definidas
+  late Animation<double> _progressAnimation; // Animación de la barra de progreso
+  late Animation<double> _borderAnimation; // Animación del borde del contenedor
+  late Animation<double> _pulseAnimation; // Animación de pulso del contenedor
+  late Animation<double> _rotationAnimation; // Animación de rotación de los anillos
 
-  late Animation<double> _scaleAnimation;
-  late Animation<double> _fadeAnimation;
-  late Animation<Offset> _slideAnimation;
+  late Animation<double> _scaleAnimation; // Animación de escala para el texto
+  late Animation<double> _fadeAnimation; // Animación de opacidad para el texto
+  late Animation<Offset> _slideAnimation; // Animación de deslizamiento para el texto
 
   @override
   void initState() {
     super.initState();
     
-    // Controlador principal
+    // Inicialización del controlador principal (4 segundos)
     _mainController = AnimationController(
       duration: const Duration(seconds: 4),
       vsync: this,
     );
     
-    // Controlador de pulso
+    // Controlador para el efecto de pulso, repetitivo
     _pulseController = AnimationController(
       duration: const Duration(milliseconds: 1500),
       vsync: this,
     )..repeat(reverse: true);
     
-    // Controlador de rotación
+    // Controlador para la rotación de los anillos, repetitivo
     _rotationController = AnimationController(
       duration: const Duration(seconds: 3),
       vsync: this,
     )..repeat();
     
-    // Controlador de partículas
+    // Controlador para las partículas flotantes, repetitivo
     _particleController = AnimationController(
       duration: const Duration(seconds: 2),
       vsync: this,
     )..repeat();
     
-    // Controlador de texto
+    // Controlador para la animación del texto de bienvenida
     _textController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
     );
 
-    // Animaciones
+    // Configuración de las animaciones
     _progressAnimation = CurvedAnimation(
       parent: _mainController, 
-      curve: const Interval(0.2, 1.0, curve: Curves.easeInOutCubic)
+      curve: const Interval(0.2, 1.0, curve: Curves.easeInOutCubic), // Progreso suave
     );
     
     _borderAnimation = CurvedAnimation(
       parent: _mainController, 
-      curve: Curves.easeInOut
+      curve: Curves.easeInOut, // Animación del borde
     );
     
     _pulseAnimation = CurvedAnimation(
       parent: _pulseController, 
-      curve: Curves.easeInOut
+      curve: Curves.easeInOut, // Efecto de pulso suave
     );
     
     _rotationAnimation = CurvedAnimation(
       parent: _rotationController, 
-      curve: Curves.linear
+      curve: Curves.linear, // Rotación continua
     );
-    
-
     
     _scaleAnimation = CurvedAnimation(
       parent: _textController, 
-      curve: Curves.elasticOut
+      curve: Curves.elasticOut, // Efecto elástico para el texto
     );
     
     _fadeAnimation = CurvedAnimation(
       parent: _textController, 
-      curve: const Interval(0.0, 0.6, curve: Curves.easeIn)
+      curve: const Interval(0.0, 0.6, curve: Curves.easeIn), // Fundido del texto
     );
     
     _slideAnimation = Tween<Offset>(
@@ -98,14 +101,14 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
       end: Offset.zero,
     ).animate(CurvedAnimation(
       parent: _textController, 
-      curve: Curves.easeOutBack
+      curve: Curves.easeOutBack, // Deslizamiento suave
     ));
 
-    // Iniciar animaciones
+    // Iniciar las animaciones principales
     _mainController.forward();
     _textController.forward();
 
-    // Redirigir al dashboard cuando la animación llegue al 100%
+    // Redirigir al dashboard cuando la animación principal llegue al 100%
     _mainController.addStatusListener((status) {
       if (status == AnimationStatus.completed && mounted) {
         Navigator.pushReplacementNamed(context, '/dashboard');
@@ -115,6 +118,7 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
 
   @override
   void dispose() {
+    // Liberar recursos al destruir el widget
     _mainController.dispose();
     _pulseController.dispose();
     _rotationController.dispose();
@@ -125,6 +129,7 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
+    // Constantes de estilo para mantener consistencia visual
     const Color accentColor = Color(0xFFBDA206);
     const Color cardColor = Color.fromRGBO(15, 19, 21, 0.9);
     const Color textColor = Colors.white;
@@ -147,18 +152,18 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
                 ),
               ),
               child: BackdropFilter(
-                filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10), // Efecto de desenfoque
                 child: Container(
-                  color: const Color.fromRGBO(0, 0, 0, 0.4),
+                  color: const Color.fromRGBO(0, 0, 0, 0.4), // Capa de opacidad
                 ),
               ),
             ),
           ),
           
-          // Partículas flotantes
+          // Generar 8 partículas flotantes animadas
           ...List.generate(8, (index) => _buildFloatingParticle(index, accentColor)),
           
-          // Cuadro centralizado con información
+          // Contenedor central con animaciones
           Center(
             child: AnimatedBuilder(
               animation: Listenable.merge([
@@ -166,10 +171,10 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
                 _pulseController, 
                 _rotationController,
                 _textController
-              ]),
+              ]), // Escucha múltiples controladores
               builder: (context, child) {
                 return Transform.scale(
-                  scale: 1.0 + (_pulseAnimation.value * 0.02),
+                  scale: 1.0 + (_pulseAnimation.value * 0.02), // Efecto de pulso
                   child: Container(
                     width: 340,
                     padding: const EdgeInsets.all(30),
@@ -196,11 +201,11 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Icono animado con anillos
+                        // Icono animado con anillos rotatorios
                         Stack(
                           alignment: Alignment.center,
                           children: [
-                            // Anillos externos rotatorios
+                            // Anillo externo 1 (rotación en sentido horario)
                             Transform.rotate(
                               angle: _rotationAnimation.value * 2 * math.pi,
                               child: Container(
@@ -215,6 +220,7 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
                                 ),
                               ),
                             ),
+                            // Anillo externo 2 (rotación en sentido antihorario)
                             Transform.rotate(
                               angle: -_rotationAnimation.value * 1.5 * math.pi,
                               child: Container(
@@ -229,7 +235,7 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
                                 ),
                               ),
                             ),
-                            // Icono central
+                            // Icono central con gradiente
                             Container(
                               width: 80,
                               height: 80,
@@ -253,7 +259,7 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
                         
                         const SizedBox(height: 30),
                         
-                        // Texto de bienvenida animado
+                        // Texto de bienvenida con animaciones
                         SlideTransition(
                           position: _slideAnimation,
                           child: FadeTransition(
@@ -282,10 +288,10 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
                         
                         const SizedBox(height: 40),
                         
-                        // Barra de progreso futurista
+                        // Barra de progreso animada
                         Stack(
                           children: [
-                            // Contenedor base
+                            // Contenedor base de la barra
                             Container(
                               height: 12,
                               width: double.infinity,
@@ -298,7 +304,7 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
                                 ),
                               ),
                             ),
-                            // Barra de progreso animada
+                            // Barra de progreso con gradiente
                             SizedBox(
                               height: 12,
                               child: FractionallySizedBox(
@@ -328,7 +334,7 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
                                 ),
                               ),
                             ),
-                            // Efecto de brillo móvil
+                            // Efecto de brillo móvil en la barra
                             if (_progressAnimation.value > 0)
                               Positioned(
                                 left: (_progressAnimation.value * 280) - 20,
@@ -352,7 +358,7 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
                         
                         const SizedBox(height: 20),
                         
-                        // Porcentaje animado
+                        // Porcentaje de progreso animado
                         AnimatedBuilder(
                           animation: _progressAnimation,
                           builder: (context, child) {
@@ -385,23 +391,24 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
     );
   }
 
+  // Construye una partícula flotante con animación
   Widget _buildFloatingParticle(int index, Color accentColor) {
     final random = math.Random(index);
-    final startX = random.nextDouble() * 400;
-    final startY = random.nextDouble() * 800;
-    final size = 3.0 + random.nextDouble() * 4.0;
+    final startX = random.nextDouble() * 400; // Posición inicial X aleatoria
+    final startY = random.nextDouble() * 800; // Posición inicial Y aleatoria
+    final size = 3.0 + random.nextDouble() * 4.0; // Tamaño aleatorio
     
     return AnimatedBuilder(
       animation: _particleController,
       builder: (context, child) {
         final progress = (_particleController.value + (index * 0.1)) % 1.0;
-        final x = startX + (math.sin(progress * 2 * math.pi) * 50);
-        final y = startY - (progress * 100);
-        final opacity = math.sin(progress * math.pi);
+        final x = startX + (math.sin(progress * 2 * math.pi) * 50); // Movimiento sinusoidal en X
+        final y = startY - (progress * 100); // Movimiento ascendente
+        final opacity = math.sin(progress * math.pi); // Opacidad variable
         
         return Positioned(
           left: x,
-          top: y % MediaQuery.of(context).size.height,
+          top: y % MediaQuery.of(context).size.height, // Asegura que la partícula permanezca en pantalla
           child: Container(
             width: size,
             height: size,

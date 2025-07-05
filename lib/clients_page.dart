@@ -7,7 +7,7 @@ import 'theme_provider.dart';
 import 'appbar.dart';
 import './integrations/clients_service.dart';
 
-// Constantes globales para la página de clientes
+//[-------------CONSTANTES DE ESTILO Y TEMA--------------]
 const Color primaryColor = Color(0xFFBDA206);
 const Color backgroundColor = Colors.black;
 const Color cardColor = Color.fromRGBO(15, 19, 21, 0.9);
@@ -60,7 +60,6 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
       vsync: this,
     );
     _searchCtrl.addListener(_filterClients);
-
     _fetchClients();
   }
 
@@ -77,6 +76,7 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
     super.dispose();
   }
 
+  //[-------------OPERACIONES CON SUPABASE--------------]
   Future<void> _fetchUserData() async {
     try {
       final user = Supabase.instance.client.auth.currentUser!;
@@ -100,7 +100,6 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
       _loading = true;
       _error = null;
     });
-    
     try {
       final user = Supabase.instance.client.auth.currentUser!;
       final response = await ClientsService.getClients(user.id);
@@ -128,13 +127,8 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
         final email = client['email']?.toString().toLowerCase() ?? '';
         final phone = client['phone']?.toString().toLowerCase() ?? '';
         final isActive = client['status'] ?? true;
-        
-        final matchesSearch = name.contains(query) || 
-                             email.contains(query) || 
-                             phone.contains(query);
-        
+        final matchesSearch = name.contains(query) || email.contains(query) || phone.contains(query);
         final matchesStatus = _showInactiveClients || isActive;
-        
         return matchesSearch && matchesStatus;
       }).toList();
     });
@@ -226,7 +220,6 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
 
   Future<void> _saveClient() async {
     if (!_formKey.currentState!.validate()) return;
-
     setState(() => _loading = true);
     try {
       final user = Supabase.instance.client.auth.currentUser!;
@@ -258,7 +251,6 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
         );
         _showSuccess('Cliente actualizado exitosamente');
       }
-      
       if (mounted) {
         _closePopup();
         await _fetchClients();
@@ -292,7 +284,6 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
     );
 
     if (confirmed != true) return;
-
     setState(() => _loading = true);
     try {
       final user = Supabase.instance.client.auth.currentUser!;
@@ -318,13 +309,11 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
     setState(() => _loading = true);
     try {
       final user = Supabase.instance.client.auth.currentUser!;
-      
       await ClientsService.toggleClientStatus(
         clientId: id,
         employeeId: user.id,
         newStatus: !currentStatus,
       );
-      
       if (mounted) {
         setState(() {
           final clientIndex = _clients.indexWhere((c) => c['id'] == id);
@@ -395,16 +384,13 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
                                   : const Center(child: CircularProgressIndicator()),
                             ),
                             const VerticalDivider(width: 1),
-                            Expanded(
-                              child: _buildMainContent(isDark, isWide),
-                            ),
+                            Expanded(child: _buildMainContent(isDark, isWide)),
                           ],
                         )
                       : _buildMainContent(isDark, isWide),
-                  // Popup centrado en el contenido principal
                   if (_isPopupOpen)
                     Positioned.fill(
-                      left: isWide ? 280 : 0, // Offset para el nav panel en web
+                      left: isWide ? 280 : 0,
                       child: ClientPopup(
                         onClose: _closePopup,
                         formKey: _formKey,
@@ -419,11 +405,10 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
                         saveClient: _saveClient,
                       ),
                     ),
-                  // Mensajes de error y éxito
                   if (_error != null)
                     Positioned(
                       bottom: 20,
-                      left: isWide ? 296 : 16, // Offset para el nav panel
+                      left: isWide ? 296 : 16,
                       right: 16,
                       child: SlideTransition(
                         position: Tween<Offset>(
@@ -437,11 +422,11 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
                             decoration: BoxDecoration(
                               color: errorColor,
                               borderRadius: BorderRadius.circular(borderRadius),
-                              boxShadow: [
+                              boxShadow: const [
                                 BoxShadow(
                                   color: Colors.black26,
                                   blurRadius: 6,
-                                  offset: const Offset(0, 3),
+                                  offset: Offset(0, 3),
                                 ),
                               ],
                             ),
@@ -464,7 +449,7 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
                   if (_successMessage != null)
                     Positioned(
                       bottom: 20,
-                      left: isWide ? 296 : 16, // Offset para el nav panel
+                      left: isWide ? 296 : 16,
                       right: 16,
                       child: SlideTransition(
                         position: Tween<Offset>(
@@ -478,11 +463,11 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
                             decoration: BoxDecoration(
                               color: successColor,
                               borderRadius: BorderRadius.circular(borderRadius),
-                              boxShadow: [
+                              boxShadow: const [
                                 BoxShadow(
                                   color: Colors.black26,
                                   blurRadius: 6,
-                                  offset: const Offset(0, 3),
+                                  offset: Offset(0, 3),
                                 ),
                               ],
                             ),
@@ -518,10 +503,7 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1200),
           child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: isWide ? 40 : 24,
-              vertical: 16, // Reducido de 24 a 16
-            ),
+            padding: EdgeInsets.symmetric(horizontal: isWide ? 40 : 24, vertical: 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -579,9 +561,7 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
             style: ElevatedButton.styleFrom(
               backgroundColor: primaryColor,
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(borderRadius),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(borderRadius)),
               elevation: 4,
             ),
           ),
@@ -598,12 +578,8 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
           decoration: BoxDecoration(
             color: isDark ? Colors.grey[800] : Colors.white,
             borderRadius: BorderRadius.circular(borderRadius),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black12,
-                blurRadius: 4,
-                offset: const Offset(0, 2),
-              ),
+            boxShadow: const [
+              BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2)),
             ],
           ),
           child: TextField(
@@ -612,16 +588,10 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
             decoration: InputDecoration(
               hintText: 'Buscar clientes por nombre, email o teléfono...',
               hintStyle: TextStyle(color: isDark ? hintColor : Colors.grey[600]),
-              prefixIcon: Icon(
-                Icons.search,
-                color: isDark ? hintColor : Colors.grey[600],
-              ),
+              prefixIcon: Icon(Icons.search, color: isDark ? hintColor : Colors.grey[600]),
               suffixIcon: _searchCtrl.text.isNotEmpty
                   ? IconButton(
-                      icon: Icon(
-                        Icons.clear,
-                        color: isDark ? hintColor : Colors.grey[600],
-                      ),
+                      icon: Icon(Icons.clear, color: isDark ? hintColor : Colors.grey[600]),
                       onPressed: () {
                         _searchCtrl.clear();
                         _filterClients();
@@ -633,23 +603,17 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
             ),
           ),
         ),
-        
         const SizedBox(height: 12),
-        
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             AnimatedContainer(
               duration: themeAnimationDuration,
               decoration: BoxDecoration(
-                color: _showInactiveClients 
-                    ? (isDark ? Colors.grey[800] : Colors.white)
-                    : primaryColor.withValues(alpha: 0.1),
+                color: _showInactiveClients ? (isDark ? Colors.grey[800] : Colors.white) : primaryColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: _showInactiveClients 
-                      ? (isDark ? Colors.grey[600]! : Colors.grey[300]!)
-                      : primaryColor,
+                  color: _showInactiveClients ? (isDark ? Colors.grey[600]! : Colors.grey[300]!) : primaryColor,
                   width: 1,
                 ),
               ),
@@ -662,13 +626,9 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        _showInactiveClients 
-                            ? Icons.visibility 
-                            : Icons.visibility_off,
+                        _showInactiveClients ? Icons.visibility : Icons.visibility_off,
                         size: 18,
-                        color: _showInactiveClients 
-                            ? (isDark ? hintColor : Colors.grey[600])
-                            : primaryColor,
+                        color: _showInactiveClients ? (isDark ? hintColor : Colors.grey[600]) : primaryColor,
                       ),
                       const SizedBox(width: 6),
                       AnimatedDefaultTextStyle(
@@ -676,9 +636,7 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w500,
-                          color: _showInactiveClients 
-                              ? (isDark ? hintColor : Colors.grey[600])
-                              : primaryColor,
+                          color: _showInactiveClients ? (isDark ? hintColor : Colors.grey[600]) : primaryColor,
                         ),
                         child: Text(_showInactiveClients ? 'Mostrar todos' : 'Solo activos'),
                       ),
@@ -687,7 +645,6 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
                 ),
               ),
             ),
-            
             _buildClientStats(isDark),
           ],
         ),
@@ -698,16 +655,13 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
   Widget _buildClientStats(bool isDark) {
     final activeClients = _clients.where((client) => client['status'] ?? true).length;
     final inactiveClients = _clients.length - activeClients;
-    
     return AnimatedContainer(
       duration: themeAnimationDuration,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: isDark ? Colors.grey[800] : Colors.white,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: isDark ? Colors.grey[600]! : Colors.grey[300]!,
-        ),
+        border: Border.all(color: isDark ? Colors.grey[600]! : Colors.grey[300]!),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -717,10 +671,7 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
               Container(
                 width: 8,
                 height: 8,
-                decoration: const BoxDecoration(
-                  color: successColor,
-                  shape: BoxShape.circle,
-                ),
+                decoration: const BoxDecoration(color: successColor, shape: BoxShape.circle),
               ),
               const SizedBox(width: 4),
               AnimatedDefaultTextStyle(
@@ -734,18 +685,13 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
               ),
             ],
           ),
-          
           const SizedBox(width: 12),
-          
           Row(
             children: [
               Container(
                 width: 8,
                 height: 8,
-                decoration: BoxDecoration(
-                  color: Colors.grey[500],
-                  shape: BoxShape.circle,
-                ),
+                decoration: BoxDecoration(color: Colors.grey[500], shape: BoxShape.circle),
               ),
               const SizedBox(width: 4),
               AnimatedDefaultTextStyle(
@@ -766,18 +712,14 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
 
   Widget _buildClientsList(bool isDark) {
     if (_loading && _clients.isEmpty) {
-      return const Center(
-        child: CircularProgressIndicator(color: primaryColor),
-      );
+      return const Center(child: CircularProgressIndicator(color: primaryColor));
     }
-
     if (_filteredClients.isEmpty) {
       String emptyMessage;
       String emptySubmessage;
-      
       if (_searchCtrl.text.isNotEmpty) {
         emptyMessage = 'No se encontraron clientes';
-        emptySubmessage = !_showInactiveClients 
+        emptySubmessage = !_showInactiveClients
             ? 'Intenta buscar en todos los clientes o revisa los filtros'
             : 'Intenta con otros términos de búsqueda';
       } else if (!_showInactiveClients && _clients.any((c) => !(c['status'] ?? true))) {
@@ -787,45 +729,30 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
         emptyMessage = 'No hay clientes registrados';
         emptySubmessage = 'Agrega tu primer cliente para comenzar';
       }
-      
       return Padding(
         padding: const EdgeInsets.only(top: 16),
         child: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.people_outline,
-                size: 64,
-                color: isDark ? hintColor : Colors.grey[400],
-              ),
+              Icon(Icons.people_outline, size: 64, color: isDark ? hintColor : Colors.grey[400]),
               const SizedBox(height: 16),
               AnimatedDefaultTextStyle(
                 duration: themeAnimationDuration,
-                style: TextStyle(
-                  fontSize: 18,
-                  color: isDark ? hintColor : Colors.grey[600],
-                ),
+                style: TextStyle(fontSize: 18, color: isDark ? hintColor : Colors.grey[600]),
                 child: Text(emptyMessage),
               ),
               const SizedBox(height: 8),
               AnimatedDefaultTextStyle(
                 duration: themeAnimationDuration,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: isDark ? hintColor : Colors.grey[500],
-                ),
-                child: Text(
-                  emptySubmessage,
-                  textAlign: TextAlign.center,
-                ),
+                style: TextStyle(fontSize: 14, color: isDark ? hintColor : Colors.grey[500]),
+                child: Text(emptySubmessage, textAlign: TextAlign.center),
               ),
             ],
           ),
         ),
       );
     }
-
     return RefreshIndicator(
       color: primaryColor,
       onRefresh: _fetchClients,
@@ -851,10 +778,7 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
                       isDark: isDark,
                       onEdit: () => _openEditClientPopup(client),
                       onDelete: () => _deleteClient(client['id']),
-                      onToggleStatus: () => _toggleClientStatus(
-                        client['id'],
-                        client['status'] ?? true,
-                      ),
+                      onToggleStatus: () => _toggleClientStatus(client['id'], client['status'] ?? true),
                       isLoading: _loading,
                     ),
                   );
@@ -869,15 +793,15 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
   }
 
   double _getMaxCrossAxisExtent(double width) {
-    if (width < 600) return 800;   // 1 columna para móviles
-    if (width < 900) return 400;   // 2 columnas para tablets pequeños
-    return 350;                    // 3 columnas para web
+    if (width < 600) return 800; // 1 columna para móviles
+    if (width < 900) return 400; // 2 columnas para tablets pequeños
+    return 350; // 3 columnas para web
   }
 
   double _getChildAspectRatio(double width) {
-    if (width < 600) return 1.6;   // Más alto para móviles (era 1.5)
-    if (width < 900) return 1.4;   // Tablets pequeños
-    return 1.1;                    // Web - más compacto (era 1.6)
+    if (width < 600) return 1.6; // Más alto para móviles
+    if (width < 900) return 1.4; // Tablets pequeños
+    return 1.1; // Web - más compacto
   }
 }
 
@@ -895,20 +819,11 @@ class NotificationsBottomSheet extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text(
-            'Notificaciones',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+          const Text('Notificaciones', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
           const SizedBox(height: 20),
           const Text('No hay notificaciones nuevas'),
           const SizedBox(height: 20),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cerrar'),
-          ),
+          ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text('Cerrar')),
         ],
       ),
     );
@@ -921,7 +836,9 @@ class ClientCard extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback onToggleStatus;
-  final bool isLoading;
+  final bool
+
+ isLoading;
 
   const ClientCard({
     super.key,
@@ -943,12 +860,9 @@ class ClientCard extends StatelessWidget {
     return AnimatedContainer(
       duration: themeAnimationDuration,
       decoration: BoxDecoration(
-        color: isDark ? Colors.grey[800] : Colors.white,
+        color: isDark ? cardColor : Colors.white, // Uso de cardColor en modo oscuro
         borderRadius: BorderRadius.circular(borderRadius),
-        border: Border.all(
-          color: isDark ? Colors.grey[700]! : Colors.grey[200]!,
-          width: 0.5,
-        ),
+        border: Border.all(color: isDark ? Colors.grey[700]! : Colors.grey[200]!, width: 0.5),
         boxShadow: [
           BoxShadow(
             color: isDark ? Colors.black26 : Colors.black.withValues(alpha: 0.08),
@@ -962,11 +876,10 @@ class ClientCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header con avatar, nombre y switch
             Row(
               children: [
                 Container(
-                  width: isWide ? 48 : 44, // Más grande en web
+                  width: isWide ? 48 : 44,
                   height: isWide ? 48 : 44,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
@@ -985,11 +898,7 @@ class ClientCard extends StatelessWidget {
                       ),
                     ],
                   ),
-                  child: Icon(
-                    Icons.person,
-                    color: Colors.white,
-                    size: isWide ? 32 : 28, // Más grande en web
-                  ),
+                  child: Icon(Icons.person, color: Colors.white, size: isWide ? 32 : 28),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -1003,11 +912,7 @@ class ClientCard extends StatelessWidget {
                           fontWeight: FontWeight.w600,
                           fontSize: 15,
                         ),
-                        child: Text(
-                          client['name'] ?? 'Sin nombre',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                        child: Text(client['name'] ?? 'Sin nombre', maxLines: 1, overflow: TextOverflow.ellipsis),
                       ),
                       const SizedBox(height: 2),
                       Row(
@@ -1052,34 +957,23 @@ class ClientCard extends StatelessWidget {
                 ),
               ],
             ),
-            
             const SizedBox(height: 10),
-            
-            // Información del cliente
             if (client['email'] != null || client['phone'] != null || preferredContact != 'No especificado' || notes != 'Sin notas') ...[
               AnimatedContainer(
                 duration: themeAnimationDuration,
                 width: double.infinity,
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: isDark 
-                      ? Colors.grey[700]?.withValues(alpha: 0.3)
-                      : Colors.grey[50],
+                  color: isDark ? Colors.grey[700]?.withValues(alpha: 0.3) : Colors.grey[50],
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: isDark ? Colors.grey[600]! : Colors.grey[200]!,
-                    width: 0.5,
-                  ),
+                  border: Border.all(color: isDark ? Colors.grey[600]! : Colors.grey[200]!, width: 0.5),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (client['email'] != null)
-                      _buildInfoRow(Icons.email, client['email']),
-                    if (client['email'] != null && client['phone'] != null)
-                      const SizedBox(height: 4),
-                    if (client['phone'] != null)
-                      _buildInfoRow(Icons.phone, client['phone']),
+                    if (client['email'] != null) _buildInfoRow(Icons.email, client['email']),
+                    if (client['email'] != null && client['phone'] != null) const SizedBox(height: 4),
+                    if (client['phone'] != null) _buildInfoRow(Icons.phone, client['phone']),
                     if (preferredContact != 'No especificado') ...[
                       const SizedBox(height: 4),
                       _buildInfoRow(Icons.contact_phone_outlined, 'Pref: $preferredContact'),
@@ -1093,8 +987,6 @@ class ClientCard extends StatelessWidget {
               ),
               const SizedBox(height: 8),
             ],
-            
-            // Botones de acción
             Expanded(
               child: Align(
                 alignment: Alignment.bottomRight,
@@ -1107,22 +999,17 @@ class ClientCard extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: Colors.blue.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                          color: Colors.blue.withValues(alpha: 0.3),
-                          width: 1,
-                        ),
+                        border: Border.all(color: Colors.blue.withValues(alpha: 0.3), width: 1),
                       ),
                       child: IconButton(
                         padding: EdgeInsets.zero,
                         icon: Icon(Icons.visibility, size: isWide ? 20 : 18),
                         color: Colors.blue,
-                        onPressed: isLoading ? null : () {
-                          Navigator.pushNamed(
-                            context, 
-                            '/client_profile',
-                            arguments: client,
-                          );
-                        },
+                        onPressed: isLoading
+                            ? null
+                            : () {
+                                Navigator.pushNamed(context, '/client_profile', arguments: client);
+                              },
                         tooltip: 'Ver perfil',
                       ),
                     ),
@@ -1133,10 +1020,7 @@ class ClientCard extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: primaryColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                          color: primaryColor.withValues(alpha: 0.3),
-                          width: 1,
-                        ),
+                        border: Border.all(color: primaryColor.withValues(alpha: 0.3), width: 1),
                       ),
                       child: IconButton(
                         padding: EdgeInsets.zero,
@@ -1153,10 +1037,7 @@ class ClientCard extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: Colors.red.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                          color: Colors.red.withValues(alpha: 0.3),
-                          width: 1,
-                        ),
+                        border: Border.all(color: Colors.red.withValues(alpha: 0.3), width: 1),
                       ),
                       child: IconButton(
                         padding: EdgeInsets.zero,
@@ -1179,24 +1060,13 @@ class ClientCard extends StatelessWidget {
   Widget _buildInfoRow(IconData icon, String text) {
     return Row(
       children: [
-        Icon(
-          icon,
-          size: 14,
-          color: isDark ? hintColor : Colors.grey[600],
-        ),
+        Icon(icon, size: 14, color: isDark ? hintColor : Colors.grey[600]),
         const SizedBox(width: 6),
         Expanded(
           child: AnimatedDefaultTextStyle(
             duration: themeAnimationDuration,
-            style: TextStyle(
-              color: isDark ? hintColor : Colors.grey[600],
-              fontSize: 14,
-            ),
-            child: Text(
-              text,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
+            style: TextStyle(color: isDark ? hintColor : Colors.grey[600], fontSize: 14),
+            child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis),
           ),
         ),
       ],
@@ -1236,8 +1106,7 @@ class ClientPopup extends StatefulWidget {
   State<ClientPopup> createState() => _ClientPopupState();
 }
 
-class _ClientPopupState extends State<ClientPopup>
-    with TickerProviderStateMixin {
+class _ClientPopupState extends State<ClientPopup> with TickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
   late Animation<double> _opacityAnimation;
@@ -1254,35 +1123,16 @@ class _ClientPopupState extends State<ClientPopup>
   @override
   void initState() {
     super.initState();
-    
-    _animationController = AnimationController(
-      duration: const Duration(milliseconds: 400),
-      vsync: this,
+    _animationController = AnimationController(duration: const Duration(milliseconds: 400), vsync: this);
+    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.elasticOut),
     );
-
-    _scaleAnimation = Tween<double>(
-      begin: 0.8,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.elasticOut,
-    ));
-
-    _opacityAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
-    ));
-
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, -0.3),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOutBack,
-    ));
+    _opacityAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: const Interval(0.0, 0.6, curve: Curves.easeOut)),
+    );
+    _slideAnimation = Tween<Offset>(begin: const Offset(0, -0.3), end: Offset.zero).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeOutBack),
+    );
 
     if (widget.selectedClient != null) {
       final existingMethod = widget.selectedClient!['preferred_contact_method']?.toString().toLowerCase();
@@ -1290,7 +1140,6 @@ class _ClientPopupState extends State<ClientPopup>
         _selectedContactMethod = existingMethod;
       }
     }
-
     _animationController.forward();
   }
 
@@ -1307,28 +1156,20 @@ class _ClientPopupState extends State<ClientPopup>
 
   String? _validateName(String? value) {
     if (value == null || value.isEmpty) return 'El nombre es requerido';
-    if (value.length < 2 || value.length > 50) {
-      return 'El nombre debe tener entre 2 y 50 caracteres';
-    }
-    if (!RegExp(r'^[a-zA-ZÀ-ÿñÑ\s]+$').hasMatch(value)) {
-      return 'El nombre solo puede contener letras y espacios';
-    }
+    if (value.length < 2 || value.length > 50) return 'El nombre debe tener entre 2 y 50 caracteres';
+    if (!RegExp(r'^[a-zA-ZÀ-ÿñÑ\s]+$').hasMatch(value)) return 'El nombre solo puede contener letras y espacios';
     return null;
   }
 
   String? _validatePhone(String? value) {
     if (value == null || value.isEmpty) return 'El teléfono es requerido';
-    if (!RegExp(r'^\+?[\d\s\-()]{7,15}$').hasMatch(value)) {
-      return 'Formato de teléfono no válido';
-    }
+    if (!RegExp(r'^\+?[\d\s\-()]{7,15}$').hasMatch(value)) return 'Formato de teléfono no válido';
     return null;
   }
 
   String? _validateEmail(String? value) {
     if (value == null || value.isEmpty) return null;
-    if (!RegExp(r'^[\w\.-]+@[\w\.-]+\.\w+$').hasMatch(value)) {
-      return 'Formato de email no válido';
-    }
+    if (!RegExp(r'^[\w\.-]+@[\w\.-]+\.\w+$').hasMatch(value)) return 'Formato de email no válido';
     return null;
   }
 
@@ -1340,7 +1181,6 @@ class _ClientPopupState extends State<ClientPopup>
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
     return AnimatedBuilder(
       animation: _animationController,
       builder: (context, child) {
@@ -1361,11 +1201,7 @@ class _ClientPopupState extends State<ClientPopup>
                       color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.3),
-                          blurRadius: 20,
-                          offset: const Offset(0, 10),
-                        ),
+                        BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 20, offset: const Offset(0, 10)),
                       ],
                     ),
                     child: SingleChildScrollView(
@@ -1404,19 +1240,10 @@ class _ClientPopupState extends State<ClientPopup>
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                primaryColor,
-                primaryColor.withValues(alpha: 0.8),
-              ],
-            ),
+            gradient: LinearGradient(colors: [primaryColor, primaryColor.withValues(alpha: 0.8)]),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(
-            widget.selectedClient == null ? Icons.person_add : Icons.edit,
-            color: Colors.black,
-            size: 24,
-          ),
+          child: Icon(widget.selectedClient == null ? Icons.person_add : Icons.edit, color: Colors.black, size: 24),
         ),
         const SizedBox(width: 16),
         Expanded(
@@ -1425,34 +1252,18 @@ class _ClientPopupState extends State<ClientPopup>
             children: [
               Text(
                 widget.selectedClient == null ? 'Nuevo Cliente' : 'Editar Cliente',
-                style: TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? textColor : Colors.black87,
-                ),
+                style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: isDark ? textColor : Colors.black87),
               ),
               Text(
-                widget.selectedClient == null 
-                    ? 'Agrega la información del cliente'
-                    : 'Modifica los datos del cliente',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: isDark ? hintColor : Colors.grey[600],
-                ),
+                widget.selectedClient == null ? 'Agrega la información del cliente' : 'Modifica los datos del cliente',
+                style: TextStyle(fontSize: 14, color: isDark ? hintColor : Colors.grey[600]),
               ),
             ],
           ),
         ),
         Container(
-          decoration: BoxDecoration(
-            color: isDark ? Colors.grey[800] : Colors.grey[100],
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: IconButton(
-            icon: const Icon(Icons.close),
-            onPressed: _closeWithAnimation,
-            color: isDark ? textColor : Colors.black87,
-          ),
+          decoration: BoxDecoration(color: isDark ? Colors.grey[800] : Colors.grey[100], borderRadius: BorderRadius.circular(10)),
+          child: IconButton(icon: const Icon(Icons.close), onPressed: _closeWithAnimation, color: isDark ? textColor : Colors.black87),
         ),
       ],
     );
@@ -1471,7 +1282,6 @@ class _ClientPopupState extends State<ClientPopup>
           delay: 0,
         ),
         const SizedBox(height: 20),
-        
         _buildAnimatedTextField(
           controller: widget.phoneCtrl,
           label: 'Teléfono',
@@ -1482,7 +1292,6 @@ class _ClientPopupState extends State<ClientPopup>
           delay: 100,
         ),
         const SizedBox(height: 20),
-        
         _buildAnimatedTextField(
           controller: widget.emailCtrl,
           label: 'Email',
@@ -1493,10 +1302,8 @@ class _ClientPopupState extends State<ClientPopup>
           delay: 150,
         ),
         const SizedBox(height: 20),
-        
         _buildContactMethodSelector(isDark),
         const SizedBox(height: 20),
-        
         _buildAnimatedTextField(
           controller: widget.notesCtrl,
           label: 'Notas adicionales',
@@ -1523,19 +1330,11 @@ class _ClientPopupState extends State<ClientPopup>
               children: [
                 Row(
                   children: [
-                    Icon(
-                      Icons.contact_phone_outlined,
-                      color: primaryColor,
-                      size: 20,
-                    ),
+                    Icon(Icons.contact_phone_outlined, color: primaryColor, size: 20),
                     const SizedBox(width: 8),
                     Text(
                       'Método de contacto preferido',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? textColor : Colors.black87,
-                      ),
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: isDark ? textColor : Colors.black87),
                     ),
                   ],
                 ),
@@ -1551,11 +1350,7 @@ class _ClientPopupState extends State<ClientPopup>
                       final isSelected = _selectedContactMethod == method['value'];
                       return Expanded(
                         child: GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _selectedContactMethod = method['value'];
-                            });
-                          },
+                          onTap: () => setState(() => _selectedContactMethod = method['value']),
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 200),
                             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
@@ -1619,16 +1414,10 @@ class _ClientPopupState extends State<ClientPopup>
               keyboardType: keyboardType,
               maxLines: maxLines,
               validator: validator,
-              style: TextStyle(
-                color: isDark ? textColor : Colors.black87,
-                fontSize: 16,
-              ),
+              style: TextStyle(color: isDark ? textColor : Colors.black87, fontSize: 16),
               decoration: InputDecoration(
                 labelText: isRequired ? '$label *' : label,
-                labelStyle: TextStyle(
-                  color: isDark ? hintColor : Colors.grey[600],
-                  fontSize: 14,
-                ),
+                labelStyle: TextStyle(color: isDark ? hintColor : Colors.grey[600], fontSize: 14),
                 prefixIcon: Container(
                   margin: const EdgeInsets.all(12),
                   padding: const EdgeInsets.all(8),
@@ -1636,23 +1425,15 @@ class _ClientPopupState extends State<ClientPopup>
                     color: primaryColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Icon(
-                    icon,
-                    color: primaryColor,
-                    size: 20,
-                  ),
+                  child: Icon(icon, color: primaryColor, size: 20),
                 ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(
-                    color: isDark ? Colors.grey[600]! : Colors.grey[300]!,
-                  ),
+                  borderSide: BorderSide(color: isDark ? Colors.grey[600]! : Colors.grey[300]!),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(
-                    color: isDark ? Colors.grey[600]! : Colors.grey[300]!,
-                  ),
+                  borderSide: BorderSide(color: isDark ? Colors.grey[600]! : Colors.grey[300]!),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -1683,12 +1464,7 @@ class _ClientPopupState extends State<ClientPopup>
       padding: const EdgeInsets.all(16),
       margin: const EdgeInsets.only(bottom: 20),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            errorColor.withValues(alpha: 0.1),
-            errorColor.withValues(alpha: 0.05),
-          ],
-        ),
+        gradient: LinearGradient(colors: [errorColor.withValues(alpha: 0.1), errorColor.withValues(alpha: 0.05)]),
         border: Border.all(color: errorColor, width: 1),
         borderRadius: BorderRadius.circular(12),
       ),
@@ -1696,21 +1472,14 @@ class _ClientPopupState extends State<ClientPopup>
         children: [
           Container(
             padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: errorColor.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(8),
-            ),
+            decoration: BoxDecoration(color: errorColor.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(8)),
             child: const Icon(Icons.error_outline, color: errorColor, size: 20),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               widget.error!,
-              style: TextStyle(
-                color: errorColor,
-                fontWeight: FontWeight.w500,
-                fontSize: 14,
-              ),
+              style: const TextStyle(color: errorColor, fontWeight: FontWeight.w500, fontSize: 14),
             ),
           ),
         ],
@@ -1724,35 +1493,21 @@ class _ClientPopupState extends State<ClientPopup>
       children: [
         Container(
           decoration: BoxDecoration(
-            border: Border.all(
-              color: isDark ? Colors.grey[600]! : Colors.grey[300]!,
-            ),
+            border: Border.all(color: isDark ? Colors.grey[600]! : Colors.grey[300]!),
             borderRadius: BorderRadius.circular(10),
           ),
           child: TextButton(
             onPressed: widget.loading ? null : _closeWithAnimation,
             style: TextButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  Icons.close,
-                  size: 18,
-                  color: isDark ? textColor : Colors.black87,
-                ),
+                Icon(Icons.close, size: 18, color: isDark ? textColor : Colors.black87),
                 const SizedBox(width: 6),
-                Text(
-                  'Cancelar',
-                  style: TextStyle(
-                    color: isDark ? textColor : Colors.black87,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
+                Text('Cancelar', style: TextStyle(color: isDark ? textColor : Colors.black87, fontWeight: FontWeight.w500)),
               ],
             ),
           ),
@@ -1760,20 +1515,9 @@ class _ClientPopupState extends State<ClientPopup>
         const SizedBox(width: 12),
         Container(
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                primaryColor,
-                primaryColor.withValues(alpha: 0.8),
-              ],
-            ),
+            gradient: LinearGradient(colors: [primaryColor, primaryColor.withValues(alpha: 0.8)]),
             borderRadius: BorderRadius.circular(10),
-            boxShadow: [
-              BoxShadow(
-                color: primaryColor.withValues(alpha: 0.3),
-                blurRadius: 8,
-                offset: const Offset(0, 4),
-              ),
-            ],
+            boxShadow: [BoxShadow(color: primaryColor.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 4))],
           ),
           child: ElevatedButton(
             onPressed: widget.loading ? null : _handleSave,
@@ -1781,35 +1525,22 @@ class _ClientPopupState extends State<ClientPopup>
               backgroundColor: Colors.transparent,
               shadowColor: Colors.transparent,
               padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
             child: widget.loading
                 ? const SizedBox(
                     width: 20,
                     height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
-                    ),
+                    child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.black)),
                   )
                 : Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        widget.selectedClient == null ? Icons.add : Icons.save,
-                        color: Colors.black,
-                        size: 18,
-                      ),
+                      Icon(widget.selectedClient == null ? Icons.add : Icons.save, color: Colors.black, size: 18),
                       const SizedBox(width: 8),
                       Text(
                         widget.selectedClient == null ? 'Crear Cliente' : 'Actualizar',
-                        style: const TextStyle(
-                          color: Colors.black,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
+                        style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 14),
                       ),
                     ],
                   ),
@@ -1824,18 +1555,13 @@ class AnimatedAppearance extends StatefulWidget {
   final Widget child;
   final int delay;
 
-  const AnimatedAppearance({
-    super.key,
-    required this.child,
-    this.delay = 0,
-  });
+  const AnimatedAppearance({super.key, required this.child, this.delay = 0});
 
   @override
   State<AnimatedAppearance> createState() => _AnimatedAppearanceState();
 }
 
-class _AnimatedAppearanceState extends State<AnimatedAppearance>
-    with SingleTickerProviderStateMixin {
+class _AnimatedAppearanceState extends State<AnimatedAppearance> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _opacity;
   late Animation<Offset> _slideAnimation;
@@ -1843,31 +1569,15 @@ class _AnimatedAppearanceState extends State<AnimatedAppearance>
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 600),
-      vsync: this,
+    _controller = AnimationController(duration: const Duration(milliseconds: 600), vsync: this);
+    _opacity = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: const Interval(0.0, 0.6, curve: Curves.easeOut)),
     );
-
-    _opacity = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
-    ));
-
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: const Interval(0.0, 1.0, curve: Curves.easeOut),
-    ));
-
+    _slideAnimation = Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
+      CurvedAnimation(parent: _controller, curve: const Interval(0.0, 1.0, curve: Curves.easeOut)),
+    );
     Future.delayed(Duration(milliseconds: widget.delay), () {
-      if (mounted) {
-        _controller.forward();
-      }
+      if (mounted) _controller.forward();
     });
   }
 
@@ -1881,10 +1591,7 @@ class _AnimatedAppearanceState extends State<AnimatedAppearance>
   Widget build(BuildContext context) {
     return SlideTransition(
       position: _slideAnimation,
-      child: FadeTransition(
-        opacity: _opacity,
-        child: widget.child,
-      ),
+      child: FadeTransition(opacity: _opacity, child: widget.child),
     );
   }
 }
@@ -1900,18 +1607,13 @@ class BlurredBackground extends StatelessWidget {
       duration: themeAnimationDuration,
       child: Container(
         decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage('assets/images/logo.png'),
-            fit: BoxFit.cover,
-          ),
+          image: DecorationImage(image: AssetImage('assets/images/logo.png'), fit: BoxFit.cover),
         ),
         child: BackdropFilter(
           filter: ui.ImageFilter.blur(sigmaX: 8, sigmaY: 8),
           child: AnimatedContainer(
             duration: themeAnimationDuration,
-            color: isDark
-                ? const Color.fromRGBO(0, 0, 0, 0.7)
-                : Colors.white.withValues(alpha: 0.85),
+            color: isDark ? const Color.fromRGBO(0, 0, 0, 0.7) : Colors.white.withValues(alpha: 0.85),
           ),
         ),
       ),

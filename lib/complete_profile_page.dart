@@ -1,9 +1,11 @@
+// Importaciones necesarias para la UI, Supabase y animaciones
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/services.dart';
 import 'loading_screen.dart';
 
+//[-------------PÁGINA PARA COMPLETAR EL PERFIL DEL USUARIO--------------]
 class CompleteProfilePage extends StatefulWidget {
   const CompleteProfilePage({super.key});
 
@@ -13,36 +15,43 @@ class CompleteProfilePage extends StatefulWidget {
 
 class _CompleteProfilePageState extends State<CompleteProfilePage>
     with SingleTickerProviderStateMixin {
+  // Controladores para los campos de texto del formulario
   final _usernameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
   final _specialtyCtrl = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   
+  // Controladores y animaciones para efectos de entrada y salida
   late AnimationController _animationController;
   late Animation<Offset> _slideAnimation;
   late Animation<double> _fadeAnimation;
   
+  // Estados para manejar la carga, errores y la selección de especialidad
   bool _loading = false;
   String? _error;
   String? _selectedSpecialty;
   bool _isCustomSpecialty = false;
   bool _isShaking = false;
 
+  // Constantes de estilo para mantener consistencia visual
   static const Color _accentColor = Color(0xFFBDA206);
   static const Color _backgroundColor = Colors.black;
   static const Color _cardColor = Color.fromRGBO(15, 19, 21, 0.9);
   static const Color _textColor = Colors.white;
   static const Color _hintColor = Colors.white70;
 
+  // Lista de especialidades predefinidas para el dropdown
   final List<String> _specialties = ['Tradicional', 'Realismo', 'Acuarela', 'Minimalista', 'Neotradicional', 'Otro'];
 
   @override
   void initState() {
     super.initState();
+    // Inicialización del controlador de animación para la entrada de la UI
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
     );
+    // Animación de deslizamiento desde abajo hacia arriba
     _slideAnimation = Tween<Offset>(
       begin: const Offset(0, 1),
       end: Offset.zero,
@@ -50,6 +59,7 @@ class _CompleteProfilePageState extends State<CompleteProfilePage>
       parent: _animationController,
       curve: Curves.easeOutBack,
     ));
+    // Animación de opacidad para un efecto de fundido
     _fadeAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
@@ -57,12 +67,15 @@ class _CompleteProfilePageState extends State<CompleteProfilePage>
       parent: _animationController,
       curve: Curves.easeIn,
     ));
+    // Ejecuta la animación después de que el frame inicial se haya renderizado
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _animationController.forward();
     });
+    // Listener para verificar la disponibilidad del nombre de usuario en tiempo real
     _usernameCtrl.addListener(_checkUsernameAvailability);
   }
 
+  // Verifica si el nombre de usuario ya está en uso en Supabase
   Future<void> _checkUsernameAvailability() async {
     if (_usernameCtrl.text.isNotEmpty && mounted) {
       final response = await Supabase.instance.client
@@ -85,6 +98,7 @@ class _CompleteProfilePageState extends State<CompleteProfilePage>
     }
   }
 
+  // Activa una animación de "sacudida" para el contenedor en caso de error
   void _triggerShake() {
     if (_isShaking) {
       Future.delayed(const Duration(milliseconds: 500), () {
@@ -95,6 +109,7 @@ class _CompleteProfilePageState extends State<CompleteProfilePage>
     }
   }
 
+  // Guarda el perfil del usuario en Supabase
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -110,10 +125,12 @@ class _CompleteProfilePageState extends State<CompleteProfilePage>
         return;
       }
 
+      // Actualiza los atributos del usuario en Supabase Auth
       await Supabase.instance.client.auth.updateUser(UserAttributes(data: {
         'username': _usernameCtrl.text.trim(),
       }));
 
+      // Inserta los datos del empleado en la tabla 'employees'
       await Supabase.instance.client.from('employees').insert({
         'id': user.id,
         'username': _usernameCtrl.text.trim(),
@@ -152,6 +169,7 @@ class _CompleteProfilePageState extends State<CompleteProfilePage>
     }
   }
 
+  // Establece un mensaje de error y lo elimina tras 5 segundos
   void _setError(String error) {
     setState(() => _error = error);
     Future.delayed(const Duration(seconds: 5), () {
@@ -161,6 +179,7 @@ class _CompleteProfilePageState extends State<CompleteProfilePage>
     });
   }
 
+  // Muestra un diálogo de éxito tras guardar el perfil
   void _showSuccessDialog(String message) {
     showDialog(
       context: context,
@@ -199,10 +218,12 @@ class _CompleteProfilePageState extends State<CompleteProfilePage>
 
   @override
   Widget build(BuildContext context) {
+    // Construye la interfaz principal con fondo difuminado y formulario
     return Scaffold(
       backgroundColor: _backgroundColor,
       body: Stack(
         children: [
+          // Fondo con imagen difuminada
           Positioned.fill(
             child: Container(
               decoration: const BoxDecoration(
@@ -223,6 +244,7 @@ class _CompleteProfilePageState extends State<CompleteProfilePage>
               ),
             ),
           ),
+          // Contenido principal con scroll
           Center(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
@@ -242,10 +264,7 @@ class _CompleteProfilePageState extends State<CompleteProfilePage>
                         decoration: BoxDecoration(
                           color: _cardColor,
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: _accentColor,
-                            width: 2,
-                          ),
+                          border: Border.all(color: _accentColor, width: 2),
                           boxShadow: [
                             BoxShadow(
                               color: _accentColor.withValues(alpha: 0.3),
@@ -266,6 +285,7 @@ class _CompleteProfilePageState extends State<CompleteProfilePage>
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
+                              // Logo en la parte superior
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(15),
                                 child: Image.asset(
@@ -275,6 +295,7 @@ class _CompleteProfilePageState extends State<CompleteProfilePage>
                                 ),
                               ),
                               const SizedBox(height: 16),
+                              // Título del formulario
                               Text(
                                 'Completar Perfil',
                                 textAlign: TextAlign.center,
@@ -291,6 +312,7 @@ class _CompleteProfilePageState extends State<CompleteProfilePage>
                                 ),
                               ),
                               const SizedBox(height: 32),
+                              // Mensaje de error si existe
                               if (_error != null) ...[
                                 Container(
                                   padding: const EdgeInsets.all(12),
@@ -298,9 +320,7 @@ class _CompleteProfilePageState extends State<CompleteProfilePage>
                                   decoration: BoxDecoration(
                                     color: Colors.redAccent.withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(
-                                      color: Colors.redAccent,
-                                    ),
+                                    border: Border.all(color: Colors.redAccent),
                                   ),
                                   child: Row(
                                     children: [
@@ -309,16 +329,14 @@ class _CompleteProfilePageState extends State<CompleteProfilePage>
                                       Expanded(
                                         child: Text(
                                           _error!,
-                                          style: const TextStyle(
-                                            color: Colors.redAccent,
-                                            fontSize: 12,
-                                          ),
+                                          style: const TextStyle(color: Colors.redAccent, fontSize: 12),
                                         ),
                                       ),
                                     ],
                                   ),
                                 ),
                               ],
+                              // Campo para el nombre de usuario
                               TextFormField(
                                 controller: _usernameCtrl,
                                 style: const TextStyle(color: _textColor),
@@ -342,6 +360,7 @@ class _CompleteProfilePageState extends State<CompleteProfilePage>
                                 ),
                               ),
                               const SizedBox(height: 20),
+                              // Campo para el teléfono
                               TextFormField(
                                 controller: _phoneCtrl,
                                 keyboardType: TextInputType.phone,
@@ -367,6 +386,7 @@ class _CompleteProfilePageState extends State<CompleteProfilePage>
                                 ),
                               ),
                               const SizedBox(height: 20),
+                              // Dropdown para seleccionar especialidad
                               DropdownButtonFormField<String>(
                                 value: _selectedSpecialty,
                                 hint: const Text('Selecciona una especialidad', style: TextStyle(color: _hintColor)),
@@ -404,6 +424,7 @@ class _CompleteProfilePageState extends State<CompleteProfilePage>
                                 style: const TextStyle(color: _textColor),
                                 validator: (value) => value == null ? 'Selecciona una especialidad' : null,
                               ),
+                              // Campo para especialidad personalizada si se selecciona 'Otro'
                               if (_isCustomSpecialty) ...[
                                 const SizedBox(height: 20),
                                 TextFormField(
@@ -430,6 +451,7 @@ class _CompleteProfilePageState extends State<CompleteProfilePage>
                                 ),
                               ],
                               const SizedBox(height: 24),
+                              // Botón para guardar el perfil
                               SizedBox(
                                 width: double.infinity,
                                 height: 50,
@@ -477,6 +499,7 @@ class _CompleteProfilePageState extends State<CompleteProfilePage>
 
   @override
   void dispose() {
+    // Limpieza de recursos al destruir el widget
     _usernameCtrl.removeListener(_checkUsernameAvailability);
     _usernameCtrl.dispose();
     _phoneCtrl.dispose();

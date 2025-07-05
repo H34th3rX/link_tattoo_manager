@@ -2,6 +2,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+//[-------------PÁGINA DE REGISTRO--------------]
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
 
@@ -9,38 +10,36 @@ class RegisterPage extends StatefulWidget {
   State<RegisterPage> createState() => _RegisterPageState();
 }
 
-class _RegisterPageState extends State<RegisterPage>
-    with SingleTickerProviderStateMixin {
-  // Controllers
-  final _emailCtrl = TextEditingController();
-  final _passwordCtrl = TextEditingController();
-  final _confirmPasswordCtrl = TextEditingController();
-  final _formKey = GlobalKey<FormState>();
-  
-  // Animation
-  late AnimationController _animationController;
-  late Animation<Offset> _slideAnimation;
-  late Animation<double> _fadeAnimation;
-  
-  // State variables
-  bool _loading = false;
-  bool _obscurePassword = true;
-  bool _obscureConfirmPassword = true;
-  String? _error;
-
-  // Constants
+class _RegisterPageState extends State<RegisterPage> with SingleTickerProviderStateMixin {
+    // Constantes para estilos
   static const Color _accentColor = Color(0xFFBDA206);
   static const Color _backgroundColor = Colors.black;
   static const Color _cardColor = Color.fromRGBO(15, 19, 21, 0.9);
   static const Color _textColor = Colors.white;
   static const Color _hintColor = Colors.white70;
+  // Controladores para los campos del formulario
+  final _emailCtrl = TextEditingController();
+  final _passwordCtrl = TextEditingController();
+  final _confirmPasswordCtrl = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+  
+  // Controladores y variables para animaciones y estado
+  late AnimationController _animationController;
+  late Animation<Offset> _slideAnimation;
+  late Animation<double> _fadeAnimation;
+  bool _loading = false;
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
+    // Inicializa las animaciones al cargar la página
     _initializeAnimations();
   }
 
+  // Configura las animaciones de deslizamiento y opacidad
   void _initializeAnimations() {
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 800),
@@ -68,6 +67,7 @@ class _RegisterPageState extends State<RegisterPage>
     });
   }
 
+  // Maneja el proceso de registro con Supabase
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -107,6 +107,7 @@ class _RegisterPageState extends State<RegisterPage>
     }
   }
 
+  // Muestra mensaje de error con duración
   void _setError(String error) {
     setState(() => _error = error);
     Future.delayed(const Duration(seconds: 5), () {
@@ -116,6 +117,7 @@ class _RegisterPageState extends State<RegisterPage>
     });
   }
 
+  // Muestra un diálogo de éxito
   void _showSuccessDialog(String message) {
     showDialog(
       context: context,
@@ -152,6 +154,7 @@ class _RegisterPageState extends State<RegisterPage>
     );
   }
 
+  // Traduce errores de autenticación a mensajes legibles
   String _getLocalizedAuthError(String? message) {
     if (message == null) return 'Error de autenticación';
     
@@ -168,6 +171,7 @@ class _RegisterPageState extends State<RegisterPage>
     return message;
   }
 
+  // Validaciones para los campos del formulario
   String? _validateEmail(String? value) {
     if (value == null || value.isEmpty) {
       return 'El email es requerido';
@@ -201,6 +205,7 @@ class _RegisterPageState extends State<RegisterPage>
     return null;
   }
 
+  // Construye la interfaz principal
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -214,6 +219,7 @@ class _RegisterPageState extends State<RegisterPage>
     );
   }
 
+  // Construye el fondo difuminado
   Widget _buildBackground() {
     return Positioned.fill(
       child: Container(
@@ -237,6 +243,7 @@ class _RegisterPageState extends State<RegisterPage>
     );
   }
 
+  // Construye el formulario de registro
   Widget _buildRegisterForm() {
     return Center(
       child: SingleChildScrollView(
@@ -328,6 +335,7 @@ class _RegisterPageState extends State<RegisterPage>
     );
   }
 
+  // Construye el logo de la aplicación
   Widget _buildLogo() {
     return ClipRRect(
       borderRadius: BorderRadius.circular(15),
@@ -339,6 +347,7 @@ class _RegisterPageState extends State<RegisterPage>
     );
   }
 
+  // Construye el título del formulario
   Widget _buildTitle() {
     return Text(
       'Registro',
@@ -357,6 +366,7 @@ class _RegisterPageState extends State<RegisterPage>
     );
   }
 
+  // Construye el campo de email
   Widget _buildEmailField() {
     return TextFormField(
       controller: _emailCtrl,
@@ -370,6 +380,7 @@ class _RegisterPageState extends State<RegisterPage>
     );
   }
 
+  // Construye el campo de contraseña
   Widget _buildPasswordField() {
     return TextFormField(
       controller: _passwordCtrl,
@@ -390,6 +401,7 @@ class _RegisterPageState extends State<RegisterPage>
     );
   }
 
+  // Construye el campo de confirmación de contraseña
   Widget _buildConfirmPasswordField() {
     return TextFormField(
       controller: _confirmPasswordCtrl,
@@ -410,6 +422,7 @@ class _RegisterPageState extends State<RegisterPage>
     );
   }
 
+  // Construye la decoración para los campos de entrada
   InputDecoration _buildInputDecoration({
     required String label,
     required IconData icon,
@@ -441,6 +454,7 @@ class _RegisterPageState extends State<RegisterPage>
     );
   }
 
+  // Construye el botón de registro
   Widget _buildRegisterButton() {
     return SizedBox(
       width: double.infinity,
@@ -476,6 +490,7 @@ class _RegisterPageState extends State<RegisterPage>
     );
   }
 
+  // Construye el enlace para iniciar sesión
   Widget _buildLoginLink() {
     return TextButton(
       onPressed: () => Navigator.pushReplacementNamed(context, '/login'),
@@ -500,6 +515,7 @@ class _RegisterPageState extends State<RegisterPage>
 
   @override
   void dispose() {
+    // Libera recursos
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
     _confirmPasswordCtrl.dispose();

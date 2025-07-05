@@ -59,51 +59,55 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget build(BuildContext context) {
     final bool isWide = MediaQuery.of(context).size.width >= 800;
     final user = Supabase.instance.client.auth.currentUser!;
-    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
-    final bool initialIsDark = themeProvider.isDark;
 
     return FutureBuilder(
       future: _loadUserData,
       builder: (context, snapshot) {
-        return Scaffold(
-          backgroundColor: initialIsDark ? null : Colors.grey.shade50,
-          appBar: CustomAppBar(
-            title: 'Dashboard',
-            onNotificationPressed: _showNotifications,
-            isWide: isWide,
-          ),
-          drawer: isWide
-              ? null
-              : Drawer(
-                  child: _userName != null
-                      ? NavPanel(user: user, onLogout: () => _logout(context), userName: _userName!)
-                      : const Center(child: CircularProgressIndicator()),
-                ),
-          body: Stack(
-            children: [
-              BlurredBackground(isDark: initialIsDark),
-              isWide
-                  ? Row(
-                      children: [
-                        SizedBox(
-                          width: 280,
-                          child: _userName != null
-                              ? NavPanel(
-                                  user: user,
-                                  onLogout: () => _logout(context),
-                                  userName: _userName!,
-                                )
-                              : const Center(child: CircularProgressIndicator()),
-                        ),
-                        const VerticalDivider(width: 1),
-                        Expanded(
-                          child: MainContent(user: user, initialIsDark: initialIsDark),
-                        ),
-                      ],
-                    )
-                  : MainContent(user: user, initialIsDark: initialIsDark),
-            ],
-          ),
+        return Consumer<ThemeProvider>(
+          builder: (context, themeProvider, child) {
+            final bool isDark = themeProvider.isDark;
+            
+            return Scaffold(
+              backgroundColor: isDark ? null : Colors.grey.shade50,
+              appBar: CustomAppBar(
+                title: 'Dashboard',
+                onNotificationPressed: _showNotifications,
+                isWide: isWide,
+              ),
+              drawer: isWide
+                  ? null
+                  : Drawer(
+                      child: _userName != null
+                          ? NavPanel(user: user, onLogout: () => _logout(context), userName: _userName!)
+                          : const Center(child: CircularProgressIndicator()),
+                    ),
+              body: Stack(
+                children: [
+                  BlurredBackground(isDark: isDark),
+                  isWide
+                      ? Row(
+                          children: [
+                            SizedBox(
+                              width: 280,
+                              child: _userName != null
+                                  ? NavPanel(
+                                      user: user,
+                                      onLogout: () => _logout(context),
+                                      userName: _userName!,
+                                    )
+                                  : const Center(child: CircularProgressIndicator()),
+                            ),
+                            const VerticalDivider(width: 1),
+                            Expanded(
+                              child: MainContent(user: user, isDark: isDark),
+                            ),
+                          ],
+                        )
+                      : MainContent(user: user, isDark: isDark),
+                ],
+              ),
+            );
+          },
         );
       },
     );
@@ -145,6 +149,7 @@ class AnimatedAppearance extends StatefulWidget {
   final Widget child;
   final int delay;
   final Duration duration;
+
   const AnimatedAppearance({
     super.key,
     required this.child,
@@ -211,8 +216,9 @@ class _AnimatedAppearanceState extends State<AnimatedAppearance>
 
 class MainContent extends StatefulWidget {
   final User user;
-  final bool initialIsDark;
-  const MainContent({super.key, required this.user, required this.initialIsDark});
+  final bool isDark;
+
+  const MainContent({super.key, required this.user, required this.isDark});
 
   @override
   State<MainContent> createState() => _MainContentState();
@@ -276,7 +282,7 @@ class _MainContentState extends State<MainContent> {
                           title: 'Citas Hoy',
                           value: '8',
                           icon: Icons.event_available,
-                          isDark: widget.initialIsDark,
+                          isDark: widget.isDark,
                         ),
                       ),
                       SizedBox(width: spacing),
@@ -285,7 +291,7 @@ class _MainContentState extends State<MainContent> {
                           title: 'Clientes',
                           valueFuture: _clientCount,
                           icon: Icons.people_outline,
-                          isDark: widget.initialIsDark,
+                          isDark: widget.isDark,
                         ),
                       ),
                     ],
@@ -301,7 +307,7 @@ class _MainContentState extends State<MainContent> {
                           title: 'Próxima',
                           value: '2:30 PM',
                           icon: Icons.schedule,
-                          isDark: widget.initialIsDark,
+                          isDark: widget.isDark,
                         ),
                       ),
                       SizedBox(width: spacing),
@@ -310,7 +316,7 @@ class _MainContentState extends State<MainContent> {
                           title: 'Ingresos',
                           value: '\$12.4K',
                           icon: Icons.trending_up,
-                          isDark: widget.initialIsDark,
+                          isDark: widget.isDark,
                         ),
                       ),
                     ],
@@ -346,7 +352,7 @@ class _MainContentState extends State<MainContent> {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        elevation: widget.initialIsDark ? 8 : 4,
+                        elevation: widget.isDark ? 8 : 4,
                         shadowColor: const ui.Color(0xFFBDA206).withValues(alpha: 0.4),
                       ),
                     ),
@@ -362,9 +368,9 @@ class _MainContentState extends State<MainContent> {
                         child: ActionCard(
                           icon: Icons.history,
                           label: 'Ver Citas',
-                          color: widget.initialIsDark ? Colors.grey[800]! : Colors.white.withValues(alpha: 0.95),
+                          color: widget.isDark ? Colors.grey[800]! : Colors.white.withValues(alpha: 0.95),
                           textColor: const ui.Color(0xFFBDA206),
-                          isDark: widget.initialIsDark,
+                          isDark: widget.isDark,
                           onTap: () => Navigator.pushNamed(context, '/appointments'),
                         ),
                       ),
@@ -373,9 +379,9 @@ class _MainContentState extends State<MainContent> {
                         child: ActionCard(
                           icon: Icons.calendar_today,
                           label: 'Calendario',
-                          color: widget.initialIsDark ? Colors.grey[800]! : Colors.white.withValues(alpha: 0.95),
+                          color: widget.isDark ? Colors.grey[800]! : Colors.white.withValues(alpha: 0.95),
                           textColor: const ui.Color(0xFFBDA206),
-                          isDark: widget.initialIsDark,
+                          isDark: widget.isDark,
                           onTap: () => Navigator.pushNamed(context, '/calendar'),
                         ),
                       ),
@@ -390,7 +396,7 @@ class _MainContentState extends State<MainContent> {
                     duration: const Duration(milliseconds: 200),
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: widget.initialIsDark ? Colors.grey[850] : Colors.white.withValues(alpha: 0.95),
+                      color: widget.isDark ? Colors.grey[850] : Colors.white.withValues(alpha: 0.95),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: const ui.Color(0xFFBDA206).withValues(alpha: 0.3),
@@ -398,8 +404,8 @@ class _MainContentState extends State<MainContent> {
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: widget.initialIsDark 
-                              ? Colors.black.withValues(alpha: 0.3)
+                          color: widget.isDark
+                               ? Colors.black.withValues(alpha: 0.3)
                               : Colors.grey.withValues(alpha: 0.15),
                           spreadRadius: 1,
                           blurRadius: 8,
@@ -413,9 +419,9 @@ class _MainContentState extends State<MainContent> {
                         Text(
                           'Ingresos de la Semana',
                           style: TextStyle(
-                            fontSize: 20, 
-                            fontWeight: FontWeight.bold,
-                            color: widget.initialIsDark ? Colors.white : Colors.black87,
+                            fontSize: 20,
+                             fontWeight: FontWeight.bold,
+                            color: widget.isDark ? Colors.white : Colors.black87,
                           ),
                         ),
                         const SizedBox(height: 20),
@@ -429,20 +435,20 @@ class _MainContentState extends State<MainContent> {
                               axisLine: const AxisLine(width: 0),
                               majorTickLines: const MajorTickLines(size: 0),
                               labelStyle: TextStyle(
-                                color: widget.initialIsDark ? Colors.white70 : Colors.black87,
+                                color: widget.isDark ? Colors.white70 : Colors.black87,
                               ),
                             ),
                             primaryYAxis: NumericAxis(
                               majorGridLines: MajorGridLines(
                                 width: 0.5,
-                                color: widget.initialIsDark ? Colors.grey[700] : Colors.grey[300],
+                                color: widget.isDark ? Colors.grey[700] : Colors.grey[300],
                                 dashArray: const [5, 5],
                               ),
                               axisLine: const AxisLine(width: 0),
                               majorTickLines: const MajorTickLines(size: 0),
                               labelFormat: '\${value}K',
                               labelStyle: TextStyle(
-                                color: widget.initialIsDark ? Colors.white70 : Colors.black87,
+                                color: widget.isDark ? Colors.white70 : Colors.black87,
                               ),
                             ),
                             tooltipBehavior: TooltipBehavior(
@@ -509,10 +515,11 @@ class _MainContentState extends State<MainContent> {
                       final latestClient = snapshot.data![0] as Map?;
                       final latestAppointmentData = snapshot.data![1] as Map?;
                       final lastThreeAppointments = snapshot.data![2] as List<Map>;
+
                       return Container(
                         padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
-                          color: widget.initialIsDark ? Colors.grey[850] : Colors.white.withValues(alpha: 0.95),
+                          color: widget.isDark ? Colors.grey[850] : Colors.white.withValues(alpha: 0.95),
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
                             color: const ui.Color(0xFFBDA206).withValues(alpha: 0.2),
@@ -520,8 +527,8 @@ class _MainContentState extends State<MainContent> {
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: widget.initialIsDark 
-                                  ? Colors.black.withValues(alpha: 0.3)
+                              color: widget.isDark
+                                   ? Colors.black.withValues(alpha: 0.3)
                                   : Colors.grey.withValues(alpha: 0.1),
                               spreadRadius: 1,
                               blurRadius: 12,
@@ -550,9 +557,9 @@ class _MainContentState extends State<MainContent> {
                                 Text(
                                   'Actividad Reciente',
                                   style: TextStyle(
-                                    fontSize: 22, 
-                                    fontWeight: FontWeight.bold,
-                                    color: widget.initialIsDark ? Colors.white : Colors.black87,
+                                    fontSize: 22,
+                                     fontWeight: FontWeight.bold,
+                                    color: widget.isDark ? Colors.white : Colors.black87,
                                   ),
                                 ),
                               ],
@@ -566,8 +573,8 @@ class _MainContentState extends State<MainContent> {
                                     child: ActivityCard(
                                       title: 'Último Cliente',
                                       icon: Icons.person_add,
-                                      content: _buildLatestClient(latestClient, widget.initialIsDark),
-                                      isDark: widget.initialIsDark,
+                                      content: _buildLatestClient(latestClient, widget.isDark),
+                                      isDark: widget.isDark,
                                     ),
                                   ),
                                   const SizedBox(width: 16),
@@ -575,8 +582,8 @@ class _MainContentState extends State<MainContent> {
                                     child: ActivityCard(
                                       title: 'Última Cita',
                                       icon: Icons.event,
-                                      content: _buildLatestAppointment(latestAppointmentData, widget.initialIsDark),
-                                      isDark: widget.initialIsDark,
+                                      content: _buildLatestAppointment(latestAppointmentData, widget.isDark),
+                                      isDark: widget.isDark,
                                     ),
                                   ),
                                   const SizedBox(width: 16),
@@ -584,8 +591,8 @@ class _MainContentState extends State<MainContent> {
                                     child: ActivityCard(
                                       title: 'Próximas Citas',
                                       icon: Icons.schedule,
-                                      content: _buildLastThreeAppointments(lastThreeAppointments, widget.initialIsDark),
-                                      isDark: widget.initialIsDark,
+                                      content: _buildLastThreeAppointments(lastThreeAppointments, widget.isDark),
+                                      isDark: widget.isDark,
                                     ),
                                   ),
                                 ],
@@ -596,22 +603,22 @@ class _MainContentState extends State<MainContent> {
                                   ActivityCard(
                                     title: 'Último Cliente',
                                     icon: Icons.person_add,
-                                    content: _buildLatestClient(latestClient, widget.initialIsDark),
-                                    isDark: widget.initialIsDark,
+                                    content: _buildLatestClient(latestClient, widget.isDark),
+                                    isDark: widget.isDark,
                                   ),
                                   const SizedBox(height: 16),
                                   ActivityCard(
                                     title: 'Última Cita',
                                     icon: Icons.event,
-                                    content: _buildLatestAppointment(latestAppointmentData, widget.initialIsDark),
-                                    isDark: widget.initialIsDark,
+                                    content: _buildLatestAppointment(latestAppointmentData, widget.isDark),
+                                    isDark: widget.isDark,
                                   ),
                                   const SizedBox(height: 16),
                                   ActivityCard(
                                     title: 'Próximas Citas',
                                     icon: Icons.schedule,
-                                    content: _buildLastThreeAppointments(lastThreeAppointments, widget.initialIsDark),
-                                    isDark: widget.initialIsDark,
+                                    content: _buildLastThreeAppointments(lastThreeAppointments, widget.isDark),
+                                    isDark: widget.isDark,
                                   ),
                                 ],
                               ),
@@ -709,6 +716,7 @@ class ActivityCard extends StatelessWidget {
   final IconData icon;
   final Widget content;
   final bool isDark;
+
   const ActivityCard({
     super.key, 
     required this.title, 
@@ -771,6 +779,7 @@ class StatCard extends StatelessWidget {
   final Future<int>? valueFuture;
   final IconData icon;
   final bool isDark;
+
   const StatCard({
     super.key,
     required this.title,
@@ -795,8 +804,8 @@ class StatCard extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: isDark 
-                ? Colors.black.withValues(alpha: 0.3)
+            color: isDark
+                 ? Colors.black.withValues(alpha: 0.3)
                 : Colors.grey.withValues(alpha: 0.15),
             spreadRadius: 1,
             blurRadius: 8,
@@ -884,6 +893,7 @@ class ActionCard extends StatelessWidget {
   final Color textColor;
   final bool isDark;
   final VoidCallback onTap;
+
   const ActionCard({
     super.key,
     required this.icon,
@@ -934,6 +944,7 @@ class ActivityTile extends StatelessWidget {
   final String title, subtitle, time;
   final bool isDark;
   final IconData icon;
+
   const ActivityTile({
     super.key,
     required this.title,

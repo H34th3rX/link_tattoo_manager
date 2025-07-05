@@ -4,12 +4,14 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'theme_provider.dart';
 
+// Duración constante para las animaciones de transición
 const Duration themeAnimationDuration = Duration(milliseconds: 300);
 
+//[-------------PANEL DE NAVEGACIÓN--------------]
 class NavPanel extends StatefulWidget {
-  final User user;
-  final VoidCallback onLogout;
-  final String userName;
+  final User user; // Objeto de usuario autenticado
+  final VoidCallback onLogout; // Callback para cerrar sesión
+  final String userName; // Nombre de usuario a mostrar
 
   const NavPanel({super.key, required this.user, required this.onLogout, required this.userName});
 
@@ -18,17 +20,20 @@ class NavPanel extends StatefulWidget {
 }
 
 class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
+  // Controladores de animación para efectos de hover y pulso
   late AnimationController _hoverController;
   late AnimationController _pulseController;
-  int _hoveredIndex = -1;
+  int _hoveredIndex = -1; // Índice del elemento con hover
 
   @override
   void initState() {
     super.initState();
+    // Inicializa el controlador para animaciones de hover
     _hoverController = AnimationController(
       duration: const Duration(milliseconds: 200),
       vsync: this,
     );
+    // Inicializa el controlador para efecto de pulso en el header
     _pulseController = AnimationController(
       duration: const Duration(milliseconds: 1500),
       vsync: this,
@@ -37,11 +42,13 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    // Libera los controladores de animación
     _hoverController.dispose();
     _pulseController.dispose();
     super.dispose();
   }
 
+  //[-------------CONSTRUCCIÓN DEL PANEL--------------]
   @override
   Widget build(BuildContext context) {
     final String current = ModalRoute.of(context)?.settings.name ?? '';
@@ -53,6 +60,7 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
     return AnimatedContainer(
       duration: themeAnimationDuration,
       decoration: BoxDecoration(
+        // Gradiente dinámico según el tema (oscuro o claro)
         gradient: themeProvider.isDark
             ? const LinearGradient(
                 begin: Alignment.topLeft,
@@ -74,7 +82,7 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
               ),
         boxShadow: [
           BoxShadow(
-            color: themeProvider.isDark ? Colors.black26 : Colors.grey.withValues(alpha:0.1), // Fixed
+            color: themeProvider.isDark ? Colors.black26 : Colors.grey.withValues(alpha: 0.1),
             blurRadius: 20,
             offset: const Offset(2, 0),
           ),
@@ -93,6 +101,8 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
     );
   }
 
+  //[-------------ENCABEZADO DEL PANEL--------------]
+  // Construye el encabezado con el avatar animado y datos del usuario
   Widget _buildModernHeader(ThemeProvider themeProvider, ui.Color accent) {
     return AnimatedContainer(
       duration: themeAnimationDuration,
@@ -108,7 +118,7 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
             const Color(0xFF3A3A3A),
           ] : [
             accent,
-            accent.withValues(alpha:0.8), // Fixed
+            accent.withValues(alpha: 0.8),
           ],
         ),
         borderRadius: const BorderRadius.all(Radius.circular(20)),
@@ -128,7 +138,7 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.white.withValues(alpha:0.3 + 0.2 * _pulseController.value), // Fixed
+                      color: Colors.white.withValues(alpha: 0.3 + 0.2 * _pulseController.value),
                       blurRadius: 20,
                       spreadRadius: 2,
                     ),
@@ -168,6 +178,8 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
     );
   }
 
+  //[-------------LISTA DE NAVEGACIÓN--------------]
+  // Construye la lista de opciones de navegación con efectos de hover y selección
   Widget _buildNavigationList(String current, ThemeData theme, ThemeProvider themeProvider, ui.Color primaryAccent, ui.Color secondaryAccent) {
     final navItems = [
       {'icon': Icons.dashboard_rounded, 'label': 'Dashboard', 'route': '/dashboard'},
@@ -205,31 +217,31 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
                 gradient: isSelected
                     ? LinearGradient(
                         colors: themeProvider.isDark ? [
-                          const Color(0xFFBDA206).withValues(alpha:0.3), // Fixed
-                          const Color(0xFF3A3A3A).withValues(alpha:0.2), // Fixed
+                          const Color(0xFFBDA206).withValues(alpha: 0.3),
+                          const Color(0xFF3A3A3A).withValues(alpha: 0.2),
                         ] : [
-                          primaryAccent.withValues(alpha:0.2), // Fixed
-                          secondaryAccent.withValues(alpha:0.1), // Fixed
+                          primaryAccent.withValues(alpha: 0.2),
+                          secondaryAccent.withValues(alpha: 0.1),
                         ],
                       )
                     : isHovered
                         ? LinearGradient(
                             colors: themeProvider.isDark ? [
-                              const Color(0xFFBDA206).withValues(alpha:0.15), // Fixed
+                              const Color(0xFFBDA206).withValues(alpha: 0.15),
                               Colors.transparent,
                             ] : [
-                              primaryAccent.withValues(alpha:0.1), // Fixed
+                              primaryAccent.withValues(alpha: 0.1),
                               Colors.transparent,
                             ],
                           )
                         : null,
                 border: isSelected
-                    ? Border.all(color: primaryAccent.withValues(alpha:0.5), width: 1) // Fixed
+                    ? Border.all(color: primaryAccent.withValues(alpha: 0.5), width: 1)
                     : null,
                 boxShadow: isSelected
                     ? [
                         BoxShadow(
-                          color: primaryAccent.withValues(alpha:0.3), // Fixed
+                          color: primaryAccent.withValues(alpha: 0.3),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),
@@ -243,9 +255,9 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: isSelected
-                        ? primaryAccent.withValues(alpha:0.2) // Fixed
+                        ? primaryAccent.withValues(alpha: 0.2)
                         : isHovered
-                            ? primaryAccent.withValues(alpha:0.1) // Fixed
+                            ? primaryAccent.withValues(alpha: 0.1)
                             : Colors.transparent,
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -254,8 +266,8 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
                     color: isSelected
                         ? primaryAccent
                         : themeProvider.isDark
-                            ? Colors.white.withValues(alpha:0.7) // Fixed
-                            : Colors.black.withValues(alpha:0.7), // Fixed
+                            ? Colors.white.withValues(alpha: 0.7)
+                            : Colors.black.withValues(alpha: 0.7),
                     size: 24,
                   ),
                 ),
@@ -281,7 +293,7 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: primaryAccent.withValues(alpha:0.5), // Fixed
+                              color: primaryAccent.withValues(alpha: 0.5),
                               blurRadius: 4,
                               spreadRadius: 1,
                             ),
@@ -298,6 +310,8 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
     );
   }
 
+  //[-------------SECCIÓN INFERIOR--------------]
+  // Construye la sección inferior con el interruptor de tema y botón de logout
   Widget _buildBottomSection(ThemeData theme, ThemeProvider themeProvider, ui.Color accent) {
     return AnimatedContainer(
       duration: themeAnimationDuration,
@@ -320,14 +334,15 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
     );
   }
 
+  // Interruptor para cambiar entre modo oscuro y claro
   Widget _buildThemeSwitcher(ThemeData theme, ThemeProvider themeProvider, ui.Color accent) {
     return AnimatedContainer(
       duration: themeAnimationDuration,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
         color: themeProvider.isDark
-            ? Colors.grey[800]!.withValues(alpha:0.5) // Fixed
-            : Colors.white.withValues(alpha:0.5), // Fixed
+            ? Colors.grey[800]!.withValues(alpha: 0.5)
+            : Colors.white.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -391,6 +406,7 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
     );
   }
 
+  // Botón para cerrar sesión
   Widget _buildLogoutButton(ui.Color accent) {
     return AnimatedContainer(
       duration: themeAnimationDuration,
@@ -405,7 +421,7 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.red.withValues(alpha:0.3), // Fixed
+            color: Colors.red.withValues(alpha: 0.3),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
