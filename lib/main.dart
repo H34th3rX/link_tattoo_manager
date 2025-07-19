@@ -14,6 +14,9 @@ import 'reports_page.dart';
 import 'client_profile_page.dart' show ClientProfilePage;
 import 'client_history_page.dart' show ClientHistoryPage;
 import 'calendar_page.dart' show CalendarPage;
+import 'package:flutter_localizations/flutter_localizations.dart'; // Importar para delegados de localización
+import './l10n/app_localizations.dart'; // Importar el archivo generado
+import 'localization_provider.dart'; // Importar el nuevo proveedor de localización
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,8 +35,11 @@ Future<void> main() async {
   }
   
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => ThemeProvider(), // Se carga automáticamente con SharedPreferences
+    MultiProvider( // Usar MultiProvider para gestionar múltiples proveedores
+      providers: [
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => LocalizationProvider()), // Añadir LocalizationProvider
+      ],
       child: MyApp(initialRoute: initialRoute),
     ),
   );
@@ -45,8 +51,8 @@ class MyApp extends StatelessWidget {
   
   @override
   Widget build(BuildContext context) {
-    return Consumer<ThemeProvider>(
-      builder: (context, themeProvider, child) {
+    return Consumer2<ThemeProvider, LocalizationProvider>( // Consumir ambos proveedores
+      builder: (context, themeProvider, localizationProvider, child) {
         return MaterialApp(
           title: 'LinkTattoo Manager',
           debugShowCheckedModeBanner: false,
@@ -54,6 +60,18 @@ class MyApp extends StatelessWidget {
           theme: _buildLightTheme(),
           darkTheme: _buildDarkTheme(),
           initialRoute: initialRoute,
+          // Configuración de internacionalización
+          localizationsDelegates: const [
+            AppLocalizations.delegate, // Delegado generado
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales.toList(), // Convertir a List<Locale>
+          locale: localizationProvider.locale, // Usar el locale del proveedor
+          localeResolutionCallback: (deviceLocale, supportedLocales) {
+            return localizationProvider.resolveLocale(supportedLocales, deviceLocale);
+          },
           routes: {
             '/login': (_) => const LoginPage(),
             '/register': (_) => const RegisterPage(),

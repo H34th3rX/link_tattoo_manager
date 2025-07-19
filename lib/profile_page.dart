@@ -8,6 +8,8 @@ import 'appbar.dart';
 import './integrations/clients_service.dart';
 import './integrations/employee_service.dart';
 import 'package:intl/intl.dart'; 
+import './l10n/app_localizations.dart'; // Importar el archivo generado
+import 'localization_provider.dart'; // Importar el proveedor de localización
 
 // Constantes globales para estilos y animaciones
 const Color primaryColor = Color(0xFFBDA206);
@@ -94,30 +96,28 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
     try {
       final user = Supabase.instance.client.auth.currentUser!;
       final profile = await EmployeeService.getEmployeeProfile(user.id);
-      if (mounted) {
-        setState(() {
-          _employeeProfile = profile;
-          _userName = profile?['username'] as String? ?? user.email!.split('@')[0];
-          _yearsOfExperience = profile != null && profile['start_date'] != null
-              ? EmployeeService.getYearsOfExperience(DateTime.parse(profile['start_date']))
-              : 0;
-        });
+      if (!mounted) return; // Guardar el contexto
 
-        // Carga estadísticas dinámicas
-        _totalClients = await ClientsService.getClientCountByEmployee(user.id);
-        _appointmentsThisMonth = await EmployeeService.getAppointmentsThisMonth(user.id);
-        _nextAppointmentFuture = EmployeeService.getNextAppointment(user.id);
+      setState(() {
+        _employeeProfile = profile;
+        _userName = profile?['username'] as String? ?? user.email!.split('@')[0];
+        _yearsOfExperience = profile != null && profile['start_date'] != null
+            ? EmployeeService.getYearsOfExperience(DateTime.parse(profile['start_date']))
+            : 0;
+      });
 
-        if (mounted) {
-          setState(() => _loading = false);
-        }
-      }
+      // Carga estadísticas dinámicas
+      _totalClients = await ClientsService.getClientCountByEmployee(user.id);
+      _appointmentsThisMonth = await EmployeeService.getAppointmentsThisMonth(user.id);
+      _nextAppointmentFuture = EmployeeService.getNextAppointment(user.id);
+
+      if (!mounted) return; // Guardar el contexto
+      setState(() => _loading = false);
     } catch (e) {
-      if (mounted) {
-        _showError('Error al cargar el perfil: ${e.toString()}');
-      }
+      if (!mounted) return; // Guardar el contexto
+      _showError(AppLocalizations.of(context)!.errorLoadingProfile(e.toString()));
     } finally {
-      if (mounted) {
+      if (mounted) { // Guardar el contexto
         setState(() => _loading = false);
       }
     }
@@ -156,11 +156,10 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
   Future<void> _logout() async {
     try {
       await Supabase.instance.client.auth.signOut();
-      if (mounted) {
-        Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
-      }
+      if (!mounted) return; // Guardar el contexto
+      Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
     } catch (e) {
-      _showError('Error al cerrar sesión.');
+      _showError(AppLocalizations.of(context)!.errorSavingProfile(e.toString()));
     }
   }
 
@@ -218,17 +217,15 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
         notes: _notesCtrl.text.trim().isNotEmpty ? _notesCtrl.text.trim() : null,
       );
 
-      if (mounted) {
-        _showSuccess('Perfil actualizado exitosamente');
-        _closePopup();
-        await _fetchProfileData();
-      }
+      if (!mounted) return; // Guardar el contexto
+      _showSuccess(AppLocalizations.of(context)!.profileUpdatedSuccessfully);
+      _closePopup();
+      await _fetchProfileData();
     } catch (e) {
-      if (mounted) {
-        _showError('Error al guardar el perfil: ${e.toString()}');
-      }
+      if (!mounted) return; // Guardar el contexto
+      _showError(AppLocalizations.of(context)!.errorSavingProfile(e.toString()));
     } finally {
-      if (mounted) {
+      if (mounted) { // Guardar el contexto
         setState(() => _loading = false);
       }
     }
@@ -238,6 +235,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
+    final AppLocalizations localizations = AppLocalizations.of(context)!; // Obtener localizaciones
     final bool isWide = MediaQuery.of(context).size.width >= 800;
     final user = Supabase.instance.client.auth.currentUser!;
     final bool isDark = themeProvider.isDark;
@@ -250,7 +248,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
             return Scaffold(
               backgroundColor: isDark ? backgroundColor : Colors.grey[100],
               appBar: CustomAppBar(
-                title: 'Mi Perfil',
+                title: localizations.profilePageTitle, // Usar texto localizado
                 onNotificationPressed: _showNotifications,
                 isWide: isWide,
               ),
@@ -283,11 +281,11 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                             ),
                             const VerticalDivider(width: 1),
                             Expanded(
-                              child: _buildMainContent(isDark, isWide),
+                              child: _buildMainContent(isDark, isWide, localizations),
                             ),
                           ],
                         )
-                      : _buildMainContent(isDark, isWide),
+                      : _buildMainContent(isDark, isWide, localizations),
                   if (_isPopupOpen)
                     Positioned.fill(
                       left: isWide ? 280 : 0,
@@ -325,7 +323,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                               borderRadius: BorderRadius.circular(borderRadius),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black26,
+                                  color: Colors.black.withValues(alpha:   0.26),
                                   blurRadius: 6,
                                   offset: const Offset(0, 3),
                                 ),
@@ -366,7 +364,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                               borderRadius: BorderRadius.circular(borderRadius),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black26,
+                                  color: Colors.black.withValues(alpha:   0.26),
                                   blurRadius: 6,
                                   offset: const Offset(0, 3),
                                 ),
@@ -398,7 +396,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
   }
 
   // Construye el contenido principal de la página
-  Widget _buildMainContent(bool isDark, bool isWide) {
+  Widget _buildMainContent(bool isDark, bool isWide, AppLocalizations localizations) {
     if (_loading && _employeeProfile == null) {
       return const Center(child: CircularProgressIndicator(color: primaryColor));
     }
@@ -410,12 +408,12 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
             Icon(Icons.person_off_outlined, size: 64, color: isDark ? hintColor : Colors.grey[400]),
             const SizedBox(height: 16),
             Text(
-              'No se pudo cargar el perfil del empleado.',
+              localizations.noEmployeeProfileLoaded, // Usar texto localizado
               style: TextStyle(fontSize: 18, color: isDark ? hintColor : Colors.grey[600]),
             ),
             const SizedBox(height: 8),
             Text(
-              'Asegúrate de que tu cuenta de usuario esté vinculada a un perfil de empleado.',
+              localizations.ensureAccountLinked, // Usar texto localizado
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 14, color: isDark ? hintColor : Colors.grey[500]),
             ),
@@ -423,7 +421,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
             ElevatedButton(
               onPressed: _fetchProfileData,
               style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
-              child: const Text('Reintentar', style: TextStyle(color: Colors.black)),
+              child: Text(localizations.retry, style: const TextStyle(color: Colors.black)), // Usar texto localizado
             ),
           ],
         ),
@@ -446,12 +444,12 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                 const SizedBox(height: 8),
                 AnimatedAppearance(
                   delay: 0,
-                  child: _buildProfileHeader(isDark),
+                  child: _buildProfileHeader(isDark, localizations),
                 ),
                 const SizedBox(height: 24),
                 AnimatedAppearance(
                   delay: 150,
-                  child: _buildStatCards(isDark),
+                  child: _buildStatCards(isDark, localizations),
                 ),
                 const SizedBox(height: 32),
                 AnimatedAppearance(
@@ -463,9 +461,9 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                       child: ElevatedButton.icon(
                         onPressed: _openEditProfilePopup,
                         icon: const Icon(Icons.edit, color: Colors.black),
-                        label: const Text(
-                          'Editar Perfil',
-                          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+                        label: Text(
+                          localizations.editProfile, // Usar texto localizado
+                          style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
                         ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: primaryColor,
@@ -480,6 +478,11 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                   ),
                 ),
                 const SizedBox(height: 40),
+                AnimatedAppearance(
+                  delay: 450,
+                  child: _buildLanguageSettings(isDark, localizations), // Añadir sección de idioma
+                ),
+                const SizedBox(height: 40),
               ],
             ),
           ),
@@ -489,7 +492,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
   }
 
   // Construye el encabezado del perfil con información del empleado
-  Widget _buildProfileHeader(bool isDark) {
+  Widget _buildProfileHeader(bool isDark, AppLocalizations localizations) {
     final String initials = (_employeeProfile?['username'] as String? ?? 'UN')
         .split(' ')
         .map((word) => word.isNotEmpty ? word[0].toUpperCase() : '')
@@ -503,7 +506,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
         borderRadius: BorderRadius.circular(borderRadius),
         boxShadow: [
           BoxShadow(
-            color: isDark ? Colors.black26 : Colors.grey.withValues(alpha: 0.1),
+            color: isDark ? Colors.black26 : Colors.grey.withValues(alpha:  0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -521,13 +524,13 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: LinearGradient(
-                    colors: [primaryColor, primaryColor.withValues(alpha: 0.7)],
+                    colors: [primaryColor, primaryColor.withValues(alpha:   0.7)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: primaryColor.withValues(alpha: 0.3),
+                      color: primaryColor.withValues(alpha:   0.3),
                       blurRadius: 12,
                       offset: const Offset(0, 4),
                     ),
@@ -559,7 +562,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      _employeeProfile?['specialty'] ?? 'Especialidad no definida',
+                      _employeeProfile?['specialty'] ?? localizations.selectSpecialty, // Usar texto localizado
                       style: TextStyle(
                         fontSize: 18,
                         color: primaryColor,
@@ -578,7 +581,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
           ),
           const SizedBox(height: 20),
           Text(
-            _employeeProfile?['notes'] ?? 'No hay descripción disponible. Puedes añadir una en la sección de edición.',
+            _employeeProfile?['notes'] ?? localizations.notesBiography, // Usar texto localizado
             style: TextStyle(
               fontSize: 16,
               color: isDark ? hintColor : Colors.grey[700],
@@ -618,7 +621,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
   }
 
   // Construye las tarjetas de estadísticas
-  Widget _buildStatCards(bool isDark) {
+  Widget _buildStatCards(bool isDark, AppLocalizations localizations) {
     return GridView.count(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -630,7 +633,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
         ProfileStatCard(
           icon: Icons.emoji_events_outlined,
           value: _yearsOfExperience.toString(),
-          label: 'Años',
+          label: localizations.years, // Usar texto localizado
           isDark: isDark,
           iconColor: Colors.blue.shade600,
           valueColor: Colors.blue.shade600,
@@ -638,7 +641,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
         ProfileStatCard(
           icon: Icons.people_alt_outlined,
           value: '$_totalClients+',
-          label: 'Clientes',
+          label: localizations.clients, // Usar texto localizado
           isDark: isDark,
           iconColor: Colors.green.shade600,
           valueColor: Colors.green.shade600,
@@ -646,7 +649,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
         ProfileStatCard(
           icon: Icons.calendar_today_outlined,
           value: _appointmentsThisMonth.toString(),
-          label: 'Este Mes',
+          label: localizations.thisMonth, // Usar texto localizado
           isDark: isDark,
           iconColor: Colors.orange.shade600,
           valueColor: Colors.orange.shade600,
@@ -654,12 +657,12 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
         FutureBuilder<Map<String, dynamic>?>(
           future: _nextAppointmentFuture,
           builder: (context, snapshot) {
-            String nextAppointmentText = 'No hay citas';
+            String nextAppointmentText = localizations.noAppointments; // Usar texto localizado
             Color nextAppointmentColor = isDark ? hintColor : Colors.grey[700]!;
             if (snapshot.connectionState == ConnectionState.waiting) {
-              nextAppointmentText = 'Cargando...';
+              nextAppointmentText = localizations.loading; // Usar texto localizado
             } else if (snapshot.hasError) {
-              nextAppointmentText = 'Error';
+              nextAppointmentText = localizations.error; // Usar texto localizado
               nextAppointmentColor = errorColor;
             } else if (snapshot.hasData && snapshot.data != null) {
               final appointment = snapshot.data!;
@@ -670,7 +673,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
             return ProfileStatCard(
               icon: Icons.schedule_outlined,
               value: nextAppointmentText,
-              label: 'Próxima Cita',
+              label: localizations.nextAppointment, // Usar texto localizado
               isDark: isDark,
               iconColor: Colors.purple.shade600,
               valueColor: nextAppointmentColor,
@@ -678,6 +681,96 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
           },
         ),
       ],
+    );
+  }
+
+  // Nuevo widget para la configuración de idioma
+  Widget _buildLanguageSettings(bool isDark, AppLocalizations localizations) {
+    final localizationProvider = Provider.of<LocalizationProvider>(context);
+    String currentPreference = localizationProvider.languagePreference;
+
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.grey[850] : Colors.white,
+        borderRadius: BorderRadius.circular(borderRadius),
+        boxShadow: [
+          BoxShadow(
+            color: isDark ? Colors.black26 : Colors.grey.withValues(alpha:  0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            localizations.languageSettings, // Usar texto localizado
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: isDark ? textColor : Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 16),
+          DropdownButtonFormField<String>(
+            value: currentPreference,
+            hint: Text(localizations.selectLanguage, style: TextStyle(color: isDark ? hintColor : Colors.grey[600])),
+            items: [
+              DropdownMenuItem(
+                value: 'system',
+                child: Text(localizations.systemDefault, style: TextStyle(color: isDark ? primaryColor : Colors.black87)),
+              ),
+              DropdownMenuItem(
+                value: 'en',
+                child: Text(localizations.english, style: TextStyle(color: isDark ? primaryColor : Colors.black87)),
+              ),
+              DropdownMenuItem(
+                value: 'es',
+                child: Text(localizations.spanish, style: TextStyle(color: isDark ? primaryColor : Colors.black87)),
+              ),
+            ],
+            onChanged: (value) async {
+              if (value != null) {
+                await localizationProvider.setLanguagePreference(value);
+                if (!mounted) return; // Guardar el contexto
+                _showSuccess(localizations.languagePreferenceSaved); // Mostrar mensaje de éxito
+              }
+            },
+            decoration: InputDecoration(
+              labelText: localizations.selectLanguage, // Usar texto localizado
+              labelStyle: TextStyle(color: isDark ? hintColor : Colors.grey[600], fontSize: 14),
+              prefixIcon: Container(
+                margin: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: primaryColor.withValues(alpha:   0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.language, color: primaryColor, size: 20),
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: isDark ? Colors.grey[600]! : Colors.grey[300]!),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: isDark ? Colors.grey[600]! : Colors.grey[300]!),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: primaryColor, width: 2),
+              ),
+              filled: true,
+              fillColor: isDark ? Colors.grey[800]?.withValues(alpha:   0.5) : Colors.grey[50],
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            ),
+            dropdownColor: isDark ? Colors.grey[800] : Colors.white,
+            style: TextStyle(color: isDark ? primaryColor : Colors.black87),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -711,7 +804,7 @@ class ProfileStatCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(borderRadius),
         boxShadow: [
           BoxShadow(
-            color: isDark ? Colors.black26 : Colors.grey.withValues(alpha: 0.1),
+            color: isDark ? Colors.black26 : Colors.grey.withValues(alpha:  0.1),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -855,25 +948,28 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
 
   // Validaciones para los campos del formulario
   String? _validateUsername(String? value) {
-    if (value == null || value.isEmpty) return 'El nombre de usuario es requerido';
+    final localizations = AppLocalizations.of(context)!;
+    if (value == null || value.isEmpty) return localizations.username;
     if (value.length < 3 || value.length > 50) {
-      return 'El nombre de usuario debe tener entre 3 y 50 caracteres';
+      return 'El nombre de usuario debe tener entre 3 y 50 caracteres'; // No localizado
     }
     return null;
   }
 
   String? _validatePhone(String? value) {
+    // final localizations = AppLocalizations.of(context)!; // No se usa
     if (value == null || value.isEmpty) return null;
     if (!RegExp(r'^\+?[\d\s\-()]{7,15}$').hasMatch(value)) {
-      return 'Formato de teléfono no válido';
+      return 'Formato de teléfono no válido'; // No localizado
     }
     return null;
   }
 
   String? _validateEmail(String? value) {
+    // final localizations = AppLocalizations.of(context)!; // No se usa
     if (value == null || value.isEmpty) return null;
     if (!RegExp(r'^[\w\.-]+@[\w\.-]+\.\w+$').hasMatch(value)) {
-      return 'Formato de email no válido';
+      return 'Formato de email no válido'; // No localizado
     }
     return null;
   }
@@ -896,11 +992,12 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
 
   @override
   Widget build(BuildContext context) {
+    final localizations = AppLocalizations.of(context)!;
     return AnimatedBuilder(
       animation: _animationController,
       builder: (context, child) {
         return Container(
-          color: Colors.black.withValues(alpha: 0.5 * _opacityAnimation.value),
+          color: Colors.black.withValues(alpha:   0.5 * _opacityAnimation.value),
           child: Center(
             child: SlideTransition(
               position: _slideAnimation,
@@ -917,7 +1014,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.3),
+                          color: Colors.black.withValues(alpha:   0.3),
                           blurRadius: 20,
                           offset: const Offset(0, 10),
                         ),
@@ -932,12 +1029,12 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
                             mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              _buildHeader(widget.isDark),
+                              _buildHeader(widget.isDark, localizations),
                               const SizedBox(height: 28),
-                              _buildFormFields(widget.isDark),
+                              _buildFormFields(widget.isDark, localizations),
                               const SizedBox(height: 24),
                               if (widget.error != null) _buildErrorMessage(),
-                              _buildActionButtons(widget.isDark),
+                              _buildActionButtons(widget.isDark, localizations),
                             ],
                           ),
                         ),
@@ -954,7 +1051,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
   }
 
   // Construye el encabezado del popup
-  Widget _buildHeader(bool isDark) {
+  Widget _buildHeader(bool isDark, AppLocalizations localizations) {
     return Row(
       children: [
         Container(
@@ -963,7 +1060,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
             gradient: LinearGradient(
               colors: [
                 primaryColor,
-                primaryColor.withValues(alpha: 0.8),
+                primaryColor.withValues(alpha:  0.8),
               ],
             ),
             borderRadius: BorderRadius.circular(12),
@@ -980,7 +1077,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Editar Perfil',
+                localizations.editProfile, // Usar texto localizado
                 style: TextStyle(
                   fontSize: 26,
                   fontWeight: FontWeight.bold,
@@ -988,7 +1085,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
                 ),
               ),
               Text(
-                'Actualiza tu información personal y profesional',
+                'Actualiza tu información personal y profesional', // No localizado
                 style: TextStyle(
                   fontSize: 14,
                   color: isDark ? hintColor : Colors.grey[600],
@@ -1013,12 +1110,12 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
   }
 
   // Construye los campos del formulario
-  Widget _buildFormFields(bool isDark) {
+  Widget _buildFormFields(bool isDark, AppLocalizations localizations) {
     return Column(
       children: [
         _buildAnimatedTextField(
           controller: widget.usernameCtrl,
-          label: 'Nombre de Usuario',
+          label: localizations.username, // Usar texto localizado
           icon: Icons.person_outline,
           validator: _validateUsername,
           isDark: isDark,
@@ -1027,11 +1124,11 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
           autovalidateMode: AutovalidateMode.onUserInteraction,
         ),
         const SizedBox(height: 20),
-        _buildSpecialtyField(isDark),
+        _buildSpecialtyField(isDark, localizations),
         const SizedBox(height: 20),
         _buildAnimatedTextField(
           controller: widget.phoneCtrl,
-          label: 'Teléfono',
+          label: localizations.phone, // Usar texto localizado
           icon: Icons.phone_outlined,
           keyboardType: TextInputType.phone,
           validator: _validatePhone,
@@ -1042,7 +1139,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
         const SizedBox(height: 20),
         _buildAnimatedTextField(
           controller: widget.emailCtrl,
-          label: 'Email',
+          label: localizations.email, // Usar texto localizado
           icon: Icons.email_outlined,
           keyboardType: TextInputType.emailAddress,
           validator: _validateEmail,
@@ -1053,7 +1150,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
         const SizedBox(height: 20),
         _buildAnimatedTextField(
           controller: widget.notesCtrl,
-          label: 'Notas / Biografía',
+          label: localizations.notesBiography, // Usar texto localizado
           icon: Icons.note_outlined,
           maxLines: 3,
           isDark: isDark,
@@ -1065,7 +1162,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
   }
 
   // Construye el campo de especialidad con dropdown
-  Widget _buildSpecialtyField(bool isDark) {
+  Widget _buildSpecialtyField(bool isDark, AppLocalizations localizations) {
     return TweenAnimationBuilder<double>(
       duration: const Duration(milliseconds: 450),
       tween: Tween(begin: 0.0, end: 1.0),
@@ -1079,7 +1176,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
               children: [
                 DropdownButtonFormField<String>(
                   value: _selectedSpecialty,
-                  hint: Text('Selecciona una especialidad', style: TextStyle(color: isDark ? hintColor : Colors.grey[600])),
+                  hint: Text(localizations.selectSpecialty, style: TextStyle(color: isDark ? hintColor : Colors.grey[600])), // Usar texto localizado
                   items: _specialties.map((String specialty) {
                     return DropdownMenuItem<String>(
                       value: specialty,
@@ -1093,15 +1190,15 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
                       if (!_isCustomSpecialty) widget.specialtyCtrl.clear();
                     });
                   },
-                  validator: (value) => value == null ? 'Selecciona una especialidad' : null,
+                  validator: (value) => value == null ? localizations.selectSpecialty : null, // Usar texto localizado
                   decoration: InputDecoration(
-                    labelText: 'Especialidad *',
+                    labelText: '${localizations.specialty} *', // Usar texto localizado
                     labelStyle: TextStyle(color: isDark ? hintColor : Colors.grey[600], fontSize: 14),
                     prefixIcon: Container(
                       margin: const EdgeInsets.all(12),
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: primaryColor.withValues(alpha: 0.1),
+                        color: primaryColor.withValues(alpha:   0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Icon(Icons.work_outline, color: primaryColor, size: 20),
@@ -1127,7 +1224,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
                       borderSide: const BorderSide(color: errorColor, width: 2),
                     ),
                     filled: true,
-                    fillColor: isDark ? Colors.grey[800]?.withValues(alpha: 0.5) : Colors.grey[50],
+                    fillColor: isDark ? Colors.grey[800]?.withValues(alpha:   0.5) : Colors.grey[50],
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                   ),
                   dropdownColor: isDark ? Colors.grey[800] : Colors.white,
@@ -1137,10 +1234,10 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
                   const SizedBox(height: 20),
                   _buildAnimatedTextField(
                     controller: widget.specialtyCtrl,
-                    label: 'Especialidad personalizada',
+                    label: localizations.customSpecialty, // Usar texto localizado
                     icon: Icons.edit,
                     isDark: isDark,
-                    validator: (value) => value == null || value.isEmpty ? 'Ingresa una especialidad personalizada' : null,
+                    validator: (value) => value == null || value.isEmpty ? 'Ingresa una especialidad personalizada' : null, // No localizado
                     delay: 250,
                     autovalidateMode: AutovalidateMode.onUserInteraction,
                   ),
@@ -1194,7 +1291,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
                   margin: const EdgeInsets.all(12),
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: primaryColor.withValues(alpha: 0.1),
+                    color: primaryColor.withValues(alpha:   0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(
@@ -1228,7 +1325,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
                   borderSide: const BorderSide(color: errorColor, width: 2),
                 ),
                 filled: true,
-                fillColor: isDark ? Colors.grey[800]?.withValues(alpha: 0.5) : Colors.grey[50],
+                fillColor: isDark ? Colors.grey[800]?.withValues(alpha:   0.5) : Colors.grey[50],
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
               ),
             ),
@@ -1247,8 +1344,8 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            errorColor.withValues(alpha: 0.1),
-            errorColor.withValues(alpha: 0.05),
+            errorColor.withValues(alpha:  0.1),
+            errorColor.withValues(alpha:  0.05),
           ],
         ),
         border: Border.all(color: errorColor, width: 1),
@@ -1259,7 +1356,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
           Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: errorColor.withValues(alpha: 0.2),
+              color: errorColor.withValues(alpha:   0.2),
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Icon(Icons.error_outline, color: errorColor, size: 20),
@@ -1281,7 +1378,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
   }
 
   // Construye los botones de acción del popup
-  Widget _buildActionButtons(bool isDark) {
+  Widget _buildActionButtons(bool isDark, AppLocalizations localizations) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
@@ -1311,7 +1408,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    'Cancelar',
+                    localizations.cancel, // Usar texto localizado
                     style: TextStyle(
                       color: isDark ? primaryColor : Colors.black87,
                       fontWeight: FontWeight.w500,
@@ -1329,13 +1426,13 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
               gradient: LinearGradient(
                 colors: [
                   primaryColor,
-                  primaryColor.withValues(alpha: 0.8),
+                  primaryColor.withValues(alpha:  0.8),
                 ],
               ),
               borderRadius: BorderRadius.circular(10),
               boxShadow: [
                 BoxShadow(
-                  color: primaryColor.withValues(alpha: 0.3),
+                  color: primaryColor.withValues(alpha:   0.3),
                   blurRadius: 8,
                   offset: const Offset(0, 4),
                 ),
@@ -1360,18 +1457,18 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
                         valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
                       ),
                     )
-                  : const Row(
+                  : Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
+                        const Icon(
                           Icons.save,
                           color: Colors.black,
                           size: 18,
                         ),
-                        SizedBox(width: 8),
+                        const SizedBox(width: 8),
                         Text(
-                          'Guardar Cambios',
-                          style: TextStyle(
+                          localizations.saveChanges, // Usar texto localizado
+                          style: const TextStyle(
                             color: Colors.black,
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
@@ -1478,7 +1575,7 @@ class BlurredBackground extends StatelessWidget {
             duration: themeAnimationDuration,
             color: isDark
                 ? const Color.fromRGBO(0, 0, 0, 0.7)
-                : Colors.white.withValues(alpha: 0.85),
+                : Colors.white.withValues(alpha:  0.85),
           ),
         ),
       ),
@@ -1492,10 +1589,11 @@ class NotificationsBottomSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final localizations = AppLocalizations.of(context)!;
     return Container(
       height: 200,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor, // Usar color del tema
         borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(20),
           topRight: Radius.circular(20),
@@ -1503,8 +1601,8 @@ class NotificationsBottomSheet extends StatelessWidget {
       ),
       child: Center(
         child: Text(
-          'Notificaciones',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          localizations.notifications, // Usar texto localizado
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Theme.of(context).textTheme.bodyLarge?.color), // Usar color del tema
         ),
       ),
     );

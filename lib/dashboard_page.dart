@@ -8,6 +8,7 @@ import 'nav_panel.dart';
 import 'theme_provider.dart';
 import 'appbar.dart';
 import './integrations/clients_service.dart';
+import './l10n/app_localizations.dart'; // Importar el archivo generado
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -59,6 +60,7 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget build(BuildContext context) {
     final bool isWide = MediaQuery.of(context).size.width >= 800;
     final user = Supabase.instance.client.auth.currentUser!;
+    final AppLocalizations localizations = AppLocalizations.of(context)!;
 
     return FutureBuilder(
       future: _loadUserData,
@@ -70,7 +72,7 @@ class _DashboardPageState extends State<DashboardPage> {
             return Scaffold(
               backgroundColor: isDark ? null : Colors.grey.shade50,
               appBar: CustomAppBar(
-                title: 'Dashboard',
+                title: localizations.dashboardPageTitle,
                 onNotificationPressed: _showNotifications,
                 isWide: isWide,
               ),
@@ -99,11 +101,11 @@ class _DashboardPageState extends State<DashboardPage> {
                             ),
                             const VerticalDivider(width: 1),
                             Expanded(
-                              child: MainContent(user: user, isDark: isDark),
+                              child: MainContent(user: user, isDark: isDark, localizations: localizations),
                             ),
                           ],
                         )
-                      : MainContent(user: user, isDark: isDark),
+                      : MainContent(user: user, isDark: isDark, localizations: localizations),
                 ],
               ),
             );
@@ -217,8 +219,8 @@ class _AnimatedAppearanceState extends State<AnimatedAppearance>
 class MainContent extends StatefulWidget {
   final User user;
   final bool isDark;
-
-  const MainContent({super.key, required this.user, required this.isDark});
+  final AppLocalizations localizations;
+  const MainContent({super.key, required this.user, required this.isDark, required this.localizations});
 
   @override
   State<MainContent> createState() => _MainContentState();
@@ -279,7 +281,7 @@ class _MainContentState extends State<MainContent> {
                     children: [
                       Expanded(
                         child: StatCard(
-                          title: 'Citas Hoy',
+                          title: widget.localizations.appointmentsToday,
                           value: '8',
                           icon: Icons.event_available,
                           isDark: widget.isDark,
@@ -288,7 +290,7 @@ class _MainContentState extends State<MainContent> {
                       SizedBox(width: spacing),
                       Expanded(
                         child: StatCard(
-                          title: 'Clientes',
+                          title: widget.localizations.clientsStat,
                           valueFuture: _clientCount,
                           icon: Icons.people_outline,
                           isDark: widget.isDark,
@@ -304,7 +306,7 @@ class _MainContentState extends State<MainContent> {
                     children: [
                       Expanded(
                         child: StatCard(
-                          title: 'Próxima',
+                          title: widget.localizations.nextAppointmentShort,
                           value: '2:30 PM',
                           icon: Icons.schedule,
                           isDark: widget.isDark,
@@ -313,7 +315,7 @@ class _MainContentState extends State<MainContent> {
                       SizedBox(width: spacing),
                       Expanded(
                         child: StatCard(
-                          title: 'Ingresos',
+                          title: widget.localizations.income,
                           value: '\$12.4K',
                           icon: Icons.trending_up,
                           isDark: widget.isDark,
@@ -339,9 +341,9 @@ class _MainContentState extends State<MainContent> {
                         );
                       },
                       icon: const Icon(Icons.add, color: Colors.black),
-                      label: const Text(
-                        'Nueva Cita',
-                        style: TextStyle(
+                      label: Text(
+                        widget.localizations.newAppointment,
+                        style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                           color: Colors.black,
@@ -367,7 +369,7 @@ class _MainContentState extends State<MainContent> {
                       Expanded(
                         child: ActionCard(
                           icon: Icons.history,
-                          label: 'Ver Citas',
+                          label: widget.localizations.viewAppointments,
                           color: widget.isDark ? Colors.grey[800]! : Colors.white.withValues(alpha: 0.95),
                           textColor: const ui.Color(0xFFBDA206),
                           isDark: widget.isDark,
@@ -378,7 +380,7 @@ class _MainContentState extends State<MainContent> {
                       Expanded(
                         child: ActionCard(
                           icon: Icons.calendar_today,
-                          label: 'Calendario',
+                          label: widget.localizations.calendarAction,
                           color: widget.isDark ? Colors.grey[800]! : Colors.white.withValues(alpha: 0.95),
                           textColor: const ui.Color(0xFFBDA206),
                           isDark: widget.isDark,
@@ -417,7 +419,7 @@ class _MainContentState extends State<MainContent> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Ingresos de la Semana',
+                          widget.localizations.weeklyRevenue,
                           style: TextStyle(
                             fontSize: 20,
                              fontWeight: FontWeight.bold,
@@ -555,7 +557,7 @@ class _MainContentState extends State<MainContent> {
                                 ),
                                 const SizedBox(width: 12),
                                 Text(
-                                  'Actividad Reciente',
+                                  widget.localizations.recentActivity,
                                   style: TextStyle(
                                     fontSize: 22,
                                      fontWeight: FontWeight.bold,
@@ -571,27 +573,27 @@ class _MainContentState extends State<MainContent> {
                                 children: [
                                   Expanded(
                                     child: ActivityCard(
-                                      title: 'Último Cliente',
+                                      title: widget.localizations.latestClient,
                                       icon: Icons.person_add,
-                                      content: _buildLatestClient(latestClient, widget.isDark),
+                                      content: _buildLatestClient(latestClient, widget.isDark, widget.localizations),
                                       isDark: widget.isDark,
                                     ),
                                   ),
                                   const SizedBox(width: 16),
                                   Expanded(
                                     child: ActivityCard(
-                                      title: 'Última Cita',
+                                      title: widget.localizations.latestAppointment,
                                       icon: Icons.event,
-                                      content: _buildLatestAppointment(latestAppointmentData, widget.isDark),
+                                      content: _buildLatestAppointment(latestAppointmentData, widget.isDark, widget.localizations),
                                       isDark: widget.isDark,
                                     ),
                                   ),
                                   const SizedBox(width: 16),
                                   Expanded(
                                     child: ActivityCard(
-                                      title: 'Próximas Citas',
+                                      title: widget.localizations.upcomingAppointments,
                                       icon: Icons.schedule,
-                                      content: _buildLastThreeAppointments(lastThreeAppointments, widget.isDark),
+                                      content: _buildLastThreeAppointments(lastThreeAppointments, widget.isDark, widget.localizations),
                                       isDark: widget.isDark,
                                     ),
                                   ),
@@ -601,23 +603,23 @@ class _MainContentState extends State<MainContent> {
                               Column(
                                 children: [
                                   ActivityCard(
-                                    title: 'Último Cliente',
+                                    title: widget.localizations.latestClient,
                                     icon: Icons.person_add,
-                                    content: _buildLatestClient(latestClient, widget.isDark),
+                                    content: _buildLatestClient(latestClient, widget.isDark, widget.localizations),
                                     isDark: widget.isDark,
                                   ),
                                   const SizedBox(height: 16),
                                   ActivityCard(
-                                    title: 'Última Cita',
+                                    title: widget.localizations.latestAppointment,
                                     icon: Icons.event,
-                                    content: _buildLatestAppointment(latestAppointmentData, widget.isDark),
+                                    content: _buildLatestAppointment(latestAppointmentData, widget.isDark, widget.localizations),
                                     isDark: widget.isDark,
                                   ),
                                   const SizedBox(height: 16),
                                   ActivityCard(
-                                    title: 'Próximas Citas',
+                                    title: widget.localizations.upcomingAppointments,
                                     icon: Icons.schedule,
-                                    content: _buildLastThreeAppointments(lastThreeAppointments, widget.isDark),
+                                    content: _buildLastThreeAppointments(lastThreeAppointments, widget.isDark, widget.localizations),
                                     isDark: widget.isDark,
                                   ),
                                 ],
@@ -637,7 +639,7 @@ class _MainContentState extends State<MainContent> {
     );
   }
 
-  Widget _buildLatestClient(Map? client, bool isDark) {
+  Widget _buildLatestClient(Map? client, bool isDark, AppLocalizations localizations) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -645,43 +647,43 @@ class _MainContentState extends State<MainContent> {
         if (client != null)
           ActivityTile(
             title: client['name'],
-            subtitle: 'Registrado',
+            subtitle: localizations.registered,
             time: DateFormat('dd/MM/yyyy').format(DateTime.parse(client['registration_date']).toLocal()),
             isDark: isDark,
             icon: Icons.person,
           )
         else
           Text(
-            'No hay clientes registrados',
+            localizations.noClientsRegistered,
             style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[700]),
           ),
       ],
     );
   }
 
-  Widget _buildLatestAppointment(Map? appointmentData, bool isDark) {
+  Widget _buildLatestAppointment(Map? appointmentData, bool isDark, AppLocalizations localizations) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 8),
         if (appointmentData != null)
           ActivityTile(
-            title: appointmentData['clientName'] ?? 'Cliente desconocido',
-            subtitle: 'Hora: ${DateTime.parse(appointmentData['start_time']).toLocal().toString().split(' ')[1].substring(0, 5)}',
-            time: appointmentData['status'] ?? 'Sin estado',
+            title: appointmentData['clientName'] ?? localizations.unknownClient,
+            subtitle: '${localizations.time}: ${DateTime.parse(appointmentData['start_time']).toLocal().toString().split(' ')[1].substring(0, 5)}',
+            time: appointmentData['status'] ?? localizations.noStatus,
             isDark: isDark,
             icon: Icons.event,
           )
         else
           Text(
-            'No hay citas registradas',
+            localizations.noAppointmentsRegistered,
             style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[700]),
           ),
       ],
     );
   }
 
-  Widget _buildLastThreeAppointments(List<Map> appointments, bool isDark) {
+  Widget _buildLastThreeAppointments(List<Map> appointments, bool isDark, AppLocalizations localizations) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -692,9 +694,9 @@ class _MainContentState extends State<MainContent> {
               return Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: ActivityTile(
-                  title: appointment['clientName'] ?? 'Cliente desconocido',
-                  subtitle: 'Hora: ${DateTime.parse(appointment['start_time']).toLocal().toString().split(' ')[1].substring(0, 5)}',
-                  time: appointment['status'] ?? 'Sin estado',
+                  title: appointment['clientName'] ?? localizations.unknownClient,
+                  subtitle: '${localizations.time}: ${DateTime.parse(appointment['start_time']).toLocal().toString().split(' ')[1].substring(0, 5)}',
+                  time: appointment['status'] ?? localizations.noStatus,
                   isDark: isDark,
                   icon: Icons.schedule,
                 ),
@@ -703,7 +705,7 @@ class _MainContentState extends State<MainContent> {
           )
         else
           Text(
-            'No hay citas registradas',
+            localizations.noAppointmentsRegistered,
             style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[700]),
           ),
       ],

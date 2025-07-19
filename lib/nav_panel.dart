@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'theme_provider.dart';
+import './l10n/app_localizations.dart'; // Importar el archivo generado
 
 // Duración constante para las animaciones de transición
 const Duration themeAnimationDuration = Duration(milliseconds: 300);
@@ -181,13 +182,14 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
   //[-------------LISTA DE NAVEGACIÓN--------------]
   // Construye la lista de opciones de navegación con efectos de hover y selección
   Widget _buildNavigationList(String current, ThemeData theme, ThemeProvider themeProvider, ui.Color primaryAccent, ui.Color secondaryAccent) {
+    final AppLocalizations localizations = AppLocalizations.of(context)!;
     final navItems = [
-      {'icon': Icons.dashboard_rounded, 'label': 'Dashboard', 'route': '/dashboard'},
-      {'icon': Icons.event_available_rounded, 'label': 'Citas', 'route': '/appointments'},
-      {'icon': Icons.calendar_month_rounded, 'label': 'Calendario', 'route': '/calendar'},
-      {'icon': Icons.people_rounded, 'label': 'Clientes', 'route': '/clients'},
-      {'icon': Icons.picture_as_pdf_rounded, 'label': 'Reportes', 'route': '/reports'},
-      {'icon': Icons.person_rounded, 'label': 'Mi Perfil', 'route': '/profile'},
+      {'icon': Icons.dashboard_rounded, 'label': localizations.dashboard, 'route': '/dashboard'},
+      {'icon': Icons.event_available_rounded, 'label': localizations.appointments, 'route': '/appointments'},
+      {'icon': Icons.calendar_month_rounded, 'label': localizations.calendar, 'route': '/calendar'},
+      {'icon': Icons.people_rounded, 'label': localizations.clients, 'route': '/clients'},
+      {'icon': Icons.picture_as_pdf_rounded, 'label': localizations.reports, 'route': '/reports'},
+      {'icon': Icons.person_rounded, 'label': localizations.myProfile, 'route': '/profile'},
     ];
 
     return ListView.builder(
@@ -336,6 +338,7 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
 
   // Interruptor para cambiar entre modo oscuro y claro
   Widget _buildThemeSwitcher(ThemeData theme, ThemeProvider themeProvider, ui.Color accent) {
+    final AppLocalizations localizations = AppLocalizations.of(context)!;
     return AnimatedContainer(
       duration: themeAnimationDuration,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -360,7 +363,7 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
               fontSize: 14,
               fontWeight: FontWeight.w500,
             ),
-            child: const Text('Modo Oscuro'),
+            child: Text(localizations.darkMode),
           ),
           const Spacer(),
           GestureDetector(
@@ -408,6 +411,7 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
 
   // Botón para cerrar sesión
   Widget _buildLogoutButton(ui.Color accent) {
+    final AppLocalizations localizations = AppLocalizations.of(context)!;
     return AnimatedContainer(
       duration: themeAnimationDuration,
       width: double.infinity,
@@ -432,16 +436,16 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
           onTap: widget.onLogout,
-          child: const Padding(
-            padding: EdgeInsets.symmetric(vertical: 12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(Icons.logout_rounded, color: Colors.white, size: 20),
                 SizedBox(width: 8),
                 Text(
-                  'Cerrar sesión',
-                  style: TextStyle(
+                  localizations.logout,
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
