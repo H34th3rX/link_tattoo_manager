@@ -14,10 +14,11 @@ dependencies:
 
   # Backend y autenticación
   supabase_flutter: ^2.9.1
+  google_sign_in: ^6.2.1
 
   shared_preferences: ^2.2.2
 
-  #Graficos
+  # Graficos
   syncfusion_flutter_charts: 29.2.11
 
   # Almacenamiento offline

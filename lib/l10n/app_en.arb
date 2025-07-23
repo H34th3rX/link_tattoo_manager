@@ -66,5 +66,76 @@
     "time": "Time",
     "noStatus": "No Status",
     "noAppointmentsRegistered": "No appointments registered",
-    "unknownClient": "Unknown Client"
+    "unknownClient": "Unknown Client",
+    "clientsPageTitle": "Clients Management",
+    "myClients": "My Clients",
+    "clientsShown": "{filtered} of {total} clients shown",
+    "@clientsShown": {
+        "placeholders": {
+            "filtered": {},
+            "total": {}
+        }
+    },
+    "newClient": "New Client",
+    "searchClients": "Search clients by name, email, or phone...",
+    "showAll": "Show all",
+    "onlyActive": "Only active",
+    "noClientsFound": "No clients found",
+    "trySearchingAll": "Try searching all clients or check the filters",
+    "onlyActiveClients": "Only active clients",
+    "inactiveClientsAvailable": "There are inactive clients available. Tap 'Show all' to view them.",
+    "noClientsRegisteredMessage": "No clients registered",
+    "addFirstClient": "Add your first client to get started",
+    "active": "Active",
+    "inactive": "Inactive",
+    "notSpecified": "Not specified",
+    "noNotes": "No notes",
+    "viewProfile": "View profile",
+    "edit": "Edit",
+    "delete": "Delete",
+    "deactivateClient": "Deactivate client",
+    "activateClient": "Activate client",
+    "preferredContact": "Pref: {method}",
+    "@preferredContact": {
+        "placeholders": {
+            "method": {}
+        }
+    },
+    "noNewNotifications": "No new notifications",
+    "close": "Close",
+    "editClient": "Edit Client",
+    "addClientInfo": "Add the client's information",
+    "modifyClientInfo": "Modify the client's information",
+    "fullName": "Full name",
+    "additionalNotes": "Additional notes",
+    "preferredContactMethod": "Preferred contact method",
+    "contactMethodEmail": "Email",
+    "contactMethodPhone": "Phone",
+    "contactMethodWhatsApp": "WhatsApp",
+    "contactMethodSMS": "SMS",
+    "createClient": "Create Client",
+    "update": "Update",
+    "confirmDeletion": "Confirm deletion",
+    "deleteClientConfirmation": "Are you sure you want to delete this client?",
+    "clientCreatedSuccessfully": "Client created successfully",
+    "clientUpdatedSuccessfully": "Client updated successfully",
+    "clientDeletedSuccessfully": "Client deleted successfully",
+    "clientStatusUpdated": "Client status updated",
+    "errorLoadingUserData": "Error loading user data",
+    "errorLoadingClients": "Error loading clients. Check your connection.",
+    "errorLoggingOut": "Error logging out.",
+    "errorSavingClient": "Error saving client: {error}",
+    "@errorSavingClient": {
+        "placeholders": {
+            "error": {}
+        }
+    },
+    "errorDeletingClient": "Error deleting client.",
+    "errorChangingClientStatus": "Error changing client status.",
+    "nameRequired": "The name is required",
+    "nameLengthError": "The name must be between 2 and 50 characters",
+    "nameFormatError": "The name can only contain letters and spaces",
+    "phoneRequired": "The phone is required",
+    "phoneFormatError": "Invalid phone format",
+    "emailFormatError": "Invalid email format"
 }

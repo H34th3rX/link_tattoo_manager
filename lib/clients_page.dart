@@ -6,6 +6,7 @@ import 'nav_panel.dart';
 import 'theme_provider.dart';
 import 'appbar.dart';
 import './integrations/clients_service.dart';
+import './l10n/app_localizations.dart'; // Importar localizaciones
 
 //[-------------CONSTANTES DE ESTILO Y TEMA--------------]
 const Color primaryColor = Color(0xFFBDA206);
@@ -91,7 +92,10 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
         });
       }
     } catch (e) {
-      _showError('Error al cargar datos del usuario');
+      if (mounted){
+        final localizations = AppLocalizations.of(context)!;
+        _showError(localizations.errorLoadingUserData);
+      }
     }
   }
 
@@ -111,10 +115,12 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
           _filteredClients = List.from(_clients);
           _loading = false;
         });
+        _filterClients();
       }
     } catch (e) {
       if (mounted) {
-        _showError('Error al cargar los clientes. Verifica tu conexión.');
+        final localizations = AppLocalizations.of(context)!;
+        _showError(localizations.errorLoadingClients);
       }
     }
   }
@@ -175,7 +181,10 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
         Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
       }
     } catch (e) {
-      _showError('Error al cerrar sesión.');
+      if (mounted){
+         final localizations = AppLocalizations.of(context)!;
+        _showError(localizations.errorLoggingOut);
+      }
     }
   }
 
@@ -229,6 +238,8 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
       final notes = _notesCtrl.text.trim().isNotEmpty ? _notesCtrl.text.trim() : null;
       final preferredContactMethod = _preferredContactCtrl.text.trim().toLowerCase();
 
+      final localizations = AppLocalizations.of(context)!;
+
       if (_selectedClient == null) {
         await ClientsService.createClient(
           employeeId: user.id,
@@ -238,7 +249,7 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
           notes: notes,
           preferredContactMethod: preferredContactMethod,
         );
-        _showSuccess('Cliente creado exitosamente');
+        _showSuccess(localizations.clientCreatedSuccessfully);
       } else {
         await ClientsService.updateClient(
           clientId: _selectedClient!['id'],
@@ -249,14 +260,17 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
           notes: notes,
           preferredContactMethod: preferredContactMethod,
         );
-        _showSuccess('Cliente actualizado exitosamente');
+        _showSuccess(localizations.clientUpdatedSuccessfully);
       }
       if (mounted) {
         _closePopup();
         await _fetchClients();
       }
     } catch (e) {
-      _showError('Error al guardar el cliente: ${e.toString()}');
+      if (mounted){
+            final localizations = AppLocalizations.of(context)!;
+        _showError(localizations.errorSavingClient(e.toString()));
+      }
     } finally {
       if (mounted) {
         setState(() => _loading = false);
@@ -265,19 +279,20 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
   }
 
   Future<void> _deleteClient(String id) async {
+    final localizations = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Confirmar eliminación'),
-        content: const Text('¿Estás seguro de que quieres eliminar este cliente?'),
+        title: Text(localizations.confirmDeletion),
+        content: Text(localizations.deleteClientConfirmation),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancelar'),
+            child: Text(localizations.cancel),
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
+            child: Text(localizations.delete, style: const TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -294,10 +309,12 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
           _filteredClients.removeWhere((client) => client['id'] == id);
           _loading = false;
         });
-        _showSuccess('Cliente eliminado exitosamente');
+        _showSuccess(localizations.clientDeletedSuccessfully);
       }
     } catch (e) {
-      _showError('Error al eliminar el cliente.');
+      if (mounted){
+      _showError(localizations.errorDeletingClient);
+      }
     } finally {
       if (mounted) {
         setState(() => _loading = false);
@@ -326,10 +343,14 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
           }
           _loading = false;
         });
-        _showSuccess('Estado del cliente actualizado');
+        final localizations = AppLocalizations.of(context)!;
+        _showSuccess(localizations.clientStatusUpdated);
       }
     } catch (e) {
-      _showError('Error al cambiar el estado del cliente.');
+        if (mounted){
+          final localizations = AppLocalizations.of(context)!;
+        _showError(localizations.errorChangingClientStatus);
+        }
     } finally {
       if (mounted) {
         setState(() => _loading = false);
@@ -343,6 +364,7 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
     final bool isWide = MediaQuery.of(context).size.width >= 800;
     final user = Supabase.instance.client.auth.currentUser!;
     final bool isDark = themeProvider.isDark;
+    final localizations = AppLocalizations.of(context)!;
 
     return FutureBuilder(
       future: _loadUserData,
@@ -352,7 +374,7 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
             return Scaffold(
               backgroundColor: isDark ? backgroundColor : Colors.grey[100],
               appBar: CustomAppBar(
-                title: 'Gestión de Clientes',
+                title: localizations.clientsPageTitle,
                 onNotificationPressed: _showNotifications,
                 isWide: isWide,
               ),
@@ -384,10 +406,10 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
                                   : const Center(child: CircularProgressIndicator()),
                             ),
                             const VerticalDivider(width: 1),
-                            Expanded(child: _buildMainContent(isDark, isWide)),
+                            Expanded(child: _buildMainContent(isDark, isWide, localizations)),
                           ],
                         )
-                      : _buildMainContent(isDark, isWide),
+                      : _buildMainContent(isDark, isWide, localizations),
                   if (_isPopupOpen)
                     Positioned.fill(
                       left: isWide ? 280 : 0,
@@ -403,6 +425,7 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
                         loading: _loading,
                         error: _error,
                         saveClient: _saveClient,
+                        localizations: localizations,
                       ),
                     ),
                   if (_error != null)
@@ -496,7 +519,7 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
     );
   }
 
-  Widget _buildMainContent(bool isDark, bool isWide) {
+  Widget _buildMainContent(bool isDark, bool isWide, AppLocalizations localizations) {
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       child: Center(
@@ -507,13 +530,13 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildHeader(isDark),
+                _buildHeader(isDark, localizations),
                 const SizedBox(height: 16),
-                _buildSearchBar(isDark),
+                _buildSearchBar(isDark, localizations),
                 const SizedBox(height: 16),
                 SizedBox(
                   height: MediaQuery.of(context).size.height * 0.6,
-                  child: _buildClientsList(isDark),
+                  child: _buildClientsList(isDark, localizations),
                 ),
               ],
             ),
@@ -523,7 +546,7 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
     );
   }
 
-  Widget _buildHeader(bool isDark) {
+  Widget _buildHeader(bool isDark, AppLocalizations localizations) {
     return AnimatedContainer(
       duration: themeAnimationDuration,
       child: Row(
@@ -539,7 +562,7 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
                   fontWeight: FontWeight.bold,
                   color: isDark ? textColor : Colors.black87,
                 ),
-                child: const Text('Mis Clientes'),
+                child: Text(localizations.myClients),
               ),
               AnimatedDefaultTextStyle(
                 duration: themeAnimationDuration,
@@ -547,16 +570,16 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
                   fontSize: 16,
                   color: isDark ? hintColor : Colors.grey[600],
                 ),
-                child: Text('${_filteredClients.length} de ${_clients.length} clientes mostrados'),
+                child: Text(localizations.clientsShown(_filteredClients.length, _clients.length)),
               ),
             ],
           ),
           ElevatedButton.icon(
             onPressed: _loading ? null : _openCreateClientPopup,
             icon: const Icon(Icons.add, color: Colors.black),
-            label: const Text(
-              'Nuevo Cliente',
-              style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+            label: Text(
+              localizations.newClient,
+              style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
             ),
             style: ElevatedButton.styleFrom(
               backgroundColor: primaryColor,
@@ -570,7 +593,7 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
     );
   }
 
-  Widget _buildSearchBar(bool isDark) {
+  Widget _buildSearchBar(bool isDark, AppLocalizations localizations) {
     return Column(
       children: [
         AnimatedContainer(
@@ -586,7 +609,7 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
             controller: _searchCtrl,
             style: TextStyle(color: isDark ? textColor : Colors.black87),
             decoration: InputDecoration(
-              hintText: 'Buscar clientes por nombre, email o teléfono...',
+              hintText: localizations.searchClients,
               hintStyle: TextStyle(color: isDark ? hintColor : Colors.grey[600]),
               prefixIcon: Icon(Icons.search, color: isDark ? hintColor : Colors.grey[600]),
               suffixIcon: _searchCtrl.text.isNotEmpty
@@ -638,7 +661,7 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
                           fontWeight: FontWeight.w500,
                           color: _showInactiveClients ? (isDark ? hintColor : Colors.grey[600]) : primaryColor,
                         ),
-                        child: Text(_showInactiveClients ? 'Mostrar todos' : 'Solo activos'),
+                        child: Text(_showInactiveClients ? localizations.showAll : localizations.onlyActive),
                       ),
                     ],
                   ),
@@ -710,7 +733,7 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
     );
   }
 
-  Widget _buildClientsList(bool isDark) {
+  Widget _buildClientsList(bool isDark, AppLocalizations localizations) {
     if (_loading && _clients.isEmpty) {
       return const Center(child: CircularProgressIndicator(color: primaryColor));
     }
@@ -718,16 +741,16 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
       String emptyMessage;
       String emptySubmessage;
       if (_searchCtrl.text.isNotEmpty) {
-        emptyMessage = 'No se encontraron clientes';
+        emptyMessage = localizations.noClientsFound;
         emptySubmessage = !_showInactiveClients
-            ? 'Intenta buscar en todos los clientes o revisa los filtros'
-            : 'Intenta con otros términos de búsqueda';
+            ? localizations.trySearchingAll
+            : localizations.trySearchingAll;
       } else if (!_showInactiveClients && _clients.any((c) => !(c['status'] ?? true))) {
-        emptyMessage = 'Solo clientes activos';
-        emptySubmessage = 'Hay clientes inactivos disponibles. Toca "Mostrar todos" para verlos.';
+        emptyMessage = localizations.onlyActiveClients;
+        emptySubmessage = localizations.inactiveClientsAvailable;
       } else {
-        emptyMessage = 'No hay clientes registrados';
-        emptySubmessage = 'Agrega tu primer cliente para comenzar';
+        emptyMessage = localizations.noClientsRegisteredMessage;
+        emptySubmessage = localizations.addFirstClient;
       }
       return Padding(
         padding: const EdgeInsets.only(top: 16),
@@ -780,6 +803,7 @@ class _ClientsPageState extends State<ClientsPage> with TickerProviderStateMixin
                       onDelete: () => _deleteClient(client['id']),
                       onToggleStatus: () => _toggleClientStatus(client['id'], client['status'] ?? true),
                       isLoading: _loading,
+                      localizations: localizations,
                     ),
                   );
                 },
@@ -810,6 +834,7 @@ class NotificationsBottomSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final localizations = AppLocalizations.of(context)!;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: const BoxDecoration(
@@ -819,11 +844,11 @@ class NotificationsBottomSheet extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text('Notificaciones', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          Text(localizations.notifications, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
           const SizedBox(height: 20),
-          const Text('No hay notificaciones nuevas'),
+          Text(localizations.noNewNotifications),
           const SizedBox(height: 20),
-          ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text('Cerrar')),
+          ElevatedButton(onPressed: () => Navigator.pop(context), child: Text(localizations.close)),
         ],
       ),
     );
@@ -836,9 +861,8 @@ class ClientCard extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback onToggleStatus;
-  final bool
-
- isLoading;
+  final bool isLoading;
+  final AppLocalizations localizations;
 
   const ClientCard({
     super.key,
@@ -848,19 +872,20 @@ class ClientCard extends StatelessWidget {
     required this.onDelete,
     required this.onToggleStatus,
     required this.isLoading,
+    required this.localizations,
   });
 
   @override
   Widget build(BuildContext context) {
     final isActive = client['status'] ?? true;
-    final preferredContact = client['preferred_contact_method'] ?? 'No especificado';
-    final notes = client['notes'] ?? 'Sin notas';
+    final preferredContact = client['preferred_contact_method'] ?? localizations.notSpecified;
+    final notes = client['notes'] ?? localizations.noNotes;
     final bool isWide = MediaQuery.of(context).size.width >= 800;
 
     return AnimatedContainer(
       duration: themeAnimationDuration,
       decoration: BoxDecoration(
-        color: isDark ? cardColor : Colors.white, // Uso de cardColor en modo oscuro
+        color: isDark ? cardColor : Colors.white,
         borderRadius: BorderRadius.circular(borderRadius),
         border: Border.all(color: isDark ? Colors.grey[700]! : Colors.grey[200]!, width: 0.5),
         boxShadow: [
@@ -912,7 +937,7 @@ class ClientCard extends StatelessWidget {
                           fontWeight: FontWeight.w600,
                           fontSize: 15,
                         ),
-                        child: Text(client['name'] ?? 'Sin nombre', maxLines: 1, overflow: TextOverflow.ellipsis),
+                        child: Text(client['name'] ?? localizations.notSpecified, maxLines: 1, overflow: TextOverflow.ellipsis),
                       ),
                       const SizedBox(height: 2),
                       Row(
@@ -933,7 +958,7 @@ class ClientCard extends StatelessWidget {
                               fontSize: 11,
                               fontWeight: FontWeight.w500,
                             ),
-                            child: Text(isActive ? 'Activo' : 'Inactivo'),
+                            child: Text(isActive ? localizations.active : localizations.inactive),
                           ),
                         ],
                       ),
@@ -941,7 +966,7 @@ class ClientCard extends StatelessWidget {
                   ),
                 ),
                 Tooltip(
-                  message: isActive ? 'Desactivar cliente' : 'Activar cliente',
+                  message: isActive ? localizations.deactivateClient : localizations.activateClient,
                   child: Transform.scale(
                     scale: 0.7,
                     child: AnimatedContainer(
@@ -958,7 +983,7 @@ class ClientCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 10),
-            if (client['email'] != null || client['phone'] != null || preferredContact != 'No especificado' || notes != 'Sin notas') ...[
+            if (client['email'] != null || client['phone'] != null || preferredContact != localizations.notSpecified || notes != localizations.noNotes) ...[
               AnimatedContainer(
                 duration: themeAnimationDuration,
                 width: double.infinity,
@@ -974,11 +999,11 @@ class ClientCard extends StatelessWidget {
                     if (client['email'] != null) _buildInfoRow(Icons.email, client['email']),
                     if (client['email'] != null && client['phone'] != null) const SizedBox(height: 4),
                     if (client['phone'] != null) _buildInfoRow(Icons.phone, client['phone']),
-                    if (preferredContact != 'No especificado') ...[
+                    if (preferredContact != localizations.notSpecified) ...[
                       const SizedBox(height: 4),
-                      _buildInfoRow(Icons.contact_phone_outlined, 'Pref: $preferredContact'),
+                      _buildInfoRow(Icons.contact_phone_outlined, localizations.preferredContact(preferredContact)),
                     ],
-                    if (notes != 'Sin notas') ...[
+                    if (notes != localizations.noNotes) ...[
                       const SizedBox(height: 4),
                       _buildInfoRow(Icons.note_outlined, notes),
                     ],
@@ -1010,7 +1035,7 @@ class ClientCard extends StatelessWidget {
                             : () {
                                 Navigator.pushNamed(context, '/client_profile', arguments: client);
                               },
-                        tooltip: 'Ver perfil',
+                        tooltip: localizations.viewProfile,
                       ),
                     ),
                     const SizedBox(width: 6),
@@ -1027,7 +1052,7 @@ class ClientCard extends StatelessWidget {
                         icon: Icon(Icons.edit, size: isWide ? 20 : 18),
                         color: primaryColor,
                         onPressed: isLoading ? null : onEdit,
-                        tooltip: 'Editar',
+                        tooltip: localizations.edit,
                       ),
                     ),
                     const SizedBox(width: 6),
@@ -1044,7 +1069,7 @@ class ClientCard extends StatelessWidget {
                         icon: Icon(Icons.delete, size: isWide ? 20 : 18),
                         color: Colors.red,
                         onPressed: isLoading ? null : onDelete,
-                        tooltip: 'Eliminar',
+                        tooltip: localizations.delete,
                       ),
                     ),
                   ],
@@ -1086,6 +1111,7 @@ class ClientPopup extends StatefulWidget {
   final bool loading;
   final String? error;
   final Future<void> Function() saveClient;
+  final AppLocalizations localizations;
 
   const ClientPopup({
     super.key,
@@ -1100,6 +1126,7 @@ class ClientPopup extends StatefulWidget {
     required this.loading,
     required this.error,
     required this.saveClient,
+    required this.localizations,
   });
 
   @override
@@ -1113,11 +1140,11 @@ class _ClientPopupState extends State<ClientPopup> with TickerProviderStateMixin
   late Animation<Offset> _slideAnimation;
 
   String _selectedContactMethod = 'email';
-  final List<Map<String, dynamic>> _contactMethods = [
-    {'value': 'email', 'label': 'Email', 'icon': Icons.email},
-    {'value': 'telefono', 'label': 'Teléfono', 'icon': Icons.phone},
-    {'value': 'whatsapp', 'label': 'WhatsApp', 'icon': Icons.chat},
-    {'value': 'sms', 'label': 'SMS', 'icon': Icons.sms},
+  List<Map<String, dynamic>> get _contactMethods => [
+    {'value': 'email', 'label': widget.localizations.contactMethodEmail, 'icon': Icons.email},
+    {'value': 'telefono', 'label': widget.localizations.contactMethodPhone, 'icon': Icons.phone},
+    {'value': 'whatsapp', 'label': widget.localizations.contactMethodWhatsApp, 'icon': Icons.chat},
+    {'value': 'sms', 'label': widget.localizations.contactMethodSMS, 'icon': Icons.sms},
   ];
 
   @override
@@ -1155,21 +1182,21 @@ class _ClientPopupState extends State<ClientPopup> with TickerProviderStateMixin
   }
 
   String? _validateName(String? value) {
-    if (value == null || value.isEmpty) return 'El nombre es requerido';
-    if (value.length < 2 || value.length > 50) return 'El nombre debe tener entre 2 y 50 caracteres';
-    if (!RegExp(r'^[a-zA-ZÀ-ÿñÑ\s]+$').hasMatch(value)) return 'El nombre solo puede contener letras y espacios';
+    if (value == null || value.isEmpty) return widget.localizations.nameRequired;
+    if (value.length < 2 || value.length > 50) return widget.localizations.nameLengthError;
+    if (!RegExp(r'^[a-zA-ZÀ-ÿñÑ\s]+$').hasMatch(value)) return widget.localizations.nameFormatError;
     return null;
   }
 
   String? _validatePhone(String? value) {
-    if (value == null || value.isEmpty) return 'El teléfono es requerido';
-    if (!RegExp(r'^\+?[\d\s\-()]{7,15}$').hasMatch(value)) return 'Formato de teléfono no válido';
+    if (value == null || value.isEmpty) return widget.localizations.phoneRequired;
+    if (!RegExp(r'^\+?[\d\s\-()]{7,15}$').hasMatch(value)) return widget.localizations.phoneFormatError;
     return null;
   }
 
   String? _validateEmail(String? value) {
     if (value == null || value.isEmpty) return null;
-    if (!RegExp(r'^[\w\.-]+@[\w\.-]+\.\w+$').hasMatch(value)) return 'Formato de email no válido';
+    if (!RegExp(r'^[\w\.-]+@[\w\.-]+\.\w+$').hasMatch(value)) return widget.localizations.emailFormatError;
     return null;
   }
 
@@ -1251,11 +1278,11 @@ class _ClientPopupState extends State<ClientPopup> with TickerProviderStateMixin
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                widget.selectedClient == null ? 'Nuevo Cliente' : 'Editar Cliente',
+                widget.selectedClient == null ? widget.localizations.newClient : widget.localizations.editClient,
                 style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: isDark ? textColor : Colors.black87),
               ),
               Text(
-                widget.selectedClient == null ? 'Agrega la información del cliente' : 'Modifica los datos del cliente',
+                widget.selectedClient == null ? widget.localizations.addClientInfo : widget.localizations.modifyClientInfo,
                 style: TextStyle(fontSize: 14, color: isDark ? hintColor : Colors.grey[600]),
               ),
             ],
@@ -1274,7 +1301,7 @@ class _ClientPopupState extends State<ClientPopup> with TickerProviderStateMixin
       children: [
         _buildAnimatedTextField(
           controller: widget.nameCtrl,
-          label: 'Nombre completo',
+          label: widget.localizations.fullName,
           icon: Icons.person_outline,
           validator: _validateName,
           isDark: isDark,
@@ -1284,7 +1311,7 @@ class _ClientPopupState extends State<ClientPopup> with TickerProviderStateMixin
         const SizedBox(height: 20),
         _buildAnimatedTextField(
           controller: widget.phoneCtrl,
-          label: 'Teléfono',
+          label: widget.localizations.phone,
           icon: Icons.phone_outlined,
           keyboardType: TextInputType.phone,
           validator: _validatePhone,
@@ -1294,7 +1321,7 @@ class _ClientPopupState extends State<ClientPopup> with TickerProviderStateMixin
         const SizedBox(height: 20),
         _buildAnimatedTextField(
           controller: widget.emailCtrl,
-          label: 'Email',
+          label: widget.localizations.email,
           icon: Icons.email_outlined,
           keyboardType: TextInputType.emailAddress,
           validator: _validateEmail,
@@ -1306,7 +1333,7 @@ class _ClientPopupState extends State<ClientPopup> with TickerProviderStateMixin
         const SizedBox(height: 20),
         _buildAnimatedTextField(
           controller: widget.notesCtrl,
-          label: 'Notas adicionales',
+          label: widget.localizations.additionalNotes,
           icon: Icons.note_outlined,
           maxLines: 3,
           isDark: isDark,
@@ -1333,7 +1360,7 @@ class _ClientPopupState extends State<ClientPopup> with TickerProviderStateMixin
                     Icon(Icons.contact_phone_outlined, color: primaryColor, size: 20),
                     const SizedBox(width: 8),
                     Text(
-                      'Método de contacto preferido',
+                      widget.localizations.preferredContactMethod,
                       style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: isDark ? textColor : Colors.black87),
                     ),
                   ],
@@ -1507,7 +1534,7 @@ class _ClientPopupState extends State<ClientPopup> with TickerProviderStateMixin
               children: [
                 Icon(Icons.close, size: 18, color: isDark ? textColor : Colors.black87),
                 const SizedBox(width: 6),
-                Text('Cancelar', style: TextStyle(color: isDark ? textColor : Colors.black87, fontWeight: FontWeight.w500)),
+                Text(widget.localizations.cancel, style: TextStyle(color: isDark ? textColor : Colors.black87, fontWeight: FontWeight.w500)),
               ],
             ),
           ),
@@ -1539,7 +1566,7 @@ class _ClientPopupState extends State<ClientPopup> with TickerProviderStateMixin
                       Icon(widget.selectedClient == null ? Icons.add : Icons.save, color: Colors.black, size: 18),
                       const SizedBox(width: 8),
                       Text(
-                        widget.selectedClient == null ? 'Crear Cliente' : 'Actualizar',
+                        widget.selectedClient == null ? widget.localizations.createClient : widget.localizations.update,
                         style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 14),
                       ),
                     ],

@@ -28,10 +28,12 @@ class AppLocalizationsEs extends AppLocalizations {
   String get notifications => 'Notificaciones';
 
   @override
-  String get noEmployeeProfileLoaded => 'No se ha cargado el perfil del empleado.';
+  String get noEmployeeProfileLoaded =>
+      'No se ha cargado el perfil del empleado.';
 
   @override
-  String get ensureAccountLinked => 'Por favor, asegúrate de que tu cuenta esté vinculada a un perfil de empleado.';
+  String get ensureAccountLinked =>
+      'Por favor, asegúrate de que tu cuenta esté vinculada a un perfil de empleado.';
 
   @override
   String get retry => 'Reintentar';
@@ -182,4 +184,181 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get unknownClient => 'Cliente Desconocido';
+
+  @override
+  String get clientsPageTitle => 'Gestión de Clientes';
+
+  @override
+  String get myClients => 'Mis Clientes';
+
+  @override
+  String clientsShown(Object filtered, Object total) {
+    return '$filtered de $total clientes mostrados';
+  }
+
+  @override
+  String get newClient => 'Nuevo Cliente';
+
+  @override
+  String get searchClients => 'Buscar clientes por nombre, email o teléfono...';
+
+  @override
+  String get showAll => 'Mostrar todos';
+
+  @override
+  String get onlyActive => 'Solo activos';
+
+  @override
+  String get noClientsFound => 'No se encontraron clientes';
+
+  @override
+  String get trySearchingAll =>
+      'Intenta buscar en todos los clientes o revisa los filtros';
+
+  @override
+  String get onlyActiveClients => 'Solo clientes activos';
+
+  @override
+  String get inactiveClientsAvailable =>
+      'Hay clientes inactivos disponibles. Toca \'Mostrar todos\' para verlos.';
+
+  @override
+  String get noClientsRegisteredMessage => 'No hay clientes registrados';
+
+  @override
+  String get addFirstClient => 'Agrega tu primer cliente para comenzar';
+
+  @override
+  String get active => 'Activo';
+
+  @override
+  String get inactive => 'Inactivo';
+
+  @override
+  String get notSpecified => 'No especificado';
+
+  @override
+  String get noNotes => 'Sin notas';
+
+  @override
+  String get viewProfile => 'Ver perfil';
+
+  @override
+  String get edit => 'Editar';
+
+  @override
+  String get delete => 'Eliminar';
+
+  @override
+  String get deactivateClient => 'Desactivar cliente';
+
+  @override
+  String get activateClient => 'Activar cliente';
+
+  @override
+  String preferredContact(Object method) {
+    return 'Pref: $method';
+  }
+
+  @override
+  String get noNewNotifications => 'No hay notificaciones nuevas';
+
+  @override
+  String get close => 'Cerrar';
+
+  @override
+  String get editClient => 'Editar Cliente';
+
+  @override
+  String get addClientInfo => 'Agrega la información del cliente';
+
+  @override
+  String get modifyClientInfo => 'Modifica los datos del cliente';
+
+  @override
+  String get fullName => 'Nombre completo';
+
+  @override
+  String get additionalNotes => 'Notas adicionales';
+
+  @override
+  String get preferredContactMethod => 'Método de contacto preferido';
+
+  @override
+  String get contactMethodEmail => 'Email';
+
+  @override
+  String get contactMethodPhone => 'Teléfono';
+
+  @override
+  String get contactMethodWhatsApp => 'WhatsApp';
+
+  @override
+  String get contactMethodSMS => 'SMS';
+
+  @override
+  String get createClient => 'Crear Cliente';
+
+  @override
+  String get update => 'Actualizar';
+
+  @override
+  String get confirmDeletion => 'Confirmar eliminación';
+
+  @override
+  String get deleteClientConfirmation =>
+      '¿Estás seguro de que quieres eliminar este cliente?';
+
+  @override
+  String get clientCreatedSuccessfully => 'Cliente creado exitosamente';
+
+  @override
+  String get clientUpdatedSuccessfully => 'Cliente actualizado exitosamente';
+
+  @override
+  String get clientDeletedSuccessfully => 'Cliente eliminado exitosamente';
+
+  @override
+  String get clientStatusUpdated => 'Estado del cliente actualizado';
+
+  @override
+  String get errorLoadingUserData => 'Error al cargar datos del usuario';
+
+  @override
+  String get errorLoadingClients =>
+      'Error al cargar los clientes. Verifica tu conexión.';
+
+  @override
+  String get errorLoggingOut => 'Error al cerrar sesión.';
+
+  @override
+  String errorSavingClient(Object error) {
+    return 'Error al guardar el cliente: $error';
+  }
+
+  @override
+  String get errorDeletingClient => 'Error al eliminar el cliente.';
+
+  @override
+  String get errorChangingClientStatus =>
+      'Error al cambiar el estado del cliente.';
+
+  @override
+  String get nameRequired => 'El nombre es requerido';
+
+  @override
+  String get nameLengthError => 'El nombre debe tener entre 2 y 50 caracteres';
+
+  @override
+  String get nameFormatError =>
+      'El nombre solo puede contener letras y espacios';
+
+  @override
+  String get phoneRequired => 'El teléfono es requerido';
+
+  @override
+  String get phoneFormatError => 'Formato de teléfono no válido';
+
+  @override
+  String get emailFormatError => 'Formato de email no válido';
 }

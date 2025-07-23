@@ -66,5 +66,76 @@
     "time": "Hora",
     "noStatus": "Sin Estado",
     "noAppointmentsRegistered": "No hay citas registradas",
-    "unknownClient": "Cliente Desconocido"
+    "unknownClient": "Cliente Desconocido",
+    "clientsPageTitle": "Gestión de Clientes",
+    "myClients": "Mis Clientes",
+    "clientsShown": "{filtered} de {total} clientes mostrados",
+    "@clientsShown": {
+        "placeholders": {
+            "filtered": {},
+            "total": {}
+        }
+    },
+    "newClient": "Nuevo Cliente",
+    "searchClients": "Buscar clientes por nombre, email o teléfono...",
+    "showAll": "Mostrar todos",
+    "onlyActive": "Solo activos",
+    "noClientsFound": "No se encontraron clientes",
+    "trySearchingAll": "Intenta buscar en todos los clientes o revisa los filtros",
+    "onlyActiveClients": "Solo clientes activos",
+    "inactiveClientsAvailable": "Hay clientes inactivos disponibles. Toca 'Mostrar todos' para verlos.",
+    "noClientsRegisteredMessage": "No hay clientes registrados",
+    "addFirstClient": "Agrega tu primer cliente para comenzar",
+    "active": "Activo",
+    "inactive": "Inactivo",
+    "notSpecified": "No especificado",
+    "noNotes": "Sin notas",
+    "viewProfile": "Ver perfil",
+    "edit": "Editar",
+    "delete": "Eliminar",
+    "deactivateClient": "Desactivar cliente",
+    "activateClient": "Activar cliente",
+    "preferredContact": "Pref: {method}",
+    "@preferredContact": {
+        "placeholders": {
+            "method": {}
+        }
+    },
+    "noNewNotifications": "No hay notificaciones nuevas",
+    "close": "Cerrar",
+    "editClient": "Editar Cliente",
+    "addClientInfo": "Agrega la información del cliente",
+    "modifyClientInfo": "Modifica los datos del cliente",
+    "fullName": "Nombre completo",
+    "additionalNotes": "Notas adicionales",
+    "preferredContactMethod": "Método de contacto preferido",
+    "contactMethodEmail": "Email",
+    "contactMethodPhone": "Teléfono",
+    "contactMethodWhatsApp": "WhatsApp",
+    "contactMethodSMS": "SMS",
+    "createClient": "Crear Cliente",
+    "update": "Actualizar",
+    "confirmDeletion": "Confirmar eliminación",
+    "deleteClientConfirmation": "¿Estás seguro de que quieres eliminar este cliente?",
+    "clientCreatedSuccessfully": "Cliente creado exitosamente",
+    "clientUpdatedSuccessfully": "Cliente actualizado exitosamente",
+    "clientDeletedSuccessfully": "Cliente eliminado exitosamente",
+    "clientStatusUpdated": "Estado del cliente actualizado",
+    "errorLoadingUserData": "Error al cargar datos del usuario",
+    "errorLoadingClients": "Error al cargar los clientes. Verifica tu conexión.",
+    "errorLoggingOut": "Error al cerrar sesión.",
+    "errorSavingClient": "Error al guardar el cliente: {error}",
+    "@errorSavingClient": {
+        "placeholders": {
+            "error": {}
+        }
+    },
+    "errorDeletingClient": "Error al eliminar el cliente.",
+    "errorChangingClientStatus": "Error al cambiar el estado del cliente.",
+    "nameRequired": "El nombre es requerido",
+    "nameLengthError": "El nombre debe tener entre 2 y 50 caracteres",
+    "nameFormatError": "El nombre solo puede contener letras y espacios",
+    "phoneRequired": "El teléfono es requerido",
+    "phoneFormatError": "Formato de teléfono no válido",
+    "emailFormatError": "Formato de email no válido"
 }
