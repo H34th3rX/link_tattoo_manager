@@ -358,4 +358,142 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get emailFormatError => 'Invalid email format';
+
+  @override
+  String get appTitle => 'LinkTattoo Manager';
+
+  @override
+  String get emailOrUsername => 'Email or Username';
+
+  @override
+  String get password => 'Password';
+
+  @override
+  String get signIn => 'Sign In';
+
+  @override
+  String get forgotPassword => 'Forgot your password?';
+
+  @override
+  String get continueWithGoogle => 'Continue with Google';
+
+  @override
+  String get or => 'OR';
+
+  @override
+  String get dontHaveAccount => 'Don\'t have an account? ';
+
+  @override
+  String get signUp => 'Sign Up';
+
+  @override
+  String get emailOrUsernameRequired => 'Email or username is required';
+
+  @override
+  String get invalidEmailOrUsername =>
+      'Enter a valid email or username\n(minimum 3 characters, only letters, numbers, - and _)';
+
+  @override
+  String get passwordRequired => 'Password is required';
+
+  @override
+  String get passwordMinLength => 'Password must be at least 6 characters';
+
+  @override
+  String get userSignedOut => 'User signed out';
+
+  @override
+  String authError(Object error) {
+    return 'Authentication error: $error';
+  }
+
+  @override
+  String get invalidCredentials =>
+      'Invalid credentials. Check your email and password.';
+
+  @override
+  String get invalidUsernameCredentials =>
+      'Invalid credentials. Check your username and password.';
+
+  @override
+  String incorrectPassword(Object username) {
+    return 'Incorrect password for user: $username';
+  }
+
+  @override
+  String get userNotFound =>
+      'User not found. Check that the username is correct.';
+
+  @override
+  String get databaseConnectionError => 'Database connection error. Try again.';
+
+  @override
+  String get unexpectedLoginError => 'Unexpected login error. Try again.';
+
+  @override
+  String get profileVerificationError => 'Error verifying profile. Try again.';
+
+  @override
+  String get signingInWithGoogle => 'Signing in with Google...';
+
+  @override
+  String get signInCancelled => 'Sign in cancelled';
+
+  @override
+  String get connectionError => 'Connection error. Check your internet';
+
+  @override
+  String get configurationError => 'Configuration error. Contact administrator';
+
+  @override
+  String get authTokenError => 'Authentication error. Try again';
+
+  @override
+  String get alternativeMethod => 'Alternative method';
+
+  @override
+  String get directMethodFailed =>
+      'The direct method failed. Do you want to try Google\'s redirect method?';
+
+  @override
+  String get tryAgain => 'Try';
+
+  @override
+  String alternativeMethodError(Object error) {
+    return 'Alternative method error: $error';
+  }
+
+  @override
+  String get passwordRecoveryInDevelopment =>
+      'Password recovery feature in development';
+
+  @override
+  String get authErrorInvalidLogin =>
+      'Invalid credentials. Check your email or username and password.';
+
+  @override
+  String get authErrorEmailNotConfirmed =>
+      'Email not confirmed. Check your inbox and confirm your account.';
+
+  @override
+  String get authErrorTooManyRequests =>
+      'Too many failed attempts. Wait a few minutes before trying again.';
+
+  @override
+  String get authErrorUserNotFound => 'User not found. Check your credentials.';
+
+  @override
+  String get authErrorInvalidPassword => 'Incorrect password.';
+
+  @override
+  String get authErrorSignupDisabled => 'Registration is temporarily disabled.';
+
+  @override
+  String get authErrorEmailRateLimit =>
+      'Email limit exceeded. Wait before trying again.';
+
+  @override
+  String authErrorGeneric(Object message) {
+    return 'Authentication error: $message';
+  }
 }

@@ -769,6 +769,246 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Invalid email format'**
   String get emailFormatError;
+
+  /// No description provided for @appTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'LinkTattoo Manager'**
+  String get appTitle;
+
+  /// No description provided for @emailOrUsername.
+  ///
+  /// In en, this message translates to:
+  /// **'Email or Username'**
+  String get emailOrUsername;
+
+  /// No description provided for @password.
+  ///
+  /// In en, this message translates to:
+  /// **'Password'**
+  String get password;
+
+  /// No description provided for @signIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign In'**
+  String get signIn;
+
+  /// No description provided for @forgotPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Forgot your password?'**
+  String get forgotPassword;
+
+  /// No description provided for @continueWithGoogle.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue with Google'**
+  String get continueWithGoogle;
+
+  /// No description provided for @or.
+  ///
+  /// In en, this message translates to:
+  /// **'OR'**
+  String get or;
+
+  /// No description provided for @dontHaveAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Don\'t have an account? '**
+  String get dontHaveAccount;
+
+  /// No description provided for @signUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign Up'**
+  String get signUp;
+
+  /// No description provided for @emailOrUsernameRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Email or username is required'**
+  String get emailOrUsernameRequired;
+
+  /// No description provided for @invalidEmailOrUsername.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid email or username\n(minimum 3 characters, only letters, numbers, - and _)'**
+  String get invalidEmailOrUsername;
+
+  /// No description provided for @passwordRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Password is required'**
+  String get passwordRequired;
+
+  /// No description provided for @passwordMinLength.
+  ///
+  /// In en, this message translates to:
+  /// **'Password must be at least 6 characters'**
+  String get passwordMinLength;
+
+  /// No description provided for @userSignedOut.
+  ///
+  /// In en, this message translates to:
+  /// **'User signed out'**
+  String get userSignedOut;
+
+  /// No description provided for @authError.
+  ///
+  /// In en, this message translates to:
+  /// **'Authentication error: {error}'**
+  String authError(Object error);
+
+  /// No description provided for @invalidCredentials.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid credentials. Check your email and password.'**
+  String get invalidCredentials;
+
+  /// No description provided for @invalidUsernameCredentials.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid credentials. Check your username and password.'**
+  String get invalidUsernameCredentials;
+
+  /// No description provided for @incorrectPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Incorrect password for user: {username}'**
+  String incorrectPassword(Object username);
+
+  /// No description provided for @userNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'User not found. Check that the username is correct.'**
+  String get userNotFound;
+
+  /// No description provided for @databaseConnectionError.
+  ///
+  /// In en, this message translates to:
+  /// **'Database connection error. Try again.'**
+  String get databaseConnectionError;
+
+  /// No description provided for @unexpectedLoginError.
+  ///
+  /// In en, this message translates to:
+  /// **'Unexpected login error. Try again.'**
+  String get unexpectedLoginError;
+
+  /// No description provided for @profileVerificationError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error verifying profile. Try again.'**
+  String get profileVerificationError;
+
+  /// No description provided for @signingInWithGoogle.
+  ///
+  /// In en, this message translates to:
+  /// **'Signing in with Google...'**
+  String get signingInWithGoogle;
+
+  /// No description provided for @signInCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in cancelled'**
+  String get signInCancelled;
+
+  /// No description provided for @connectionError.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection error. Check your internet'**
+  String get connectionError;
+
+  /// No description provided for @configurationError.
+  ///
+  /// In en, this message translates to:
+  /// **'Configuration error. Contact administrator'**
+  String get configurationError;
+
+  /// No description provided for @authTokenError.
+  ///
+  /// In en, this message translates to:
+  /// **'Authentication error. Try again'**
+  String get authTokenError;
+
+  /// No description provided for @alternativeMethod.
+  ///
+  /// In en, this message translates to:
+  /// **'Alternative method'**
+  String get alternativeMethod;
+
+  /// No description provided for @directMethodFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The direct method failed. Do you want to try Google\'s redirect method?'**
+  String get directMethodFailed;
+
+  /// No description provided for @tryAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Try'**
+  String get tryAgain;
+
+  /// No description provided for @alternativeMethodError.
+  ///
+  /// In en, this message translates to:
+  /// **'Alternative method error: {error}'**
+  String alternativeMethodError(Object error);
+
+  /// No description provided for @passwordRecoveryInDevelopment.
+  ///
+  /// In en, this message translates to:
+  /// **'Password recovery feature in development'**
+  String get passwordRecoveryInDevelopment;
+
+  /// No description provided for @authErrorInvalidLogin.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid credentials. Check your email or username and password.'**
+  String get authErrorInvalidLogin;
+
+  /// No description provided for @authErrorEmailNotConfirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'Email not confirmed. Check your inbox and confirm your account.'**
+  String get authErrorEmailNotConfirmed;
+
+  /// No description provided for @authErrorTooManyRequests.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many failed attempts. Wait a few minutes before trying again.'**
+  String get authErrorTooManyRequests;
+
+  /// No description provided for @authErrorUserNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'User not found. Check your credentials.'**
+  String get authErrorUserNotFound;
+
+  /// No description provided for @authErrorInvalidPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Incorrect password.'**
+  String get authErrorInvalidPassword;
+
+  /// No description provided for @authErrorSignupDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Registration is temporarily disabled.'**
+  String get authErrorSignupDisabled;
+
+  /// No description provided for @authErrorEmailRateLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'Email limit exceeded. Wait before trying again.'**
+  String get authErrorEmailRateLimit;
+
+  /// No description provided for @authErrorGeneric.
+  ///
+  /// In en, this message translates to:
+  /// **'Authentication error: {message}'**
+  String authErrorGeneric(Object message);
 }
 
 class _AppLocalizationsDelegate

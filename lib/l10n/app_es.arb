@@ -137,5 +137,72 @@
     "nameFormatError": "El nombre solo puede contener letras y espacios",
     "phoneRequired": "El teléfono es requerido",
     "phoneFormatError": "Formato de teléfono no válido",
-    "emailFormatError": "Formato de email no válido"
+    "emailFormatError": "Formato de email no válido",
+
+
+     "appTitle": "LinkTattoo Manager",
+    "emailOrUsername": "Email o Nombre de usuario",
+    "password": "Contraseña",
+    "signIn": "Iniciar Sesión",
+    "forgotPassword": "¿Olvidaste tu contraseña?",
+    "continueWithGoogle": "Continuar con Google",
+    "or": "O",
+    "dontHaveAccount": "¿No tienes una cuenta? ",
+    "signUp": "Regístrate",
+
+    "emailOrUsernameRequired": "El email o nombre de usuario es requerido",
+    "invalidEmailOrUsername": "Ingresa un email válido o un nombre de usuario\n(mínimo 3 caracteres, solo letras, números, - y _)",
+    "passwordRequired": "La contraseña es requerida",
+    "passwordMinLength": "La contraseña debe tener al menos 6 caracteres",
+
+    "userSignedOut": "Usuario cerró sesión",
+    "authError": "Error de autenticación: {error}",
+    "@authError": {
+        "placeholders": {
+            "error": {}
+        }
+    },
+    "invalidCredentials": "Credenciales inválidas. Verifica tu email y contraseña.",
+    "invalidUsernameCredentials": "Credenciales inválidas. Verifica tu nombre de usuario y contraseña.",
+    "incorrectPassword": "Contraseña incorrecta para el usuario: {username}",
+    "@incorrectPassword": {
+        "placeholders": {
+            "username": {}
+        }
+    },
+    "userNotFound": "Usuario no encontrado. Verifica que el nombre de usuario sea correcto.",
+    "databaseConnectionError": "Error de conexión con la base de datos. Intenta de nuevo.",
+    "unexpectedLoginError": "Error inesperado al iniciar sesión. Intenta de nuevo.",
+    "profileVerificationError": "Error al verificar el perfil. Intenta de nuevo.",
+
+    "signingInWithGoogle": "Iniciando sesión con Google...",
+    "signInCancelled": "Inicio de sesión cancelado",
+    "connectionError": "Error de conexión. Verifica tu internet",
+    "configurationError": "Error de configuración. Contacta al administrador",
+    "authTokenError": "Error de autenticación. Intenta de nuevo",
+    "alternativeMethod": "Método alternativo",
+    "directMethodFailed": "El método directo falló. ¿Quieres intentar con el método de redirección de Google?",
+    "tryAgain": "Intentar",
+    "alternativeMethodError": "Error en método alternativo: {error}",
+    "@alternativeMethodError": {
+        "placeholders": {
+            "error": {}
+        }
+    },
+
+    "passwordRecoveryInDevelopment": "Función de recuperación en desarrollo",
+
+    "authErrorInvalidLogin": "Credenciales inválidas. Verifica tu email o nombre de usuario y contraseña.",
+    "authErrorEmailNotConfirmed": "Email no confirmado. Revisa tu bandeja de entrada y confirma tu cuenta.",
+    "authErrorTooManyRequests": "Demasiados intentos fallidos. Espera unos minutos antes de intentar de nuevo.",
+    "authErrorUserNotFound": "Usuario no encontrado. Verifica tus credenciales.",
+    "authErrorInvalidPassword": "Contraseña incorrecta.",
+    "authErrorSignupDisabled": "El registro está temporalmente deshabilitado.",
+    "authErrorEmailRateLimit": "Límite de emails excedido. Espera antes de intentar de nuevo.",
+    "authErrorGeneric": "Error de autenticación: {message}",
+    "@authErrorGeneric": {
+        "placeholders": {
+            "message": {}
+        }
+    }
 }

@@ -361,4 +361,150 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get emailFormatError => 'Formato de email no válido';
+
+  @override
+  String get appTitle => 'LinkTattoo Manager';
+
+  @override
+  String get emailOrUsername => 'Email o Nombre de usuario';
+
+  @override
+  String get password => 'Contraseña';
+
+  @override
+  String get signIn => 'Iniciar Sesión';
+
+  @override
+  String get forgotPassword => '¿Olvidaste tu contraseña?';
+
+  @override
+  String get continueWithGoogle => 'Continuar con Google';
+
+  @override
+  String get or => 'O';
+
+  @override
+  String get dontHaveAccount => '¿No tienes una cuenta? ';
+
+  @override
+  String get signUp => 'Regístrate';
+
+  @override
+  String get emailOrUsernameRequired =>
+      'El email o nombre de usuario es requerido';
+
+  @override
+  String get invalidEmailOrUsername =>
+      'Ingresa un email válido o un nombre de usuario\n(mínimo 3 caracteres, solo letras, números, - y _)';
+
+  @override
+  String get passwordRequired => 'La contraseña es requerida';
+
+  @override
+  String get passwordMinLength =>
+      'La contraseña debe tener al menos 6 caracteres';
+
+  @override
+  String get userSignedOut => 'Usuario cerró sesión';
+
+  @override
+  String authError(Object error) {
+    return 'Error de autenticación: $error';
+  }
+
+  @override
+  String get invalidCredentials =>
+      'Credenciales inválidas. Verifica tu email y contraseña.';
+
+  @override
+  String get invalidUsernameCredentials =>
+      'Credenciales inválidas. Verifica tu nombre de usuario y contraseña.';
+
+  @override
+  String incorrectPassword(Object username) {
+    return 'Contraseña incorrecta para el usuario: $username';
+  }
+
+  @override
+  String get userNotFound =>
+      'Usuario no encontrado. Verifica que el nombre de usuario sea correcto.';
+
+  @override
+  String get databaseConnectionError =>
+      'Error de conexión con la base de datos. Intenta de nuevo.';
+
+  @override
+  String get unexpectedLoginError =>
+      'Error inesperado al iniciar sesión. Intenta de nuevo.';
+
+  @override
+  String get profileVerificationError =>
+      'Error al verificar el perfil. Intenta de nuevo.';
+
+  @override
+  String get signingInWithGoogle => 'Iniciando sesión con Google...';
+
+  @override
+  String get signInCancelled => 'Inicio de sesión cancelado';
+
+  @override
+  String get connectionError => 'Error de conexión. Verifica tu internet';
+
+  @override
+  String get configurationError =>
+      'Error de configuración. Contacta al administrador';
+
+  @override
+  String get authTokenError => 'Error de autenticación. Intenta de nuevo';
+
+  @override
+  String get alternativeMethod => 'Método alternativo';
+
+  @override
+  String get directMethodFailed =>
+      'El método directo falló. ¿Quieres intentar con el método de redirección de Google?';
+
+  @override
+  String get tryAgain => 'Intentar';
+
+  @override
+  String alternativeMethodError(Object error) {
+    return 'Error en método alternativo: $error';
+  }
+
+  @override
+  String get passwordRecoveryInDevelopment =>
+      'Función de recuperación en desarrollo';
+
+  @override
+  String get authErrorInvalidLogin =>
+      'Credenciales inválidas. Verifica tu email o nombre de usuario y contraseña.';
+
+  @override
+  String get authErrorEmailNotConfirmed =>
+      'Email no confirmado. Revisa tu bandeja de entrada y confirma tu cuenta.';
+
+  @override
+  String get authErrorTooManyRequests =>
+      'Demasiados intentos fallidos. Espera unos minutos antes de intentar de nuevo.';
+
+  @override
+  String get authErrorUserNotFound =>
+      'Usuario no encontrado. Verifica tus credenciales.';
+
+  @override
+  String get authErrorInvalidPassword => 'Contraseña incorrecta.';
+
+  @override
+  String get authErrorSignupDisabled =>
+      'El registro está temporalmente deshabilitado.';
+
+  @override
+  String get authErrorEmailRateLimit =>
+      'Límite de emails excedido. Espera antes de intentar de nuevo.';
+
+  @override
+  String authErrorGeneric(Object message) {
+    return 'Error de autenticación: $message';
+  }
 }

@@ -137,5 +137,73 @@
     "nameFormatError": "The name can only contain letters and spaces",
     "phoneRequired": "The phone is required",
     "phoneFormatError": "Invalid phone format",
-    "emailFormatError": "Invalid email format"
+    "emailFormatError": "Invalid email format",
+
+
+
+    "appTitle": "LinkTattoo Manager",
+    "emailOrUsername": "Email or Username",
+    "password": "Password",
+    "signIn": "Sign In",
+    "forgotPassword": "Forgot your password?",
+    "continueWithGoogle": "Continue with Google",
+    "or": "OR",
+    "dontHaveAccount": "Don't have an account? ",
+    "signUp": "Sign Up",
+
+    "emailOrUsernameRequired": "Email or username is required",
+    "invalidEmailOrUsername": "Enter a valid email or username\n(minimum 3 characters, only letters, numbers, - and _)",
+    "passwordRequired": "Password is required",
+    "passwordMinLength": "Password must be at least 6 characters",
+
+    "userSignedOut": "User signed out",
+    "authError": "Authentication error: {error}",
+    "@authError": {
+        "placeholders": {
+            "error": {}
+        }
+    },
+    "invalidCredentials": "Invalid credentials. Check your email and password.",
+    "invalidUsernameCredentials": "Invalid credentials. Check your username and password.",
+    "incorrectPassword": "Incorrect password for user: {username}",
+    "@incorrectPassword": {
+        "placeholders": {
+            "username": {}
+        }
+    },
+    "userNotFound": "User not found. Check that the username is correct.",
+    "databaseConnectionError": "Database connection error. Try again.",
+    "unexpectedLoginError": "Unexpected login error. Try again.",
+    "profileVerificationError": "Error verifying profile. Try again.",
+
+    "signingInWithGoogle": "Signing in with Google...",
+    "signInCancelled": "Sign in cancelled",
+    "connectionError": "Connection error. Check your internet",
+    "configurationError": "Configuration error. Contact administrator",
+    "authTokenError": "Authentication error. Try again",
+    "alternativeMethod": "Alternative method",
+    "directMethodFailed": "The direct method failed. Do you want to try Google's redirect method?",
+    "tryAgain": "Try",
+    "alternativeMethodError": "Alternative method error: {error}",
+    "@alternativeMethodError": {
+        "placeholders": {
+            "error": {}
+        }
+    },
+
+    "passwordRecoveryInDevelopment": "Password recovery feature in development",
+
+    "authErrorInvalidLogin": "Invalid credentials. Check your email or username and password.",
+    "authErrorEmailNotConfirmed": "Email not confirmed. Check your inbox and confirm your account.",
+    "authErrorTooManyRequests": "Too many failed attempts. Wait a few minutes before trying again.",
+    "authErrorUserNotFound": "User not found. Check your credentials.",
+    "authErrorInvalidPassword": "Incorrect password.",
+    "authErrorSignupDisabled": "Registration is temporarily disabled.",
+    "authErrorEmailRateLimit": "Email limit exceeded. Wait before trying again.",
+    "authErrorGeneric": "Authentication error: {message}",
+    "@authErrorGeneric": {
+        "placeholders": {
+            "message": {}
+        }
+    }
 }

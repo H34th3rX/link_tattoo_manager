@@ -1,10 +1,13 @@
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import './l10n/app_localizations.dart';
 import 'loading_screen.dart';
 import 'services/auth_service.dart';
 
-//[-------------PÁGINA DE INICIO DE SESIÓN--------------]
+//[-------------PÁGINA DE INICIO DE SESIÓN MULTI-PLATAFORMA--------------]
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
@@ -23,10 +26,15 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   late Animation<Offset> _slideAnimation;
   late Animation<double> _fadeAnimation;
   
-  // Variables de estado para manejar carga, visibilidad de contraseña y errores
-  bool _loading = false;
+  // Variables de estado separadas para cada tipo de login
+  bool _loadingEmailLogin = false;
+  bool _loadingGoogleLogin = false;
   bool _obscurePassword = true;
   String? _error;
+
+  // Expresiones regulares compiladas para mejor rendimiento
+  static final RegExp _emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+  static final RegExp _usernameRegex = RegExp(r'^[a-zA-Z0-9_-]{3,}$');
 
   // Constantes de estilo para mantener consistencia visual
   static const Color _accentColor = Color(0xFFBDA206);
@@ -38,12 +46,43 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   @override
   void initState() {
     super.initState();
-    // Inicializa las animaciones al cargar la página
     _initializeAnimations();
+    _setupAuthListener();
+  }
+
+  //[-------------CONFIGURACIÓN DE LISTENER PARA AUTH--------------]
+  void _setupAuthListener() {
+    AuthService.setupAuthListener(
+      onSignIn: (User user) {
+        if (mounted) {
+          setState(() {
+            _loadingGoogleLogin = false;
+            _error = null;
+          });
+          _checkAndRedirect(user);
+        }
+      },
+      onSignOut: () {
+        if (mounted && kDebugMode) {
+          final l10n = AppLocalizations.of(context);
+          if (kDebugMode) {
+            print(l10n?.userSignedOut ?? 'User signed out');
+          }
+        }
+      },
+      onError: (String error) {
+        if (mounted) {
+          setState(() {
+            _loadingGoogleLogin = false;
+          });
+          final l10n = AppLocalizations.of(context);
+          _setError(l10n?.authError(error) ?? 'Authentication error: $error');
+        }
+      },
+    );
   }
 
   //[-------------CONFIGURACIÓN DE ANIMACIONES--------------]
-  // Configura las animaciones de deslizamiento y fundido para la entrada del formulario
   void _initializeAnimations() {
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 800),
@@ -75,8 +114,14 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
 
+    // Evitar múltiples llamadas simultáneas
+    if (_loadingEmailLogin || _loadingGoogleLogin) return;
+
+    // Feedback háptico
+    HapticFeedback.lightImpact();
+
     setState(() {
-      _loading = true;
+      _loadingEmailLogin = true;
       _error = null;
     });
 
@@ -84,184 +129,383 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       final credential = _credentialCtrl.text.trim();
       final password = _passCtrl.text.trim();
 
-      // Verifica si la credencial es un email
-      final bool isEmail = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(credential);
+      // Verificar si la credencial es un email usando regex compilado
+      final bool isEmail = _emailRegex.hasMatch(credential);
       
       if (isEmail) {
-        // Login directo con email
+        await _attemptEmailLogin(credential, password);
+      } else {
+        await _attemptUsernameLogin(credential, password);
+      }
+    } catch (e) {
+      _handleLoginError(e);
+    } finally {
+      if (mounted) {
+        setState(() => _loadingEmailLogin = false);
+      }
+    }
+  }
+
+  // Método separado para login con email
+  Future<void> _attemptEmailLogin(String email, String password) async {
+    final response = await AuthService.signInWithEmailPassword(
+      email: email,
+      password: password,
+    );
+    
+    if (response.session != null) {
+      await _checkAndRedirect(response.user!);
+    } else if (mounted) {
+      final l10n = AppLocalizations.of(context);
+      _setError(l10n?.invalidCredentials ?? 'Invalid credentials');
+    }
+  }
+
+  // Método separado para login con username
+  Future<void> _attemptUsernameLogin(String username, String password) async {
+    final userResponse = await AuthService.getUserByUsername(username);
+    
+    if (userResponse != null && userResponse['email'] != null) {
+      final loginEmail = userResponse['email'] as String;
+      
+      try {
         final response = await AuthService.signInWithEmailPassword(
-          email: credential,
+          email: loginEmail,
           password: password,
         );
         
         if (response.session != null) {
           await _checkAndRedirect(response.user!);
-          return;
+        } else if (mounted) {
+          final l10n = AppLocalizations.of(context);
+          _setError(l10n?.invalidUsernameCredentials ?? 'Invalid credentials');
         }
-      } else {
-        // Busca el email asociado al nombre de usuario
-        final userResponse = await AuthService.getUserByUsername(credential);
-        
-        if (userResponse != null && userResponse['email'] != null) {
-          final loginEmail = userResponse['email'] as String;
-          
-          // Intenta login con el email encontrado
-          try {
-            final response = await AuthService.signInWithEmailPassword(
-              email: loginEmail,
-              password: password,
-            );
-            
-            if (response.session != null) {
-              await _checkAndRedirect(response.user!);
-              return;
-            }
-          } catch (authError) {
-            if (authError is AuthException && authError.message.contains('Invalid login credentials')) {
-              _setError('Contraseña incorrecta para el usuario: $credential');
-              return;
-            }
-            rethrow;
+      } catch (authError) {
+        if (authError is AuthException && authError.message.contains('Invalid login credentials')) {
+          if (mounted) {
+            final l10n = AppLocalizations.of(context);
+            _setError(l10n?.incorrectPassword(username) ?? 'Incorrect password for user: $username');
           }
-        } else {
-          _setError('Usuario no encontrado. Verifica que el nombre de usuario sea correcto.');
           return;
         }
+        rethrow;
       }
-
-      _setError('Credenciales inválidas. Verifica tu email o nombre de usuario y contraseña.');
-
-    } catch (e) {
-      if (e is AuthException) {
-        _setError(_getLocalizedAuthError(e.message));
-      } else if (e is PostgrestException) {
-        _setError('Error de conexión con la base de datos. Intenta de nuevo.');
-      } else {
-        _setError('Error inesperado al iniciar sesión. Intenta de nuevo.');
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _loading = false);
-      }
+    } else if (mounted) {
+      final l10n = AppLocalizations.of(context);
+      _setError(l10n?.userNotFound ?? 'User not found');
     }
   }
 
-  //[-------------LÓGICA DE INICIO DE SESIÓN CON GOOGLE--------------]
+  // Manejo centralizado de errores de login
+  void _handleLoginError(dynamic e) {
+    if (!mounted) return;
+    
+    String errorMessage;
+    final l10n = AppLocalizations.of(context);
+    
+    if (e is AuthException) {
+      errorMessage = _getLocalizedAuthError(e.message);
+    } else if (e is PostgrestException) {
+      errorMessage = l10n?.databaseConnectionError ?? 'Database connection error';
+    } else {
+      errorMessage = l10n?.unexpectedLoginError ?? 'Unexpected login error';
+      // Log del error para debugging (en desarrollo)
+      debugPrint('Error de login: $e');
+    }
+    
+    _setError(errorMessage);
+  }
+
+  //[-------------LÓGICA DE INICIO DE SESIÓN CON GOOGLE MEJORADA--------------]
   Future<void> _signInWithGoogle() async {
+    // Evitar múltiples llamadas simultáneas
+    if (_loadingEmailLogin || _loadingGoogleLogin) return;
+
+    // Feedback háptico
+    HapticFeedback.lightImpact();
+
     setState(() {
-      _loading = true;
+      _loadingGoogleLogin = true;
       _error = null;
     });
 
     try {
+      if (kIsWeb && mounted) {
+        // En Web, mostrar mensaje informativo
+        final l10n = AppLocalizations.of(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n?.signingInWithGoogle ?? 'Signing in with Google...'),
+            backgroundColor: _accentColor,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+
       final response = await AuthService.signInWithGoogle();
       
       if (response != null && response.session != null) {
+        // Login exitoso con respuesta directa
         await _checkAndRedirect(response.user!);
-      } else {
-        _setError('Inicio de sesión con Google cancelado');
+      } else if (kIsWeb) {
+        // En Web, el OAuth redirect manejará la respuesta
+        // El listener se encargará del resto
+        if (kDebugMode) {
+          print('OAuth redirect iniciado, esperando callback...');
+        }
+      } else if (mounted) {
+        // En Mobile, si no hay respuesta significa que se canceló
+        setState(() {
+          _loadingGoogleLogin = false;
+        });
+        final l10n = AppLocalizations.of(context);
+        _setError(l10n?.signInCancelled ?? 'Sign in cancelled');
       }
     } catch (e) {
-      _setError('Error al iniciar sesión con Google: ${e.toString()}');
-    } finally {
       if (mounted) {
-        setState(() => _loading = false);
+        setState(() {
+          _loadingGoogleLogin = false;
+        });
+        
+        final l10n = AppLocalizations.of(context);
+        String errorMessage = l10n?.signInCancelled ?? 'Sign in cancelled';
+        
+        // Manejo específico de errores comunes
+        final errorString = e.toString().toLowerCase();
+        if (errorString.contains('popup_closed_by_user') || 
+            errorString.contains('user_cancelled') ||
+            errorString.contains('cancelled')) {
+          errorMessage = l10n?.signInCancelled ?? 'Sign in cancelled';
+        } else if (errorString.contains('network') || 
+                   errorString.contains('connection')) {
+          errorMessage = l10n?.connectionError ?? 'Connection error';
+        } else if (errorString.contains('invalid_client') ||
+                   errorString.contains('unauthorized')) {
+          errorMessage = l10n?.configurationError ?? 'Configuration error';
+        } else if (errorString.contains('id token') || 
+                   errorString.contains('token')) {
+          errorMessage = l10n?.authTokenError ?? 'Authentication error';
+          
+          // En Web, ofrecer el método OAuth como alternativa
+          if (kIsWeb) {
+            _showOAuthFallbackDialog();
+            return;
+          }
+        }
+        
+        _setError(errorMessage);
+        if (kDebugMode) {
+          print('Error Google Sign In detallado: $e');
+        }
       }
     }
   }
 
-  //[-------------REDIRECCIÓN POST-LOGIN--------------]
-  // Verifica si el usuario tiene un perfil completo y redirige apropiadamente
-  Future<void> _checkAndRedirect(User user) async {
-    final profileExists = await AuthService.getEmployeeProfile(user.id);
-    
-    if (mounted) {
-      if (profileExists != null) {
-        final userName = profileExists['username'] as String? ?? user.email!.split('@')[0];
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => LoadingScreen(userName: userName),
+  //[-------------Dialog para feedback--------------]
+  void _showOAuthFallbackDialog() {
+  if (!mounted) return;
+  
+  // Obtener localizaciones usando el contexto del State antes del diálogo
+  final l10n = AppLocalizations.of(context);
+  final alternativeMethod = l10n?.alternativeMethod ?? 'Alternative method';
+  final directMethodFailed = l10n?.directMethodFailed ?? 'The direct method failed. Do you want to try Google\'s redirect method?';
+  final cancelText = l10n?.cancel ?? 'Cancel';
+  final tryAgainText = l10n?.tryAgain ?? 'Try';
+  
+  showDialog(
+    context: context,
+    builder: (BuildContext dialogContext) {
+      return AlertDialog(
+        backgroundColor: _cardColor,
+        title: Text(
+          alternativeMethod,
+          style: TextStyle(color: _accentColor),
+        ),
+        content: Text(
+          directMethodFailed,
+          style: TextStyle(color: _textColor),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              if (mounted) {
+                Navigator.of(dialogContext).pop();
+                setState(() {
+                  _loadingGoogleLogin = false;
+                });
+              }
+            },
+            child: Text(
+              cancelText,
+              style: TextStyle(color: _hintColor),
+            ),
           ),
-        );
-      } else {
-        Navigator.pushReplacementNamed(context, '/complete_profile');
+          ElevatedButton(
+            onPressed: () async {
+              if (mounted) {
+                Navigator.of(dialogContext).pop();
+                try {
+                  await AuthService.signInWithGoogleOAuth();
+                } catch (e) {
+                  if (mounted) {
+                    setState(() {
+                      _loadingGoogleLogin = false;
+                    });
+                    final l10nInner = AppLocalizations.of(context);
+                    _setError(l10nInner?.alternativeMethodError(e.toString()) ?? 'Alternative method error: ${e.toString()}');
+                  }
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _accentColor,
+              foregroundColor: _backgroundColor,
+            ),
+            child: Text(tryAgainText),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+  //[-------------REDIRECCIÓN POST-LOGIN--------------]
+  Future<void> _checkAndRedirect(User user) async {
+    try {
+      final profileExists = await AuthService.getEmployeeProfile(user.id);
+      
+      if (mounted) {
+        if (profileExists != null) {
+          final userName = profileExists['username'] as String? ?? 
+                          user.email?.split('@')[0] ?? 
+                          (AppLocalizations.of(context)?.username ?? 'User');
+          
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => LoadingScreen(userName: userName),
+            ),
+          );
+        } else {
+          Navigator.pushReplacementNamed(context, '/complete_profile');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        final l10n = AppLocalizations.of(context);
+        _setError(l10n?.profileVerificationError ?? 'Error verifying profile');
+        debugPrint('Error verificando perfil: $e');
       }
     }
   }
 
   //[-------------MANEJO DE ERRORES--------------]
-  // Establece un mensaje de error y lo elimina tras 5 segundos
   void _setError(String error) {
+    if (!mounted) return;
+    
     setState(() => _error = error);
+    
+    // Feedback háptico para errores
+    HapticFeedback.heavyImpact();
+    
+    // Auto-limpiar error después de 5 segundos
     Future.delayed(const Duration(seconds: 5), () {
-      if (mounted) {
+      if (mounted && _error == error) { // Solo limpiar si es el mismo error
         setState(() => _error = null);
       }
     });
   }
 
-  // Valida el campo de email o nombre de usuario
+  // Validaciones mejoradas
   String? _validateEmailOrUsername(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'El email o nombre de usuario es requerido';
+    if (!mounted) return null;
+    final l10n = AppLocalizations.of(context);
+    
+    if (value == null || value.trim().isEmpty) {
+      return l10n?.emailOrUsernameRequired ?? 'Email or username is required';
     }
     
-    final bool isValidEmail = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value);
-    final bool isValidUsername = RegExp(r'^[a-zA-Z0-9_-]{3,}$').hasMatch(value);
+    final trimmedValue = value.trim();
+    final bool isValidEmail = _emailRegex.hasMatch(trimmedValue);
+    final bool isValidUsername = _usernameRegex.hasMatch(trimmedValue);
     
     if (!isValidEmail && !isValidUsername) {
-      return 'Ingresa un email válido o un nombre de usuario (mínimo 3 caracteres, solo letras, números, - y _)';
+      return l10n?.invalidEmailOrUsername ?? 'Enter a valid email or username';
     }
     
     return null;
   }
 
-  // Traduce errores de autenticación a mensajes amigables
-  String _getLocalizedAuthError(String? message) {
-    if (message == null) return 'Error de autenticación';
-    
-    if (message.contains('Invalid login credentials')) {
-      return 'Credenciales inválidas. Verifica tu email o nombre de usuario y contraseña.';
-    } else if (message.contains('Email not confirmed')) {
-      return 'Email no confirmado. Revisa tu bandeja de entrada y confirma tu cuenta.';
-    } else if (message.contains('Too many requests')) {
-      return 'Demasiados intentos fallidos. Espera unos minutos antes de intentar de nuevo.';
-    } else if (message.contains('User not found')) {
-      return 'Usuario no encontrado. Verifica tus credenciales.';
-    } else if (message.contains('Invalid password')) {
-      return 'Contraseña incorrecta.';
-    }
-    
-    return 'Error de autenticación: $message';
-  }
-
-  // Valida el campo de contraseña
   String? _validatePassword(String? value) {
+    if (!mounted) return null;
+    final l10n = AppLocalizations.of(context);
+    
     if (value == null || value.isEmpty) {
-      return 'La contraseña es requerida';
+      return l10n?.passwordRequired ?? 'Password is required';
     }
     if (value.length < 6) {
-      return 'La contraseña debe tener al menos 6 caracteres';
+      return l10n?.passwordMinLength ?? 'Password must be at least 6 characters';
     }
     return null;
   }
+
+  // Mapeo mejorado de errores de autenticación
+  String _getLocalizedAuthError(String? message) {
+    if (message == null) {
+      if (!mounted) return 'Authentication error';
+      final l10n = AppLocalizations.of(context);
+      return l10n?.authErrorGeneric('Error desconocido') ?? 'Authentication error';
+    }
+    
+    if (!mounted) return 'Authentication error: $message';
+    final l10n = AppLocalizations.of(context);
+    
+    // Mapeo directo de errores con fallbacks
+    if (message.contains('Invalid login credentials')) {
+      return l10n?.authErrorInvalidLogin ?? 'Invalid credentials. Check your email or username and password.';
+    }
+    if (message.contains('Email not confirmed')) {
+      return l10n?.authErrorEmailNotConfirmed ?? 'Email not confirmed. Check your inbox and confirm your account.';
+    }
+    if (message.contains('Too many requests')) {
+      return l10n?.authErrorTooManyRequests ?? 'Too many failed attempts. Wait a few minutes before trying again.';
+    }
+    if (message.contains('User not found')) {
+      return l10n?.authErrorUserNotFound ?? 'User not found. Check your credentials.';
+    }
+    if (message.contains('Invalid password')) {
+      return l10n?.authErrorInvalidPassword ?? 'Incorrect password.';
+    }
+    if (message.contains('Signup disabled')) {
+      return l10n?.authErrorSignupDisabled ?? 'Registration is temporarily disabled.';
+    }
+    if (message.contains('Email rate limit exceeded')) {
+      return l10n?.authErrorEmailRateLimit ?? 'Email limit exceeded. Wait before trying again.';
+    }
+    
+    return l10n?.authErrorGeneric(message) ?? 'Authentication error: $message';
+  }
+
+  // Getter para verificar si algún login está en progreso
+  bool get _isAnyLoginLoading => _loadingEmailLogin || _loadingGoogleLogin;
 
   //[-------------CONSTRUCCIÓN DE LA INTERFAZ--------------]
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _backgroundColor,
-      body: Stack(
-        children: [
-          _buildBackground(),
-          _buildLoginForm(),
-        ],
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(), // Ocultar teclado al tocar fuera
+        child: Stack(
+          children: [
+            _buildBackground(),
+            _buildLoginForm(),
+          ],
+        ),
       ),
     );
   }
 
-  // Construye el fondo difuminado con el logo
   Widget _buildBackground() {
     return Positioned.fill(
       child: Container(
@@ -285,42 +529,43 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     );
   }
 
-  // Construye el formulario de login con animaciones
   Widget _buildLoginForm() {
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: SlideTransition(
-          position: _slideAnimation,
-          child: FadeTransition(
-            opacity: _fadeAnimation,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 400),
-              child: Container(
-                padding: const EdgeInsets.all(32),
-                decoration: BoxDecoration(
-                  color: _cardColor,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: _accentColor,
-                    width: 2,
+    return SafeArea(
+      child: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: SlideTransition(
+            position: _slideAnimation,
+            child: FadeTransition(
+              opacity: _fadeAnimation,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 400),
+                child: Container(
+                  padding: const EdgeInsets.all(32),
+                  decoration: BoxDecoration(
+                    color: _cardColor,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: _accentColor,
+                      width: 2,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: _accentColor.withValues(alpha: 0.3),
+                        blurRadius: 25,
+                        spreadRadius: 8,
+                        offset: const Offset(0, 8),
+                      ),
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.5),
+                        blurRadius: 15,
+                        spreadRadius: 2,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: _accentColor.withValues(alpha: 0.3),
-                      blurRadius: 25,
-                      spreadRadius: 8,
-                      offset: const Offset(0, 8),
-                    ),
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.5),
-                      blurRadius: 15,
-                      spreadRadius: 2,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
+                  child: _buildFormContent(),
                 ),
-                child: _buildFormContent(),
               ),
             ),
           ),
@@ -329,7 +574,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     );
   }
 
-  // Contenido del formulario
   Widget _buildFormContent() {
     return Form(
       key: _formKey,
@@ -359,22 +603,38 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     );
   }
 
-  // Logo de la aplicación
   Widget _buildLogo() {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(15),
-      child: Image.asset(
-        'assets/images/logo.png',
-        height: 160,
-        fit: BoxFit.contain,
+    return Hero(
+      tag: 'app_logo',
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(15),
+        child: Image.asset(
+          'assets/images/logo.png',
+          height: 160,
+          fit: BoxFit.contain,
+          errorBuilder: (context, error, stackTrace) {
+            return Container(
+              height: 160,
+              width: 160,
+              decoration: BoxDecoration(
+                color: _accentColor.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: Icon(
+                Icons.image_not_supported,
+                size: 80,
+                color: _accentColor,
+              ),
+            );
+          },
+        ),
       ),
     );
   }
 
-  // Título de la página
   Widget _buildTitle() {
     return Text(
-      'LinkTattoo Manager',
+      AppLocalizations.of(context)?.appTitle ?? 'LinkTattoo Manager',
       textAlign: TextAlign.center,
       style: TextStyle(
         fontSize: 28,
@@ -390,13 +650,13 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     );
   }
 
-  // Mensaje de error animado
   Widget _buildErrorMessage() {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
-      height: _error != null ? 60 : 0,
+      height: _error != null ? null : 0,
       child: _error != null
           ? Container(
+              width: double.infinity,
               padding: const EdgeInsets.all(12),
               margin: const EdgeInsets.only(bottom: 20),
               decoration: BoxDecoration(
@@ -405,6 +665,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                 border: Border.all(color: Colors.redAccent.withValues(alpha: 0.3)),
               ),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Icon(Icons.error_outline, color: Colors.redAccent, size: 20),
                   const SizedBox(width: 8),
@@ -424,42 +685,46 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     );
   }
 
-  // Campo para email o nombre de usuario
   Widget _buildEmailOrUsernameField() {
     return TextFormField(
       controller: _credentialCtrl,
       keyboardType: TextInputType.emailAddress,
+      textInputAction: TextInputAction.next,
       style: const TextStyle(color: _textColor),
       validator: _validateEmailOrUsername,
+      enabled: !_isAnyLoginLoading,
       decoration: _buildInputDecoration(
-        label: 'Email o Nombre de usuario',
+        label: AppLocalizations.of(context)?.emailOrUsername ?? 'Email or Username',
         icon: Icons.person_outline,
       ),
     );
   }
 
-  // Campo para la contraseña con opción de visibilidad
   Widget _buildPasswordField() {
     return TextFormField(
       controller: _passCtrl,
       obscureText: _obscurePassword,
+      textInputAction: TextInputAction.done,
       style: const TextStyle(color: _textColor),
       validator: _validatePassword,
+      enabled: !_isAnyLoginLoading,
+      onFieldSubmitted: (_) => _login(),
       decoration: _buildInputDecoration(
-        label: 'Contraseña',
+        label: AppLocalizations.of(context)?.password ?? 'Password',
         icon: Icons.lock_outline,
         suffixIcon: IconButton(
           icon: Icon(
             _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
             color: _hintColor,
           ),
-          onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+          onPressed: !_isAnyLoginLoading 
+            ? () => setState(() => _obscurePassword = !_obscurePassword)
+            : null,
         ),
       ),
     );
   }
 
-  // Decoración común para los campos de texto
   InputDecoration _buildInputDecoration({
     required String label,
     required IconData icon,
@@ -488,26 +753,34 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: Colors.redAccent),
       ),
+      disabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: _hintColor.withValues(alpha: 0.2)),
+      ),
     );
   }
 
-  // Enlace para recuperar contraseña (en desarrollo)
   Widget _buildForgotPasswordLink() {
     return Align(
       alignment: Alignment.centerRight,
       child: TextButton(
-        onPressed: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Función de recuperación en desarrollo'),
-              backgroundColor: _accentColor,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        },
-        child: const Text(
-          '¿Olvidaste tu contraseña?',
-          style: TextStyle(
+        onPressed: !_isAnyLoginLoading ? () {
+          HapticFeedback.lightImpact();
+          final l10n = AppLocalizations.of(context);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(l10n?.passwordRecoveryInDevelopment ?? 'Password recovery feature in development'),
+                backgroundColor: _accentColor,
+                behavior: SnackBarBehavior.floating,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          }
+        } : null,
+        child: Text(
+          AppLocalizations.of(context)?.forgotPassword ?? 'Forgot your password?',
+          style: const TextStyle(
             fontSize: 12,
             color: _accentColor,
             decoration: TextDecoration.underline,
@@ -517,23 +790,23 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     );
   }
 
-  // Botón de inicio de sesión
   Widget _buildLoginButton() {
     return SizedBox(
       width: double.infinity,
       height: 50,
       child: ElevatedButton(
-        onPressed: _loading ? null : _login,
+        onPressed: (!_loadingEmailLogin && !_loadingGoogleLogin) ? _login : null,
         style: ElevatedButton.styleFrom(
           backgroundColor: _accentColor,
           foregroundColor: _backgroundColor,
+          disabledBackgroundColor: _accentColor.withValues(alpha: 0.5),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
           elevation: 8,
           shadowColor: _accentColor.withValues(alpha: 0.4),
         ),
-        child: _loading
+        child: _loadingEmailLogin
             ? const SizedBox(
                 width: 20,
                 height: 20,
@@ -542,9 +815,9 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                   strokeWidth: 2,
                 ),
               )
-            : const Text(
-                'Iniciar Sesión',
-                style: TextStyle(
+            : Text(
+                AppLocalizations.of(context)?.signIn ?? 'Sign In',
+                style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                 ),
@@ -553,7 +826,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     );
   }
 
-  // Divisor entre métodos de autenticación
   Widget _buildDivider() {
     return Row(
       children: [
@@ -566,7 +838,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text(
-            'O',
+            AppLocalizations.of(context)?.or ?? 'OR',
             style: TextStyle(
               color: _hintColor,
               fontSize: 14,
@@ -584,23 +856,23 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     );
   }
 
-  // Botón de inicio de sesión con Google
   Widget _buildGoogleSignInButton() {
     return SizedBox(
       width: double.infinity,
       height: 50,
       child: ElevatedButton.icon(
-        onPressed: _loading ? null : _signInWithGoogle,
+        onPressed: (!_loadingEmailLogin && !_loadingGoogleLogin) ? _signInWithGoogle : null,
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.white,
           foregroundColor: Colors.black87,
+          disabledBackgroundColor: Colors.grey.withValues(alpha: 0.3),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
             side: BorderSide(color: Colors.grey.withValues(alpha: 0.3)),
           ),
           elevation: 2,
         ),
-        icon: _loading
+        icon: _loadingGoogleLogin
             ? const SizedBox(
                 width: 20,
                 height: 20,
@@ -621,9 +893,9 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                   );
                 },
               ),
-        label: const Text(
-          'Continuar con Google',
-          style: TextStyle(
+        label: Text(
+          AppLocalizations.of(context)?.continueWithGoogle ?? 'Continue with Google',
+          style: const TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w500,
           ),
@@ -632,18 +904,23 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     );
   }
 
-  // Enlace para registrarse
   Widget _buildRegisterLink() {
+    final l10n = AppLocalizations.of(context);
     return TextButton(
-      onPressed: () => Navigator.pushNamed(context, '/register'),
+      onPressed: !_isAnyLoginLoading ? () {
+        HapticFeedback.lightImpact();
+        if (mounted) {
+          Navigator.pushNamed(context, '/register');
+        }
+      } : null,
       child: RichText(
-        text: const TextSpan(
-          text: '¿No tienes una cuenta? ',
-          style: TextStyle(color: _hintColor, fontSize: 14),
+        text: TextSpan(
+          text: l10n?.dontHaveAccount ?? "Don't have an account? ",
+          style: const TextStyle(color: _hintColor, fontSize: 14),
           children: [
             TextSpan(
-              text: 'Regístrate',
-              style: TextStyle(
+              text: l10n?.signUp ?? 'Sign Up',
+              style: const TextStyle(
                 color: _accentColor,
                 fontWeight: FontWeight.bold,
                 decoration: TextDecoration.underline,
@@ -657,7 +934,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
   @override
   void dispose() {
-    // Liberar recursos al destruir el widget
     _credentialCtrl.dispose();
     _passCtrl.dispose();
     _animationController.dispose();
