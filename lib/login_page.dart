@@ -2,6 +2,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'loading_screen.dart';
+import 'services/auth_service.dart';
 
 //[-------------PÁGINA DE INICIO DE SESIÓN--------------]
 class LoginPage extends StatefulWidget {
@@ -70,8 +71,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     });
   }
 
-  //[-------------LÓGICA DE INICIO DE SESIÓN--------------]
-  // Maneja el proceso de autenticación con Supabase, permite login con email o nombre de usuario
+  //[-------------LÓGICA DE INICIO DE SESIÓN CON EMAIL/PASSWORD--------------]
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -89,7 +89,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       
       if (isEmail) {
         // Login directo con email
-        final response = await Supabase.instance.client.auth.signInWithPassword(
+        final response = await AuthService.signInWithEmailPassword(
           email: credential,
           password: password,
         );
@@ -100,18 +100,14 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         }
       } else {
         // Busca el email asociado al nombre de usuario
-        final userResponse = await Supabase.instance.client
-            .from('employees')
-            .select('email, username, id')
-            .eq('username', credential)
-            .maybeSingle();
+        final userResponse = await AuthService.getUserByUsername(credential);
         
         if (userResponse != null && userResponse['email'] != null) {
           final loginEmail = userResponse['email'] as String;
           
           // Intenta login con el email encontrado
           try {
-            final response = await Supabase.instance.client.auth.signInWithPassword(
+            final response = await AuthService.signInWithEmailPassword(
               email: loginEmail,
               password: password,
             );
@@ -150,14 +146,34 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     }
   }
 
+  //[-------------LÓGICA DE INICIO DE SESIÓN CON GOOGLE--------------]
+  Future<void> _signInWithGoogle() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final response = await AuthService.signInWithGoogle();
+      
+      if (response != null && response.session != null) {
+        await _checkAndRedirect(response.user!);
+      } else {
+        _setError('Inicio de sesión con Google cancelado');
+      }
+    } catch (e) {
+      _setError('Error al iniciar sesión con Google: ${e.toString()}');
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
+  }
+
   //[-------------REDIRECCIÓN POST-LOGIN--------------]
   // Verifica si el usuario tiene un perfil completo y redirige apropiadamente
   Future<void> _checkAndRedirect(User user) async {
-    final profileExists = await Supabase.instance.client
-        .from('employees')
-        .select('id, username')
-        .eq('id', user.id)
-        .maybeSingle();
+    final profileExists = await AuthService.getEmployeeProfile(user.id);
     
     if (mounted) {
       if (profileExists != null) {
@@ -332,6 +348,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
           _buildForgotPasswordLink(),
           const SizedBox(height: 24),
           _buildLoginButton(),
+          const SizedBox(height: 16),
+          _buildDivider(),
+          const SizedBox(height: 16),
+          _buildGoogleSignInButton(),
           const SizedBox(height: 20),
           _buildRegisterLink(),
         ],
@@ -529,6 +549,85 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                   fontWeight: FontWeight.bold,
                 ),
               ),
+      ),
+    );
+  }
+
+  // Divisor entre métodos de autenticación
+  Widget _buildDivider() {
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            height: 1,
+            color: _hintColor.withValues(alpha: 0.3),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Text(
+            'O',
+            style: TextStyle(
+              color: _hintColor,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Container(
+            height: 1,
+            color: _hintColor.withValues(alpha: 0.3),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Botón de inicio de sesión con Google
+  Widget _buildGoogleSignInButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: 50,
+      child: ElevatedButton.icon(
+        onPressed: _loading ? null : _signInWithGoogle,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.white,
+          foregroundColor: Colors.black87,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: Colors.grey.withValues(alpha: 0.3)),
+          ),
+          elevation: 2,
+        ),
+        icon: _loading
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation(Colors.black87),
+                  strokeWidth: 2,
+                ),
+              )
+            : Image.asset(
+                'assets/images/google_logo.png',
+                height: 20,
+                width: 20,
+                errorBuilder: (context, error, stackTrace) {
+                  return const Icon(
+                    Icons.login,
+                    size: 20,
+                    color: Colors.black87,
+                  );
+                },
+              ),
+        label: const Text(
+          'Continuar con Google',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
       ),
     );
   }

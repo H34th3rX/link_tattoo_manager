@@ -111,63 +111,83 @@ class _CompleteProfilePageState extends State<CompleteProfilePage>
 
   // Guarda el perfil del usuario en Supabase
   Future<void> _saveProfile() async {
-    if (!_formKey.currentState!.validate()) return;
+  if (!_formKey.currentState!.validate()) return;
 
-    setState(() {
-      _loading = true;
-      _error = null;
+  setState(() {
+    _loading = true;
+    _error = null;
+  });
+
+  try {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) {
+      if (mounted) _setError('Usuario no autenticado');
+      return;
+    }
+
+    // Verifica si el perfil ya existe antes de intentar insertar
+    final existingProfile = await Supabase.instance.client
+        .from('employees')
+        .select('id')
+        .eq('id', user.id)
+        .maybeSingle();
+
+    if (existingProfile != null) {
+      if (mounted) _setError('El perfil ya existe. Contacta al soporte si necesitas modificarlo.');
+      return;
+    }
+
+    // Actualiza los atributos del usuario en Supabase Auth
+    await Supabase.instance.client.auth.updateUser(UserAttributes(data: {
+      'username': _usernameCtrl.text.trim(),
+    }));
+
+    // Inserta los datos del empleado en la tabla 'employees'
+    await Supabase.instance.client.from('employees').insert({
+      'id': user.id,
+      'username': _usernameCtrl.text.trim(),
+      'phone': _phoneCtrl.text.trim(),
+      'email': user.email,
+      'specialty': _isCustomSpecialty && _specialtyCtrl.text.isNotEmpty
+          ? _specialtyCtrl.text.trim()
+          : _selectedSpecialty,
+      'start_date': DateTime.now().toIso8601String().split('T')[0],
+      'is_active': true,
+      'notes': null,
     });
 
-    try {
-      final user = Supabase.instance.client.auth.currentUser;
-      if (user == null) {
-        if (mounted) _setError('Usuario no autenticado');
-        return;
-      }
-
-      // Actualiza los atributos del usuario en Supabase Auth
-      await Supabase.instance.client.auth.updateUser(UserAttributes(data: {
-        'username': _usernameCtrl.text.trim(),
-      }));
-
-      // Inserta los datos del empleado en la tabla 'employees'
-      await Supabase.instance.client.from('employees').insert({
-        'id': user.id,
-        'username': _usernameCtrl.text.trim(),
-        'phone': _phoneCtrl.text.trim(),
-        'email': user.email,
-        'specialty': _isCustomSpecialty && _specialtyCtrl.text.isNotEmpty
-            ? _specialtyCtrl.text.trim()
-            : _selectedSpecialty,
-        'start_date': DateTime.now().toIso8601String().split('T')[0],
-        'is_active': true,
-        'notes': null,
+    if (mounted) {
+      _showSuccessDialog('Perfil completado exitosamente');
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted) {
+          Navigator.pop(context); // Cierra el diálogo
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => LoadingScreen(userName: _usernameCtrl.text.trim()),
+            ),
+          );
+        }
       });
-
-      if (mounted) {
-        _showSuccessDialog('Perfil completado exitosamente');
-        Future.delayed(const Duration(seconds: 2), () {
-          if (mounted) {
-            Navigator.pop(context); // Cierra el diálogo
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => LoadingScreen(userName: _usernameCtrl.text.trim()),
-              ),
-            );
-          }
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        _setError('Error al guardar el perfil: $e. Verifica los datos o contacta al soporte.');
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _loading = false);
+    }
+  } on PostgrestException catch (e) {
+    if (mounted) {
+      if (e.code == '42501') {
+        _setError('Error de permisos al guardar el perfil. Contacta al soporte.');
+      } else {
+        _setError('Error al guardar el perfil: ${e.message}. Verifica los datos o contacta al soporte.');
       }
     }
+  } catch (e) {
+    if (mounted) {
+      _setError('Error inesperado al guardar el perfil: $e. Contacta al soporte.');
+    }
+  } finally {
+    if (mounted) {
+      setState(() => _loading = false);
+    }
   }
+}
 
   // Establece un mensaje de error y lo elimina tras 5 segundos
   void _setError(String error) {
