@@ -14,13 +14,15 @@ import 'reports_page.dart';
 import 'client_profile_page.dart' show ClientProfilePage;
 import 'client_history_page.dart' show ClientHistoryPage;
 import 'calendar_page.dart' show CalendarPage;
-import 'package:flutter_localizations/flutter_localizations.dart'; // Importar para delegados de localización
-import './l10n/app_localizations.dart'; // Importar el archivo generado
-import 'localization_provider.dart'; // Importar el nuevo proveedor de localización
+import 'package:flutter_localizations/flutter_localizations.dart';
+import './l10n/app_localizations.dart';
+import 'localization_provider.dart';
+import 'services/auth_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SupabaseService.initialize();
+  await AuthService.initializeAuthState();
   
   final user = Supabase.instance.client.auth.currentUser;
   String initialRoute = '/login';
@@ -35,10 +37,10 @@ Future<void> main() async {
   }
   
   runApp(
-    MultiProvider( // Usar MultiProvider para gestionar múltiples proveedores
+    MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
-        ChangeNotifierProvider(create: (_) => LocalizationProvider()), // Añadir LocalizationProvider
+        ChangeNotifierProvider(create: (_) => LocalizationProvider()),
       ],
       child: MyApp(initialRoute: initialRoute),
     ),
@@ -51,7 +53,7 @@ class MyApp extends StatelessWidget {
   
   @override
   Widget build(BuildContext context) {
-    return Consumer2<ThemeProvider, LocalizationProvider>( // Consumir ambos proveedores
+    return Consumer2<ThemeProvider, LocalizationProvider>(
       builder: (context, themeProvider, localizationProvider, child) {
         return MaterialApp(
           title: 'LinkTattoo Manager',
@@ -60,15 +62,14 @@ class MyApp extends StatelessWidget {
           theme: _buildLightTheme(),
           darkTheme: _buildDarkTheme(),
           initialRoute: initialRoute,
-          // Configuración de internacionalización
           localizationsDelegates: const [
-            AppLocalizations.delegate, // Delegado generado
+            AppLocalizations.delegate,
             GlobalMaterialLocalizations.delegate,
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
           ],
-          supportedLocales: AppLocalizations.supportedLocales.toList(), // Convertir a List<Locale>
-          locale: localizationProvider.locale, // Usar el locale del proveedor
+          supportedLocales: AppLocalizations.supportedLocales.toList(),
+          locale: localizationProvider.locale,
           localeResolutionCallback: (deviceLocale, supportedLocales) {
             return localizationProvider.resolveLocale(supportedLocales, deviceLocale);
           },
@@ -98,13 +99,11 @@ class MyApp extends StatelessWidget {
 
   ThemeData _buildLightTheme() {
     return ThemeData.light(useMaterial3: true).copyWith(
-      // Personalización adicional del tema claro si es necesaria
       primaryColor: const Color(0xFFBDA206),
       colorScheme: ColorScheme.fromSeed(
         seedColor: const Color(0xFFBDA206),
         brightness: Brightness.light,
       ),
-      // Duración consistente para todas las animaciones de tema
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {
           TargetPlatform.android: CupertinoPageTransitionsBuilder(),
@@ -116,13 +115,11 @@ class MyApp extends StatelessWidget {
 
   ThemeData _buildDarkTheme() {
     return ThemeData.dark(useMaterial3: true).copyWith(
-      // Personalización adicional del tema oscuro si es necesaria
       primaryColor: const Color(0xFFBDA206),
       colorScheme: ColorScheme.fromSeed(
         seedColor: const Color(0xFFBDA206),
         brightness: Brightness.dark,
       ),
-      // Duración consistente para todas las animaciones de tema
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {
           TargetPlatform.android: CupertinoPageTransitionsBuilder(),

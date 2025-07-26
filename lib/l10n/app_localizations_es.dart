@@ -507,4 +507,74 @@ class AppLocalizationsEs extends AppLocalizations {
   String authErrorGeneric(Object message) {
     return 'Error de autenticación: $message';
   }
+
+  @override
+  String get unexpectedGoogleError =>
+      'Error inesperado en el inicio de sesión con Google';
+
+  @override
+  String get googleError => 'Error de Google';
+
+  @override
+  String get changeAccountMessage =>
+      'Podría haber un problema con tu cuenta de Google. ¿Te gustaría intentar con una cuenta diferente o usar el método alternativo?';
+
+  @override
+  String get changeAccount => 'Cambiar Cuenta';
+
+  @override
+  String get retryError => 'Error al reintentar el inicio de sesión';
+
+  @override
+  String get emailLabel => 'Dirección de correo';
+
+  @override
+  String get passwordLabel => 'Contraseña';
+
+  @override
+  String get registerTitle => 'Registro';
+
+  @override
+  String get confirmPasswordLabel => 'Confirmar contraseña';
+
+  @override
+  String get passwordComplexity =>
+      'La contraseña debe contener al menos una letra y un número';
+
+  @override
+  String get confirmPasswordRequired => 'Confirma tu contraseña';
+
+  @override
+  String get passwordsDontMatch => 'Las contraseñas no coinciden';
+
+  @override
+  String get emailRequired => 'El correo es requerido';
+
+  @override
+  String get invalidEmail => 'Ingresa un correo válido';
+
+  @override
+  String get accountCreated =>
+      'Cuenta creada. Se ha enviado un correo de verificación.';
+
+  @override
+  String get accountCreationFailed =>
+      'No se pudo crear la cuenta. Intenta de nuevo.';
+
+  @override
+  String get unexpectedError =>
+      'Error inesperado. Verifica tu conexión a internet.';
+
+  @override
+  String get userAlreadyRegistered =>
+      'Este correo ya está registrado. Intenta iniciar sesión.';
+
+  @override
+  String get invalidEmailFormat => 'El formato del correo es inválido.';
+
+  @override
+  String get ok => 'OK';
+
+  @override
+  String get alreadyHaveAccount => '¿Ya tienes una cuenta? ';
 }

@@ -496,4 +496,73 @@ class AppLocalizationsEn extends AppLocalizations {
   String authErrorGeneric(Object message) {
     return 'Authentication error: $message';
   }
+
+  @override
+  String get unexpectedGoogleError => 'Unexpected Google Sign-In error';
+
+  @override
+  String get googleError => 'Google Error';
+
+  @override
+  String get changeAccountMessage =>
+      'There might be an issue with your Google account. Would you like to try with a different account or use the alternative method?';
+
+  @override
+  String get changeAccount => 'Change Account';
+
+  @override
+  String get retryError => 'Error retrying login';
+
+  @override
+  String get emailLabel => 'Email address';
+
+  @override
+  String get passwordLabel => 'Password';
+
+  @override
+  String get registerTitle => 'Register';
+
+  @override
+  String get confirmPasswordLabel => 'Confirm password';
+
+  @override
+  String get passwordComplexity =>
+      'Password must contain at least one letter and one number';
+
+  @override
+  String get confirmPasswordRequired => 'Confirm your password';
+
+  @override
+  String get passwordsDontMatch => 'Passwords do not match';
+
+  @override
+  String get emailRequired => 'Email is required';
+
+  @override
+  String get invalidEmail => 'Enter a valid email';
+
+  @override
+  String get accountCreated =>
+      'Account created. A verification email has been sent.';
+
+  @override
+  String get accountCreationFailed =>
+      'Could not create account. Please try again.';
+
+  @override
+  String get unexpectedError =>
+      'Unexpected error. Please check your internet connection.';
+
+  @override
+  String get userAlreadyRegistered =>
+      'This email is already registered. Please try logging in.';
+
+  @override
+  String get invalidEmailFormat => 'The email format is invalid.';
+
+  @override
+  String get ok => 'OK';
+
+  @override
+  String get alreadyHaveAccount => 'Already have an account? ';
 }

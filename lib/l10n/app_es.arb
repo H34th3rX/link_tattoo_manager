@@ -189,6 +189,10 @@
             "error": {}
         }
     },
+    "googleError": "Error de Google",
+    "changeAccountMessage": "Podría haber un problema con tu cuenta de Google. ¿Te gustaría intentar con una cuenta diferente o usar el método alternativo?",
+    "changeAccount": "Cambiar Cuenta",
+    "retryError": "Error al reintentar el inicio de sesión",
 
     "passwordRecoveryInDevelopment": "Función de recuperación en desarrollo",
 
@@ -204,5 +208,25 @@
         "placeholders": {
             "message": {}
         }
-    }
+    },
+    "unexpectedGoogleError": "Error inesperado en el inicio de sesión con Google",
+
+
+        
+    "emailLabel": "Dirección de correo",
+    "passwordLabel": "Contraseña",
+    "registerTitle": "Registro",
+    "confirmPasswordLabel": "Confirmar contraseña",
+    "passwordComplexity": "La contraseña debe contener al menos una letra y un número",
+    "confirmPasswordRequired": "Confirma tu contraseña",
+    "passwordsDontMatch": "Las contraseñas no coinciden",
+    "emailRequired": "El correo es requerido",
+    "invalidEmail": "Ingresa un correo válido",
+    "accountCreated": "Cuenta creada. Se ha enviado un correo de verificación.",
+    "accountCreationFailed": "No se pudo crear la cuenta. Intenta de nuevo.",
+    "unexpectedError": "Error inesperado. Verifica tu conexión a internet.",
+    "userAlreadyRegistered": "Este correo ya está registrado. Intenta iniciar sesión.",
+    "invalidEmailFormat": "El formato del correo es inválido.",
+    "ok": "OK",
+    "alreadyHaveAccount": "¿Ya tienes una cuenta? "
 }

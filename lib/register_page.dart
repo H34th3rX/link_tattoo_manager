@@ -1,6 +1,7 @@
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import './l10n/app_localizations.dart';
 
 //[-------------PÁGINA DE REGISTRO--------------]
 class RegisterPage extends StatefulWidget {
@@ -11,12 +12,13 @@ class RegisterPage extends StatefulWidget {
 }
 
 class _RegisterPageState extends State<RegisterPage> with SingleTickerProviderStateMixin {
-    // Constantes para estilos
+  // Constantes para estilos
   static const Color _accentColor = Color(0xFFBDA206);
   static const Color _backgroundColor = Colors.black;
   static const Color _cardColor = Color.fromRGBO(15, 19, 21, 0.9);
   static const Color _textColor = Colors.white;
   static const Color _hintColor = Colors.white70;
+
   // Controladores para los campos del formulario
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
@@ -83,14 +85,16 @@ class _RegisterPageState extends State<RegisterPage> with SingleTickerProviderSt
       );
 
       if (response.user != null && mounted) {
-        _showSuccessDialog('Cuenta creada. Se ha enviado un correo de verificación.');
+        final l10n = AppLocalizations.of(context);
+        _showSuccessDialog(l10n?.accountCreated ?? 'Account created. A verification email has been sent.');
         Future.delayed(const Duration(seconds: 2), () {
           if (mounted) {
             Navigator.pushReplacementNamed(context, '/login');
           }
         });
       } else if (mounted) {
-        _setError('No se pudo crear la cuenta. Intenta de nuevo.');
+        final l10n = AppLocalizations.of(context);
+        _setError(l10n?.accountCreationFailed ?? 'Could not create account. Please try again.');
       }
     } on AuthException catch (e) {
       if (mounted) {
@@ -98,7 +102,8 @@ class _RegisterPageState extends State<RegisterPage> with SingleTickerProviderSt
       }
     } catch (e) {
       if (mounted) {
-        _setError('Error inesperado. Verifica tu conexión a internet.');
+        final l10n = AppLocalizations.of(context);
+        _setError(l10n?.unexpectedError ?? 'Unexpected error. Please check your internet connection.');
       }
     } finally {
       if (mounted) {
@@ -119,10 +124,16 @@ class _RegisterPageState extends State<RegisterPage> with SingleTickerProviderSt
 
   // Muestra un diálogo de éxito
   void _showSuccessDialog(String message) {
+    if (!mounted) return;
+
+    // Obtener localización para el botón "OK" antes del diálogo
+    final l10n = AppLocalizations.of(context);
+    final okText = l10n?.ok ?? 'OK';
+
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => Dialog(
+      builder: (BuildContext dialogContext) => Dialog(
         backgroundColor: _cardColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: Padding(
@@ -139,13 +150,13 @@ class _RegisterPageState extends State<RegisterPage> with SingleTickerProviderSt
               ),
               const SizedBox(height: 20),
               ElevatedButton(
-                onPressed: () => Navigator.of(context).pop(),
+                onPressed: () => Navigator.of(dialogContext).pop(),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _accentColor,
                   foregroundColor: _backgroundColor,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
-                child: const Text('OK'),
+                child: Text(okText),
               ),
             ],
           ),
@@ -156,51 +167,67 @@ class _RegisterPageState extends State<RegisterPage> with SingleTickerProviderSt
 
   // Traduce errores de autenticación a mensajes legibles
   String _getLocalizedAuthError(String? message) {
-    if (message == null) return 'Error de autenticación';
-    
-    if (message.contains('User already registered')) {
-      return 'Este email ya está registrado. Intenta iniciar sesión.';
-    } else if (message.contains('Password should be at least')) {
-      return 'La contraseña debe tener al menos 6 caracteres.';
-    } else if (message.contains('Invalid email')) {
-      return 'El formato del email no es válido.';
-    } else if (message.contains('signup is disabled')) {
-      return 'El registro está deshabilitado temporalmente.';
+    if (message == null) {
+      if (!mounted) return 'Authentication error';
+      final l10n = AppLocalizations.of(context);
+      return l10n?.authErrorGeneric('Unknown error') ?? 'Authentication error';
     }
     
-    return message;
+    if (!mounted) return 'Authentication error: $message';
+    final l10n = AppLocalizations.of(context);
+
+    if (message.contains('User already registered')) {
+      return l10n?.userAlreadyRegistered ?? 'This email is already registered. Please try logging in.';
+    } else if (message.contains('Password should be at least')) {
+      return l10n?.passwordMinLength ?? 'The password must be at least 6 characters.';
+    } else if (message.contains('Invalid email')) {
+      return l10n?.invalidEmailFormat ?? 'The email format is invalid.';
+    } else if (message.contains('signup is disabled')) {
+      return l10n?.authErrorSignupDisabled ?? 'Registration is temporarily disabled.';
+    }
+    
+    return l10n?.authErrorGeneric(message) ?? message;
   }
 
   // Validaciones para los campos del formulario
   String? _validateEmail(String? value) {
+    if (!mounted) return null;
+    final l10n = AppLocalizations.of(context);
+    
     if (value == null || value.isEmpty) {
-      return 'El email es requerido';
+      return l10n?.emailRequired ?? 'Email is required';
     }
     if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-      return 'Ingresa un email válido';
+      return l10n?.invalidEmail ?? 'Enter a valid email';
     }
     return null;
   }
 
   String? _validatePassword(String? value) {
+    if (!mounted) return null;
+    final l10n = AppLocalizations.of(context);
+    
     if (value == null || value.isEmpty) {
-      return 'La contraseña es requerida';
+      return l10n?.passwordRequired ?? 'Password is required';
     }
     if (value.length < 6) {
-      return 'La contraseña debe tener al menos 6 caracteres';
+      return l10n?.passwordMinLength ?? 'Password must be at least 6 characters';
     }
     if (!RegExp(r'^(?=.*[a-zA-Z])(?=.*\d)').hasMatch(value)) {
-      return 'La contraseña debe contener al menos una letra y un número';
+      return l10n?.passwordComplexity ?? 'Password must contain at least one letter and one number';
     }
     return null;
   }
 
   String? _validateConfirmPassword(String? value) {
+    if (!mounted) return null;
+    final l10n = AppLocalizations.of(context);
+    
     if (value == null || value.isEmpty) {
-      return 'Confirma tu contraseña';
+      return l10n?.confirmPasswordRequired ?? 'Confirm your password';
     }
     if (value != _passwordCtrl.text) {
-      return 'Las contraseñas no coinciden';
+      return l10n?.passwordsDontMatch ?? 'Passwords do not match';
     }
     return null;
   }
@@ -350,7 +377,7 @@ class _RegisterPageState extends State<RegisterPage> with SingleTickerProviderSt
   // Construye el título del formulario
   Widget _buildTitle() {
     return Text(
-      'Registro',
+      AppLocalizations.of(context)?.registerTitle ?? 'Register',
       textAlign: TextAlign.center,
       style: TextStyle(
         fontSize: 28,
@@ -373,8 +400,9 @@ class _RegisterPageState extends State<RegisterPage> with SingleTickerProviderSt
       keyboardType: TextInputType.emailAddress,
       style: const TextStyle(color: _textColor),
       validator: _validateEmail,
+      enabled: !_loading,
       decoration: _buildInputDecoration(
-        label: 'Dirección de email',
+        label: AppLocalizations.of(context)?.emailLabel ?? 'Email address',
         icon: Icons.email_outlined,
       ),
     );
@@ -387,8 +415,9 @@ class _RegisterPageState extends State<RegisterPage> with SingleTickerProviderSt
       obscureText: _obscurePassword,
       style: const TextStyle(color: _textColor),
       validator: _validatePassword,
+      enabled: !_loading,
       decoration: _buildInputDecoration(
-        label: 'Contraseña',
+        label: AppLocalizations.of(context)?.passwordLabel ?? 'Password',
         icon: Icons.lock_outline,
         suffixIcon: IconButton(
           icon: Icon(
@@ -408,8 +437,9 @@ class _RegisterPageState extends State<RegisterPage> with SingleTickerProviderSt
       obscureText: _obscureConfirmPassword,
       style: const TextStyle(color: _textColor),
       validator: _validateConfirmPassword,
+      enabled: !_loading,
       decoration: _buildInputDecoration(
-        label: 'Confirmar contraseña',
+        label: AppLocalizations.of(context)?.confirmPasswordLabel ?? 'Confirm password',
         icon: Icons.lock_outline,
         suffixIcon: IconButton(
           icon: Icon(
@@ -451,6 +481,10 @@ class _RegisterPageState extends State<RegisterPage> with SingleTickerProviderSt
         borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: Colors.redAccent),
       ),
+      disabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: _hintColor.withValues(alpha: 0.2)),
+      ),
     );
   }
 
@@ -479,9 +513,9 @@ class _RegisterPageState extends State<RegisterPage> with SingleTickerProviderSt
                   strokeWidth: 2,
                 ),
               )
-            : const Text(
-                'Registrarse',
-                style: TextStyle(
+            : Text(
+                AppLocalizations.of(context)?.signUp ?? 'Sign Up',
+                style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                 ),
@@ -492,16 +526,19 @@ class _RegisterPageState extends State<RegisterPage> with SingleTickerProviderSt
 
   // Construye el enlace para iniciar sesión
   Widget _buildLoginLink() {
+    final l10n = AppLocalizations.of(context);
     return TextButton(
-      onPressed: () => Navigator.pushReplacementNamed(context, '/login'),
+      onPressed: _loading
+          ? null
+          : () => Navigator.pushReplacementNamed(context, '/login'),
       child: RichText(
-        text: const TextSpan(
-          text: '¿Ya tienes una cuenta? ',
-          style: TextStyle(color: _hintColor, fontSize: 14),
+        text: TextSpan(
+          text: l10n?.alreadyHaveAccount ?? 'Already have an account? ',
+          style: const TextStyle(color: _hintColor, fontSize: 14),
           children: [
             TextSpan(
-              text: 'Inicia Sesión',
-              style: TextStyle(
+              text: l10n?.signIn ?? 'Sign In',
+              style: const TextStyle(
                 color: _accentColor,
                 fontWeight: FontWeight.bold,
                 decoration: TextDecoration.underline,

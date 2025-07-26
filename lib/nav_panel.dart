@@ -1,9 +1,11 @@
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'theme_provider.dart';
-import './l10n/app_localizations.dart'; // Importar el archivo generado
+import './l10n/app_localizations.dart';
+import 'services/auth_service.dart';
 
 // Duración constante para las animaciones de transición
 const Duration themeAnimationDuration = Duration(milliseconds: 300);
@@ -435,7 +437,7 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
-          onTap: widget.onLogout,
+          onTap: () => _handleLogout(), // Usar método específico
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 12),
             child: Row(
@@ -458,4 +460,54 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
       ),
     );
   }
+// Método específico para manejar logout correctamente
+Future<void> _handleLogout() async {
+  try {
+  
+      if (kDebugMode) {
+        print('Iniciando proceso de logout...');
+      }
+    
+    
+    // Usar el método de logout mejorado del AuthService
+    await AuthService.signOut();
+    
+    
+      if (kDebugMode) {
+        print('Logout completado, redirigiendo...');
+      }
+    
+    
+    // Navegar a login con limpieza completa
+    if (mounted) {
+      Navigator.of(context).pushNamedAndRemoveUntil(
+        '/login',
+        (route) => false, // Eliminar todas las rutas anteriores
+      );
+    }
+  } catch (e) {
+   
+      if (kDebugMode) {
+        print('Error durante logout: $e');
+      }
+    
+    
+    // En caso de error, mostrar mensaje y proceder con logout básico
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error cerrando sesión: $e'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      
+      // Proceder con logout básico - navegar de todas formas
+      Navigator.of(context).pushNamedAndRemoveUntil(
+        '/login',
+        (route) => false,
+      );
+    }
+  }
 }
+}
+

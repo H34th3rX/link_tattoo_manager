@@ -48,39 +48,48 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     super.initState();
     _initializeAnimations();
     _setupAuthListener();
+     _initializeAuthState();
   }
 
   //[-------------CONFIGURACIÓN DE LISTENER PARA AUTH--------------]
   void _setupAuthListener() {
-    AuthService.setupAuthListener(
-      onSignIn: (User user) {
-        if (mounted) {
-          setState(() {
-            _loadingGoogleLogin = false;
-            _error = null;
-          });
-          _checkAndRedirect(user);
-        }
-      },
-      onSignOut: () {
-        if (mounted && kDebugMode) {
+  AuthService.setupAuthListener(
+    onSignIn: (User user) {
+      if (mounted) {
+        setState(() {
+          _loadingGoogleLogin = false; // Importante: limpiar loading state
+          _loadingEmailLogin = false;
+          _error = null;
+        });
+        _checkAndRedirect(user);
+      }
+    },
+    onSignOut: () {
+      if (mounted) {
+        setState(() {
+          _loadingGoogleLogin = false;
+          _loadingEmailLogin = false;
+          _error = null;
+        });
+        
+        if (kDebugMode) {
           final l10n = AppLocalizations.of(context);
-          if (kDebugMode) {
-            print(l10n?.userSignedOut ?? 'User signed out');
-          }
+          print(l10n?.userSignedOut ?? 'User signed out');
         }
-      },
-      onError: (String error) {
-        if (mounted) {
-          setState(() {
-            _loadingGoogleLogin = false;
-          });
-          final l10n = AppLocalizations.of(context);
-          _setError(l10n?.authError(error) ?? 'Authentication error: $error');
-        }
-      },
-    );
-  }
+      }
+    },
+    onError: (String error) {
+      if (mounted) {
+        setState(() {
+          _loadingGoogleLogin = false;
+          _loadingEmailLogin = false;
+        });
+        final l10n = AppLocalizations.of(context);
+        _setError(l10n?.authError(error) ?? 'Authentication error: $error');
+      }
+    },
+  );
+}
 
   //[-------------CONFIGURACIÓN DE ANIMACIONES--------------]
   void _initializeAnimations() {
@@ -216,8 +225,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     _setError(errorMessage);
   }
 
-  //[-------------LÓGICA DE INICIO DE SESIÓN CON GOOGLE MEJORADA--------------]
-  Future<void> _signInWithGoogle() async {
+    //[-------------LÓGICA DE INICIO DE SESIÓN CON GOOGLE MEJORADA--------------]
+    Future<void> _signInWithGoogle() async {
     // Evitar múltiples llamadas simultáneas
     if (_loadingEmailLogin || _loadingGoogleLogin) return;
 
@@ -230,14 +239,14 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     });
 
     try {
-      if (kIsWeb && mounted) {
-        // En Web, mostrar mensaje informativo
+      if (kIsWeb) {
+        // En Web, mostrar mensaje y proceder con OAuth directo
         final l10n = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(l10n?.signingInWithGoogle ?? 'Signing in with Google...'),
             backgroundColor: _accentColor,
-            duration: const Duration(seconds: 3),
+            duration: const Duration(seconds: 2),
           ),
         );
       }
@@ -245,7 +254,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       final response = await AuthService.signInWithGoogle();
       
       if (response != null && response.session != null) {
-        // Login exitoso con respuesta directa
+        // Login exitoso con respuesta directa (solo en mobile)
         await _checkAndRedirect(response.user!);
       } else if (kIsWeb) {
         // En Web, el OAuth redirect manejará la respuesta
@@ -253,6 +262,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         if (kDebugMode) {
           print('OAuth redirect iniciado, esperando callback...');
         }
+        // No cambiar el loading state aquí, el listener lo manejará
       } else if (mounted) {
         // En Mobile, si no hay respuesta significa que se canceló
         setState(() {
@@ -268,7 +278,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         });
         
         final l10n = AppLocalizations.of(context);
-        String errorMessage = l10n?.signInCancelled ?? 'Sign in cancelled';
+        String errorMessage;
         
         // Manejo específico de errores comunes
         final errorString = e.toString().toLowerCase();
@@ -277,20 +287,13 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
             errorString.contains('cancelled')) {
           errorMessage = l10n?.signInCancelled ?? 'Sign in cancelled';
         } else if (errorString.contains('network') || 
-                   errorString.contains('connection')) {
+                  errorString.contains('connection')) {
           errorMessage = l10n?.connectionError ?? 'Connection error';
         } else if (errorString.contains('invalid_client') ||
-                   errorString.contains('unauthorized')) {
+                  errorString.contains('unauthorized')) {
           errorMessage = l10n?.configurationError ?? 'Configuration error';
-        } else if (errorString.contains('id token') || 
-                   errorString.contains('token')) {
-          errorMessage = l10n?.authTokenError ?? 'Authentication error';
-          
-          // En Web, ofrecer el método OAuth como alternativa
-          if (kIsWeb) {
-            _showOAuthFallbackDialog();
-            return;
-          }
+        } else {
+          errorMessage = l10n?.unexpectedGoogleError ?? 'Unexpected Google error';
         }
         
         _setError(errorMessage);
@@ -301,73 +304,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     }
   }
 
-  //[-------------Dialog para feedback--------------]
-  void _showOAuthFallbackDialog() {
-  if (!mounted) return;
-  
-  // Obtener localizaciones usando el contexto del State antes del diálogo
-  final l10n = AppLocalizations.of(context);
-  final alternativeMethod = l10n?.alternativeMethod ?? 'Alternative method';
-  final directMethodFailed = l10n?.directMethodFailed ?? 'The direct method failed. Do you want to try Google\'s redirect method?';
-  final cancelText = l10n?.cancel ?? 'Cancel';
-  final tryAgainText = l10n?.tryAgain ?? 'Try';
-  
-  showDialog(
-    context: context,
-    builder: (BuildContext dialogContext) {
-      return AlertDialog(
-        backgroundColor: _cardColor,
-        title: Text(
-          alternativeMethod,
-          style: TextStyle(color: _accentColor),
-        ),
-        content: Text(
-          directMethodFailed,
-          style: TextStyle(color: _textColor),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              if (mounted) {
-                Navigator.of(dialogContext).pop();
-                setState(() {
-                  _loadingGoogleLogin = false;
-                });
-              }
-            },
-            child: Text(
-              cancelText,
-              style: TextStyle(color: _hintColor),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (mounted) {
-                Navigator.of(dialogContext).pop();
-                try {
-                  await AuthService.signInWithGoogleOAuth();
-                } catch (e) {
-                  if (mounted) {
-                    setState(() {
-                      _loadingGoogleLogin = false;
-                    });
-                    final l10nInner = AppLocalizations.of(context);
-                    _setError(l10nInner?.alternativeMethodError(e.toString()) ?? 'Alternative method error: ${e.toString()}');
-                  }
-                }
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _accentColor,
-              foregroundColor: _backgroundColor,
-            ),
-            child: Text(tryAgainText),
-          ),
-        ],
-      );
-    },
-  );
-}
 
   //[-------------REDIRECCIÓN POST-LOGIN--------------]
   Future<void> _checkAndRedirect(User user) async {
@@ -414,6 +350,28 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         setState(() => _error = null);
       }
     });
+  }
+
+  //Inicializar estado de autenticación
+  Future<void> _initializeAuthState() async {
+    try {
+      // Llamar al nuevo método de inicialización
+      await AuthService.initializeAuthState();
+      
+      // Verificar si ya hay una sesión activa
+      final user = AuthService.getCurrentUser();
+      if (user != null && mounted) {
+        if (kDebugMode) {
+          print('Usuario ya autenticado detectado: ${user.email}');
+        }
+        // Si hay un usuario activo, redirigir automáticamente
+        await _checkAndRedirect(user);
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error inicializando estado de auth: $e');
+      }
+    }
   }
 
   // Validaciones mejoradas

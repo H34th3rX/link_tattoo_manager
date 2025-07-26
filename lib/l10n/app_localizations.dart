@@ -1009,6 +1009,132 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Authentication error: {message}'**
   String authErrorGeneric(Object message);
+
+  /// No description provided for @unexpectedGoogleError.
+  ///
+  /// In en, this message translates to:
+  /// **'Unexpected Google Sign-In error'**
+  String get unexpectedGoogleError;
+
+  /// No description provided for @googleError.
+  ///
+  /// In en, this message translates to:
+  /// **'Google Error'**
+  String get googleError;
+
+  /// No description provided for @changeAccountMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'There might be an issue with your Google account. Would you like to try with a different account or use the alternative method?'**
+  String get changeAccountMessage;
+
+  /// No description provided for @changeAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Change Account'**
+  String get changeAccount;
+
+  /// No description provided for @retryError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error retrying login'**
+  String get retryError;
+
+  /// No description provided for @emailLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Email address'**
+  String get emailLabel;
+
+  /// No description provided for @passwordLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Password'**
+  String get passwordLabel;
+
+  /// No description provided for @registerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Register'**
+  String get registerTitle;
+
+  /// No description provided for @confirmPasswordLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm password'**
+  String get confirmPasswordLabel;
+
+  /// No description provided for @passwordComplexity.
+  ///
+  /// In en, this message translates to:
+  /// **'Password must contain at least one letter and one number'**
+  String get passwordComplexity;
+
+  /// No description provided for @confirmPasswordRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm your password'**
+  String get confirmPasswordRequired;
+
+  /// No description provided for @passwordsDontMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Passwords do not match'**
+  String get passwordsDontMatch;
+
+  /// No description provided for @emailRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Email is required'**
+  String get emailRequired;
+
+  /// No description provided for @invalidEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid email'**
+  String get invalidEmail;
+
+  /// No description provided for @accountCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Account created. A verification email has been sent.'**
+  String get accountCreated;
+
+  /// No description provided for @accountCreationFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not create account. Please try again.'**
+  String get accountCreationFailed;
+
+  /// No description provided for @unexpectedError.
+  ///
+  /// In en, this message translates to:
+  /// **'Unexpected error. Please check your internet connection.'**
+  String get unexpectedError;
+
+  /// No description provided for @userAlreadyRegistered.
+  ///
+  /// In en, this message translates to:
+  /// **'This email is already registered. Please try logging in.'**
+  String get userAlreadyRegistered;
+
+  /// No description provided for @invalidEmailFormat.
+  ///
+  /// In en, this message translates to:
+  /// **'The email format is invalid.'**
+  String get invalidEmailFormat;
+
+  /// No description provided for @ok.
+  ///
+  /// In en, this message translates to:
+  /// **'OK'**
+  String get ok;
+
+  /// No description provided for @alreadyHaveAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Already have an account? '**
+  String get alreadyHaveAccount;
 }
 
 class _AppLocalizationsDelegate

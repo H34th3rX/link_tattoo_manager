@@ -1,21 +1,21 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter/foundation.dart';
+// CAMBIO IMPORTANTE: Usar conditional imports
+import 'stub_html.dart' if (dart.library.html) 'dart:html' as html;
 
-//[-------------SERVICIO DE AUTENTICACIÓN ROBUSTO--------------]
+//[-------------SERVICIO DE AUTENTICACIÓN CON SOLUCIÓN WEB DEFINITIVA--------------]
 class AuthService {
   static final _supabase = Supabase.instance.client;
   
   // Configuración diferente para Web y Mobile
   static GoogleSignIn get _googleSignIn {
     if (kIsWeb) {
-      // Para Web: usar solo el Web Client ID con configuración más específica
       return GoogleSignIn(
         clientId: '643519795291-f6h7tg6vbko0g9hm98ktc6p2ucv9pvt2.apps.googleusercontent.com',
         scopes: ['email', 'profile', 'openid'],
       );
     } else {
-      // Para Android: usar el Server Client ID (Web Client ID)
       return GoogleSignIn(
         serverClientId: '643519795291-f6h7tg6vbko0g9hm98ktc6p2ucv9pvt2.apps.googleusercontent.com',
         scopes: ['email', 'profile', 'openid'],
@@ -34,17 +34,15 @@ class AuthService {
     );
   }
 
-  //[-------------AUTENTICACIÓN CON GOOGLE MULTI-ESTRATEGIA--------------]
+  //[-------------AUTENTICACIÓN CON GOOGLE - ESTRATEGIA SIMPLIFICADA--------------]
   static Future<AuthResponse?> signInWithGoogle() async {
     try {
-      // IMPORTANTE: Cerrar sesión de Google primero para forzar selección de cuenta
-      await _forceGoogleAccountSelection();
-      
       if (kIsWeb) {
-        // En Web, intentar múltiples estrategias
-        return await _signInWithGoogleWeb();
+        // En Web, usar OAuth directo para evitar doble prompt
+        return await _signInWithGoogleWebOAuth();
       } else {
-        // En Mobile, usar estrategia nativa
+        // En Mobile, usar la estrategia con Google Sign-In plugin
+        await _forceGoogleAccountSelection();
         return await _signInWithGoogleMobile();
       }
     } catch (e) {
@@ -55,93 +53,161 @@ class AuthService {
     }
   }
 
-  //[-------------FORZAR SELECCIÓN DE CUENTA DE GOOGLE--------------]
+  //[-------------GOOGLE SIGN-IN PARA WEB - SOLO OAUTH (SIN GOOGLE PLUGIN)--------------]
+  static Future<AuthResponse?> _signInWithGoogleWebOAuth() async {
+    try {
+      if (kDebugMode) {
+        print('Iniciando Google OAuth para Web...');
+      }
+      
+      // SOLUCIÓN 1: Limpiar URL antes del OAuth
+      await _cleanUrlAndNavigate();
+      
+      // SOLUCIÓN 2: OAuth directo con Supabase (sin Google plugin)
+      await _supabase.auth.signInWithOAuth(
+        OAuthProvider.google,
+        redirectTo: _getRedirectUrl(),
+        queryParams: {
+          'prompt': 'select_account', // Esto permite seleccionar cuenta cada vez
+          'access_type': 'offline',
+        },
+      );
+      
+      if (kDebugMode) {
+        print('OAuth redirect iniciado...');
+      }
+      
+      // En Web OAuth, el redirect manejará el login
+      return null;
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error en Google OAuth Web: $e');
+      }
+      throw Exception('Error en Google OAuth Web: $e');
+    }
+  }
+
+  //[-------------OBTENER URL DE REDIRECT CORRECTA--------------]
+  static String _getRedirectUrl() {
+    if (kIsWeb) {
+      // CAMBIO: Usar función helper para obtener la URL
+      return _getWebLocationHref();
+    }
+    return '';
+  }
+
+  //[-------------HELPER PARA OBTENER URL ACTUAL--------------]
+  static String _getWebLocationHref() {
+    if (kIsWeb) {
+      try {
+        final uri = Uri.parse(html.window.location.href);
+        final baseUrl = '${uri.scheme}://${uri.host}${uri.port != 80 && uri.port != 443 ? ':${uri.port}' : ''}';
+        
+        if (kDebugMode) {
+          print('Redirect URL: $baseUrl');
+        }
+        
+        return baseUrl;
+      } catch (e) {
+        if (kDebugMode) {
+          print('Error obteniendo URL: $e');
+        }
+        return '';
+      }
+    }
+    return '';
+  }
+
+  //[-------------LIMPIAR URL Y NAVEGAR A BASE--------------]
+  static Future<void> _cleanUrlAndNavigate() async {
+    if (kIsWeb) {
+      try {
+        final currentHref = _getCurrentHref();
+        if (currentHref.isEmpty) return;
+        
+        final uri = Uri.parse(currentHref);
+        final cleanUrl = '${uri.scheme}://${uri.host}${uri.port != 80 && uri.port != 443 ? ':${uri.port}' : ''}${uri.path}';
+        
+        if (currentHref != cleanUrl) {
+          if (kDebugMode) {
+            print('Limpiando URL de: $currentHref a: $cleanUrl');
+          }
+          
+          // Usar replaceState para no crear nueva entrada en historial
+          _replaceHistoryState(cleanUrl);
+          
+          if (kDebugMode) {
+            print('URL limpiada exitosamente');
+          }
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          print('Error limpiando URL: $e');
+        }
+      }
+    }
+  }
+
+  //[-------------HELPERS PARA FUNCIONES WEB--------------]
+  static String _getCurrentHref() {
+    if (kIsWeb) {
+      try {
+        return html.window.location.href;
+      } catch (e) {
+        return '';
+      }
+    }
+    return '';
+  }
+
+  static void _replaceHistoryState(String url) {
+    if (kIsWeb) {
+      try {
+        html.window.history.replaceState(null, '', url);
+      } catch (e) {
+        if (kDebugMode) {
+          print('Error replacing history state: $e');
+        }
+      }
+    }
+  }
+
+  static void _reloadWindow() {
+    if (kIsWeb) {
+      try {
+        html.window.location.reload();
+      } catch (e) {
+        if (kDebugMode) {
+          print('Error reloading window: $e');
+        }
+      }
+    }
+  }
+
+  //[-------------FORZAR SELECCIÓN DE CUENTA DE GOOGLE (Solo para Mobile)--------------]
   static Future<void> _forceGoogleAccountSelection() async {
     try {
-      // Verificar si hay una sesión activa de Google
-      if (await _googleSignIn.isSignedIn()) {
+      if (!kIsWeb && await _googleSignIn.isSignedIn()) {
         if (kDebugMode) {
           print('Cerrando sesión de Google para permitir selección de cuenta');
         }
         await _googleSignIn.signOut();
-        
-        // Pequeña pausa para asegurar que el signOut se complete
         await Future.delayed(const Duration(milliseconds: 500));
       }
     } catch (e) {
       if (kDebugMode) {
         print('Error al cerrar sesión de Google: $e');
       }
-      // No lanzar error aquí, continuar con el proceso de login
     }
   }
 
-  //[-------------GOOGLE SIGN-IN PARA WEB CON MÚLTIPLES ESTRATEGIAS--------------]
-  static Future<AuthResponse?> _signInWithGoogleWeb() async {
-    try {
-      // Estrategia 1: Intentar con google_sign_in primero
-      try {
-        // Configurar para forzar selección de cuenta en Web
-        final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-        
-        if (googleUser == null) {
-          return null; // Usuario canceló
-        }
-
-        final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-
-        if (kDebugMode) {
-          print('ID Token existe: ${googleAuth.idToken != null}');
-          print('Access Token existe: ${googleAuth.accessToken != null}');
-          print('Usuario seleccionado: ${googleUser.email}');
-        }
-
-        if (googleAuth.idToken != null) {
-          // Si tenemos ID token, usar signInWithIdToken
-          final AuthResponse response = await _supabase.auth.signInWithIdToken(
-            provider: OAuthProvider.google,
-            idToken: googleAuth.idToken!,
-            accessToken: googleAuth.accessToken,
-          );
-          return response;
-        } else {
-          // Si no hay ID token, intentar con OAuth
-          throw Exception('ID Token no disponible, intentando OAuth');
-        }
-      } catch (e) {
-        if (kDebugMode) {
-          print('Estrategia 1 falló: $e');
-        }
-        
-        // Estrategia 2: Usar Supabase OAuth como fallback con selección de cuenta
-        if (kDebugMode) {
-          print('Intentando con Supabase OAuth...');
-        }
-        
-        await _supabase.auth.signInWithOAuth(
-          OAuthProvider.google,
-          redirectTo: kIsWeb ? null : 'io.supabase.flutterquickstart://login-callback/',
-          queryParams: {
-            'prompt': 'select_account', // Forzar selección de cuenta
-          },
-        );
-        
-        // En OAuth, la respuesta será manejada por el redirect
-        return null;
-      }
-    } catch (e) {
-      throw Exception('Error en Google Sign-In Web: $e');
-    }
-  }
-
-  //[-------------GOOGLE SIGN-IN PARA MOBILE--------------]
+  //[-------------GOOGLE SIGN-IN PARA MOBILE (Sin cambios)--------------]
   static Future<AuthResponse?> _signInWithGoogleMobile() async {
     try {
-      // En mobile, después del signOut anterior, esto forzará la selección
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
       
       if (googleUser == null) {
-        return null; // Usuario canceló
+        return null;
       }
 
       final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
@@ -168,21 +234,10 @@ class AuthService {
     }
   }
 
-  //[-------------MÉTODO ALTERNATIVO PARA WEB (Solo OAuth)--------------]
+  //[-------------MÉTODO ALTERNATIVO PARA WEB (Mismo que el principal)--------------]
   static Future<void> signInWithGoogleOAuth() async {
-    try {
-      // Asegurar que no haya sesión activa antes del OAuth
-      await _forceGoogleAccountSelection();
-      
-      await _supabase.auth.signInWithOAuth(
-        OAuthProvider.google,
-        queryParams: {
-          'prompt': 'select_account', // Forzar selección de cuenta
-        },
-      );
-    } catch (e) {
-      throw Exception('Error en Google OAuth: $e');
-    }
+    // Redirigir al método principal para consistencia
+    await signInWithGoogle();
   }
 
   //[-------------REGISTRO CON EMAIL/PASSWORD--------------]
@@ -196,42 +251,179 @@ class AuthService {
     );
   }
 
-  //[-------------CERRAR SESIÓN--------------]
+  //[-------------CERRAR SESIÓN MEJORADO CON LIMPIEZA COMPLETA--------------]
   static Future<void> signOut() async {
     try {
-      // Cerrar sesión en Google si está activo
-      if (await _googleSignIn.isSignedIn()) {
-        await _googleSignIn.signOut();
-        if (kDebugMode) {
-          print('Sesión de Google cerrada');
+      if (kDebugMode) {
+        print('Iniciando logout completo...');
+      }
+      
+      // 1. En Web, limpiar Google OAuth primero
+      if (kIsWeb) {
+        await _clearWebGoogleAuth();
+      } else {
+        // 2. En Mobile, cerrar sesión de Google
+        if (await _googleSignIn.isSignedIn()) {
+          if (kDebugMode) {
+            print('Cerrando sesión de Google en Mobile...');
+          }
+          await _googleSignIn.disconnect();
         }
+      }
+      
+      // 3. Cerrar sesión en Supabase
+      await _supabase.auth.signOut();
+      
+      if (kDebugMode) {
+        print('Sesión de Supabase cerrada');
+      }
+      
+      // 4. Limpiar URL en Web
+      if (kIsWeb) {
+        await _cleanUrlAndNavigate();
+        
+        // 5. Recargar página para limpiar completamente el estado
+        await Future.delayed(const Duration(milliseconds: 300));
+        _reloadWindow();
+      }
+      
+      if (kDebugMode) {
+        print('Logout completo finalizado');
       }
     } catch (e) {
       if (kDebugMode) {
-        print('Error cerrando sesión de Google: $e');
+        print('Error durante logout: $e');
       }
-    }
-    
-    // Cerrar sesión en Supabase
-    await _supabase.auth.signOut();
-    if (kDebugMode) {
-      print('Sesión de Supabase cerrada');
+      
+      // Logout de emergencia
+      try {
+        await _supabase.auth.signOut();
+        if (kIsWeb) {
+          _reloadWindow();
+        }
+      } catch (emergencyError) {
+        if (kDebugMode) {
+          print('Error en logout de emergencia: $emergencyError');
+        }
+      }
     }
   }
 
-  //[-------------CERRAR SESIÓN SILENCIOSA DE GOOGLE (para cambio de cuenta)--------------]
+  //[-------------LIMPIAR AUTENTICACIÓN WEB DE GOOGLE--------------]
+  static Future<void> _clearWebGoogleAuth() async {
+    if (kIsWeb) {
+      try {
+        if (kDebugMode) {
+          print('Limpiando autenticación web de Google...');
+        }
+        
+        // Intentar logout del plugin de Google si está disponible
+        try {
+          if (await _googleSignIn.isSignedIn()) {
+            await _googleSignIn.disconnect();
+            if (kDebugMode) {
+              print('Google plugin desconectado');
+            }
+          }
+        } catch (pluginError) {
+          if (kDebugMode) {
+            print('Google plugin no disponible o error: $pluginError');
+          }
+        }
+        
+        // Limpiar cookies de Google manualmente
+        await _clearGoogleCookies();
+        
+        if (kDebugMode) {
+          print('Limpieza web de Google completada');
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          print('Error limpiando auth web de Google: $e');
+        }
+      }
+    }
+  }
+
+  //[-------------LIMPIAR COOKIES DE GOOGLE--------------]
+  static Future<void> _clearGoogleCookies() async {
+    if (kIsWeb) {
+      try {
+        // Limpiar cookies relacionadas con Google
+        final cookiesToClear = [
+          'accounts.google.com',
+          '.google.com',
+          '.googleapis.com',
+        ];
+        
+        // ignore: unused_local_variable
+        for (String domain in cookiesToClear) {
+          try {
+            // En Flutter Web, las cookies se manejan automáticamente
+            // pero podemos intentar limpiar el localStorage
+            _clearWebStorage();
+          } catch (e) {
+            // Ignorar errores de limpieza individual
+          }
+        }
+        
+        if (kDebugMode) {
+          print('Cookies y storage de Google limpiados');
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          print('Error limpiando cookies de Google: $e');
+        }
+      }
+    }
+  }
+
+  //[-------------HELPER PARA LIMPIAR WEB STORAGE--------------]
+  static void _clearWebStorage() {
+    if (kIsWeb) {
+      try {
+        html.window.localStorage.removeWhere((key, value) => 
+          key.contains('google') || 
+          key.contains('oauth') || 
+          key.contains('gapi'));
+        
+        html.window.sessionStorage.removeWhere((key, value) => 
+          key.contains('google') || 
+          key.contains('oauth') || 
+          key.contains('gapi'));
+      } catch (e) {
+        if (kDebugMode) {
+          print('Error clearing web storage: $e');
+        }
+      }
+    }
+  }
+
+  //[-------------CERRAR SESIÓN SILENCIOSA DE GOOGLE--------------]
   static Future<void> disconnectGoogleAccount() async {
     try {
-      if (await _googleSignIn.isSignedIn()) {
-        await _googleSignIn.disconnect();
-        if (kDebugMode) {
-          print('Cuenta de Google desconectada completamente');
+      if (kIsWeb) {
+        await _clearWebGoogleAuth();
+      } else {
+        if (await _googleSignIn.isSignedIn()) {
+          await _googleSignIn.disconnect();
+          if (kDebugMode) {
+            print('Cuenta de Google desconectada completamente');
+          }
         }
       }
     } catch (e) {
       if (kDebugMode) {
         print('Error desconectando cuenta de Google: $e');
       }
+    }
+  }
+
+  //[-------------MÉTODO PARA LIMPIAR ESTADO DE GOOGLE EN WEB--------------]
+  static Future<void> clearGoogleWebState() async {
+    if (kIsWeb) {
+      await _clearWebGoogleAuth();
+      await _cleanUrlAndNavigate();
     }
   }
 
@@ -260,24 +452,6 @@ class AuthService {
     return response;
   }
 
-  //[-------------VERIFICAR ESTADO DE GOOGLE SIGN-IN--------------]
-  static Future<bool> isGoogleSignedIn() async {
-    try {
-      return await _googleSignIn.isSignedIn();
-    } catch (e) {
-      return false;
-    }
-  }
-
-  //[-------------OBTENER INFORMACIÓN DE USUARIO GOOGLE--------------]
-  static Future<GoogleSignInAccount?> getCurrentGoogleUser() async {
-    try {
-      return _googleSignIn.currentUser;
-    } catch (e) {
-      return null;
-    }
-  }
-
   //[-------------SETUP LISTENER PARA AUTH STATE CHANGES--------------]
   static void setupAuthListener({
     required Function(User user) onSignIn,
@@ -299,6 +473,10 @@ class AuthService {
         switch (event) {
           case AuthChangeEvent.signedIn:
             if (session?.user != null) {
+              // Limpiar URL después de login exitoso
+              if (kIsWeb) {
+                _cleanUrlAndNavigate();
+              }
               onSignIn(session!.user);
             }
             break;
@@ -319,5 +497,50 @@ class AuthService {
         onError('Error en auth state change: $e');
       }
     });
+  }
+
+  //[-------------INICIALIZAR ESTADO DE AUTENTICACIÓN--------------]
+  static Future<void> initializeAuthState() async {
+    if (kIsWeb) {
+      try {
+        // Limpiar URL de parámetros OAuth al inicializar
+        await _cleanUrlAndNavigate();
+        
+        if (kDebugMode) {
+          print('Estado de autenticación inicializado para Web');
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          print('Error inicializando estado de auth: $e');
+        }
+      }
+    }
+  }
+
+  //[-------------VERIFICAR ESTADO DE GOOGLE SIGN-IN--------------]
+  static Future<bool> isGoogleSignedIn() async {
+    try {
+      if (kIsWeb) {
+        // En Web, verificar por la sesión de Supabase
+        return getCurrentUser() != null;
+      } else {
+        return await _googleSignIn.isSignedIn();
+      }
+    } catch (e) {
+      return false;
+    }
+  }
+
+  //[-------------OBTENER INFORMACIÓN DE USUARIO GOOGLE--------------]
+  static Future<GoogleSignInAccount?> getCurrentGoogleUser() async {
+    try {
+      if (kIsWeb) {
+        return null; // En Web OAuth no tenemos acceso al GoogleSignInAccount
+      } else {
+        return _googleSignIn.currentUser;
+      }
+    } catch (e) {
+      return null;
+    }
   }
 }

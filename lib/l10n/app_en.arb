@@ -205,5 +205,29 @@
         "placeholders": {
             "message": {}
         }
-    }
+    },
+    "unexpectedGoogleError": "Unexpected Google Sign-In error",
+    "googleError": "Google Error",
+    "changeAccountMessage": "There might be an issue with your Google account. Would you like to try with a different account or use the alternative method?",
+    "changeAccount": "Change Account",
+    "retryError": "Error retrying login",
+
+
+    
+    "emailLabel": "Email address",
+    "passwordLabel": "Password",
+    "registerTitle": "Register",
+    "confirmPasswordLabel": "Confirm password",
+    "passwordComplexity": "Password must contain at least one letter and one number",
+    "confirmPasswordRequired": "Confirm your password",
+    "passwordsDontMatch": "Passwords do not match",
+    "emailRequired": "Email is required",
+    "invalidEmail": "Enter a valid email",
+    "accountCreated": "Account created. A verification email has been sent.",
+    "accountCreationFailed": "Could not create account. Please try again.",
+    "unexpectedError": "Unexpected error. Please check your internet connection.",
+    "userAlreadyRegistered": "This email is already registered. Please try logging in.",
+    "invalidEmailFormat": "The email format is invalid.",
+    "ok": "OK",
+    "alreadyHaveAccount": "Already have an account? "
 }
