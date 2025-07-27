@@ -1135,6 +1135,216 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Already have an account? '**
   String get alreadyHaveAccount;
+
+  /// No description provided for @passwordRecovery.
+  ///
+  /// In en, this message translates to:
+  /// **'Password Recovery'**
+  String get passwordRecovery;
+
+  /// No description provided for @passwordRecoveryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset Password'**
+  String get passwordRecoveryTitle;
+
+  /// No description provided for @passwordRecoverySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your email address to reset your password'**
+  String get passwordRecoverySubtitle;
+
+  /// No description provided for @enterEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your email address'**
+  String get enterEmail;
+
+  /// No description provided for @sendRecoveryEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Send Recovery Email'**
+  String get sendRecoveryEmail;
+
+  /// No description provided for @backToLogin.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to Login'**
+  String get backToLogin;
+
+  /// No description provided for @emailSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Email Sent'**
+  String get emailSent;
+
+  /// No description provided for @recoveryEmailSent.
+  ///
+  /// In en, this message translates to:
+  /// **'A recovery email has been sent to your email address. Please check your inbox.'**
+  String get recoveryEmailSent;
+
+  /// No description provided for @userNotFoundOrGoogle.
+  ///
+  /// In en, this message translates to:
+  /// **'User not found or registered with Google'**
+  String get userNotFoundOrGoogle;
+
+  /// No description provided for @googleUserNoPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'This user is registered with Google and doesn\'t need to reset password'**
+  String get googleUserNoPassword;
+
+  /// No description provided for @verifyingUser.
+  ///
+  /// In en, this message translates to:
+  /// **'Verifying user...'**
+  String get verifyingUser;
+
+  /// No description provided for @sendingEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Sending email...'**
+  String get sendingEmail;
+
+  /// No description provided for @emailNotValid.
+  ///
+  /// In en, this message translates to:
+  /// **'The email format is not valid'**
+  String get emailNotValid;
+
+  /// No description provided for @recoveryError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error sending recovery email'**
+  String get recoveryError;
+
+  /// No description provided for @checkYourEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Check your email'**
+  String get checkYourEmail;
+
+  /// No description provided for @recoveryLinkSent.
+  ///
+  /// In en, this message translates to:
+  /// **'A recovery link has been sent to'**
+  String get recoveryLinkSent;
+
+  /// No description provided for @didntReceiveEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Didn\'t receive the email?'**
+  String get didntReceiveEmail;
+
+  /// No description provided for @resendEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Resend email'**
+  String get resendEmail;
+
+  /// No description provided for @setNewPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Set New Password'**
+  String get setNewPassword;
+
+  /// No description provided for @setNewPasswordSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your new password below'**
+  String get setNewPasswordSubtitle;
+
+  /// No description provided for @newPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'New Password'**
+  String get newPassword;
+
+  /// No description provided for @confirmPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm Password'**
+  String get confirmPassword;
+
+  /// No description provided for @updatePassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Update Password'**
+  String get updatePassword;
+
+  /// No description provided for @passwordUpdatedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Password Updated!'**
+  String get passwordUpdatedTitle;
+
+  /// No description provided for @passwordUpdatedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Your password has been successfully updated. You will be redirected to the login page.'**
+  String get passwordUpdatedMessage;
+
+  /// No description provided for @newPasswordDifferent.
+  ///
+  /// In en, this message translates to:
+  /// **'New password should be different from the old one'**
+  String get newPasswordDifferent;
+
+  /// No description provided for @passwordUpdateError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error updating password'**
+  String get passwordUpdateError;
+
+  /// No description provided for @passwordMaxLength.
+  ///
+  /// In en, this message translates to:
+  /// **'Password must be less than 72 characters'**
+  String get passwordMaxLength;
+
+  /// No description provided for @passwordRequirements.
+  ///
+  /// In en, this message translates to:
+  /// **'Password must contain at least one letter and one number'**
+  String get passwordRequirements;
+
+  /// No description provided for @passwordsDoNotMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Passwords do not match'**
+  String get passwordsDoNotMatch;
+
+  /// No description provided for @verifyAndContinue.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify and Continue'**
+  String get verifyAndContinue;
+
+  /// No description provided for @cannotResetPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Cannot reset password for this user.'**
+  String get cannotResetPassword;
+
+  /// No description provided for @back.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get back;
+
+  /// No description provided for @contactAdminError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not update password. Contact administrator.'**
+  String get contactAdminError;
+
+  /// No description provided for @changePassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Change Password'**
+  String get changePassword;
 }
 
 class _AppLocalizationsDelegate

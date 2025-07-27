@@ -11,7 +11,7 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.8
   flutter_launcher_icons: ^0.14.4
-
+  web: ^1.1.1
   # Backend y autenticación
   supabase_flutter: ^2.9.1
   google_sign_in: ^6.2.1

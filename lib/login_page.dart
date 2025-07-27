@@ -48,7 +48,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     super.initState();
     _initializeAnimations();
     _setupAuthListener();
-     _initializeAuthState();
   }
 
   //[-------------CONFIGURACIÓN DE LISTENER PARA AUTH--------------]
@@ -163,7 +162,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     );
     
     if (response.session != null) {
-      await _checkAndRedirect(response.user!);
+      // La redirección se maneja por el listener de autenticación global
     } else if (mounted) {
       final l10n = AppLocalizations.of(context);
       _setError(l10n?.invalidCredentials ?? 'Invalid credentials');
@@ -184,7 +183,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         );
         
         if (response.session != null) {
-          await _checkAndRedirect(response.user!);
+          // La redirección se maneja por el listener de autenticación global
         } else if (mounted) {
           final l10n = AppLocalizations.of(context);
           _setError(l10n?.invalidUsernameCredentials ?? 'Invalid credentials');
@@ -350,28 +349,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         setState(() => _error = null);
       }
     });
-  }
-
-  //Inicializar estado de autenticación
-  Future<void> _initializeAuthState() async {
-    try {
-      // Llamar al nuevo método de inicialización
-      await AuthService.initializeAuthState();
-      
-      // Verificar si ya hay una sesión activa
-      final user = AuthService.getCurrentUser();
-      if (user != null && mounted) {
-        if (kDebugMode) {
-          print('Usuario ya autenticado detectado: ${user.email}');
-        }
-        // Si hay un usuario activo, redirigir automáticamente
-        await _checkAndRedirect(user);
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('Error inicializando estado de auth: $e');
-      }
-    }
   }
 
   // Validaciones mejoradas
@@ -719,34 +696,27 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   }
 
   Widget _buildForgotPasswordLink() {
-    return Align(
-      alignment: Alignment.centerRight,
-      child: TextButton(
-        onPressed: !_isAnyLoginLoading ? () {
-          HapticFeedback.lightImpact();
-          final l10n = AppLocalizations.of(context);
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(l10n?.passwordRecoveryInDevelopment ?? 'Password recovery feature in development'),
-                backgroundColor: _accentColor,
-                behavior: SnackBarBehavior.floating,
-                duration: const Duration(seconds: 3),
-              ),
-            );
-          }
-        } : null,
-        child: Text(
-          AppLocalizations.of(context)?.forgotPassword ?? 'Forgot your password?',
-          style: const TextStyle(
-            fontSize: 12,
-            color: _accentColor,
-            decoration: TextDecoration.underline,
-          ),
+  return Align(
+    alignment: Alignment.centerRight,
+    child: TextButton(
+      onPressed: !_isAnyLoginLoading ? () {
+        HapticFeedback.lightImpact();
+        if (mounted) {
+          // Navegar a la página de recuperación de contraseña
+          Navigator.pushNamed(context, '/password_recovery');
+        }
+      } : null,
+      child: Text(
+        AppLocalizations.of(context)?.forgotPassword ?? 'Forgot your password?',
+        style: const TextStyle(
+          fontSize: 12,
+          color: _accentColor,
+          decoration: TextDecoration.underline,
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildLoginButton() {
     return SizedBox(

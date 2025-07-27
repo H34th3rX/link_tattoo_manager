@@ -462,46 +462,48 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
   }
 // Método específico para manejar logout correctamente
 Future<void> _handleLogout() async {
-  try {
+  // Verificar si el widget sigue montado antes de cualquier operación UI
+  if (!mounted) return;
   
-      if (kDebugMode) {
-        print('Iniciando proceso de logout...');
-      }
-    
+  try {
+    if (kDebugMode) {
+      print('Iniciando proceso de logout...');
+    }
     
     // Usar el método de logout mejorado del AuthService
     await AuthService.signOut();
     
+    if (kDebugMode) {
+      print('Logout completado, redirigiendo...');
+    }
     
-      if (kDebugMode) {
-        print('Logout completado, redirigiendo...');
-      }
+    // Esperar un momento para asegurar que el logout se complete
+    await Future.delayed(const Duration(milliseconds: 300));
     
-    
-    // Navegar a login con limpieza completa
+    // Verificar nuevamente si el widget sigue montado antes de navegar
     if (mounted) {
+      // Navegar a login con limpieza completa
       Navigator.of(context).pushNamedAndRemoveUntil(
         '/login',
         (route) => false, // Eliminar todas las rutas anteriores
       );
     }
   } catch (e) {
-   
+    if (kDebugMode) {
+      print('Error durante logout: $e');
+    }
+    
+    // En caso de error, forzar logout básico
+    try {
+      await Supabase.instance.client.auth.signOut();
+    } catch (basicLogoutError) {
       if (kDebugMode) {
-        print('Error durante logout: $e');
+        print('Error en logout básico: $basicLogoutError');
       }
+    }
     
-    
-    // En caso de error, mostrar mensaje y proceder con logout básico
+    // Proceder con navegación de todas formas, pero solo si el widget sigue montado
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error cerrando sesión: $e'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      
-      // Proceder con logout básico - navegar de todas formas
       Navigator.of(context).pushNamedAndRemoveUntil(
         '/login',
         (route) => false,
@@ -510,4 +512,3 @@ Future<void> _handleLogout() async {
   }
 }
 }
-

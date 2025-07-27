@@ -223,7 +223,7 @@ class AppLocalizationsEs extends AppLocalizations {
       'Hay clientes inactivos disponibles. Toca \'Mostrar todos\' para verlos.';
 
   @override
-  String get noClientsRegisteredMessage => 'No hay clientes registrados';
+  String get noClientsRegisteredMessage => 'No clientes registrados';
 
   @override
   String get addFirstClient => 'Agrega tu primer cliente para comenzar';
@@ -577,4 +577,120 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get alreadyHaveAccount => '¿Ya tienes una cuenta? ';
+
+  @override
+  String get passwordRecovery => 'Recuperar Contraseña';
+
+  @override
+  String get passwordRecoveryTitle => 'Restablecer Contraseña';
+
+  @override
+  String get passwordRecoverySubtitle =>
+      'Ingresa tu correo electrónico para restablecer tu contraseña';
+
+  @override
+  String get enterEmail => 'Ingresa tu correo electrónico';
+
+  @override
+  String get sendRecoveryEmail => 'Enviar Correo de Recuperación';
+
+  @override
+  String get backToLogin => 'Volver al Inicio de Sesión';
+
+  @override
+  String get emailSent => 'Correo Enviado';
+
+  @override
+  String get recoveryEmailSent =>
+      'Se ha enviado un correo de recuperación a tu dirección de email. Revisa tu bandeja de entrada.';
+
+  @override
+  String get userNotFoundOrGoogle =>
+      'Usuario no encontrado o registrado con Google';
+
+  @override
+  String get googleUserNoPassword =>
+      'Este usuario está registrado con Google y no necesita restablecer contraseña';
+
+  @override
+  String get verifyingUser => 'Verificando usuario...';
+
+  @override
+  String get sendingEmail => 'Enviando correo...';
+
+  @override
+  String get emailNotValid => 'El formato del correo electrónico no es válido';
+
+  @override
+  String get recoveryError => 'Error al enviar el correo de recuperación';
+
+  @override
+  String get checkYourEmail => 'Revisa tu correo';
+
+  @override
+  String get recoveryLinkSent => 'Se ha enviado un enlace de recuperación a';
+
+  @override
+  String get didntReceiveEmail => '¿No recibiste el correo?';
+
+  @override
+  String get resendEmail => 'Reenviar correo';
+
+  @override
+  String get setNewPassword => 'Establecer Nueva Contraseña';
+
+  @override
+  String get setNewPasswordSubtitle =>
+      'Ingresa tu nueva contraseña a continuación';
+
+  @override
+  String get newPassword => 'Nueva Contraseña';
+
+  @override
+  String get confirmPassword => 'Confirmar Contraseña';
+
+  @override
+  String get updatePassword => 'Actualizar Contraseña';
+
+  @override
+  String get passwordUpdatedTitle => '¡Contraseña Actualizada!';
+
+  @override
+  String get passwordUpdatedMessage =>
+      'Tu contraseña ha sido actualizada exitosamente. Serás redirigido a la página de inicio de sesión.';
+
+  @override
+  String get newPasswordDifferent =>
+      'La nueva contraseña debe ser diferente a la anterior';
+
+  @override
+  String get passwordUpdateError => 'Error al actualizar la contraseña';
+
+  @override
+  String get passwordMaxLength =>
+      'La contraseña debe tener menos de 72 caracteres';
+
+  @override
+  String get passwordRequirements =>
+      'La contraseña debe contener al menos una letra y un número';
+
+  @override
+  String get passwordsDoNotMatch => 'Las contraseñas no coinciden';
+
+  @override
+  String get verifyAndContinue => 'Verificar y Continuar';
+
+  @override
+  String get cannotResetPassword =>
+      'No se puede restablecer la contraseña para este usuario.';
+
+  @override
+  String get back => 'Volver';
+
+  @override
+  String get contactAdminError =>
+      'No se pudo actualizar la contraseña. Contacte al administrador.';
+
+  @override
+  String get changePassword => 'Cambiar Contraseña';
 }

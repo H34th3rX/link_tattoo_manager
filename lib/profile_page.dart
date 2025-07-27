@@ -10,6 +10,8 @@ import './integrations/employee_service.dart';
 import 'package:intl/intl.dart'; 
 import './l10n/app_localizations.dart'; // Importar el archivo generado
 import 'localization_provider.dart'; // Importar el proveedor de localización
+import 'services/auth_service.dart'; // Importar AuthService
+import 'reset_password_page.dart'; // Importar ResetPasswordPage
 
 // Constantes globales para estilos y animaciones
 const Color primaryColor = Color(0xFFBDA206);
@@ -48,6 +50,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
   String? _successMessage;
   late AnimationController _errorAnimationController;
   late AnimationController _successAnimationController;
+  bool _isGoogleUser = false; // Nuevo: para saber si es usuario de Google
 
   // Estadísticas del empleado
   int _yearsOfExperience = 0;
@@ -96,6 +99,16 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
     try {
       final user = Supabase.instance.client.auth.currentUser!;
       final profile = await EmployeeService.getEmployeeProfile(user.id);
+      
+      // Nuevo: Verificar si el usuario es de Google
+      if (user.email != null) {
+        final userStatus = await AuthService.checkUserCanResetPassword(user.email!);
+        if (!mounted) return;
+        setState(() {
+          _isGoogleUser = userStatus['isGoogleUser'] as bool;
+        });
+      }
+
       if (!mounted) return; // Guardar el contexto
 
       setState(() {
@@ -155,11 +168,13 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
   // Cierra sesión y redirige a la pantalla de login
   Future<void> _logout() async {
     try {
-      await Supabase.instance.client.auth.signOut();
+      await AuthService.signOut(); // Usar el método completo de AuthService
       if (!mounted) return; // Guardar el contexto
+      // La navegación se maneja dentro de AuthService.signOut() para web,
+      // pero para mobile o fallback, aseguramos la navegación aquí.
       Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
     } catch (e) {
-      _showError(AppLocalizations.of(context)!.errorSavingProfile(e.toString()));
+      _showError(AppLocalizations.of(context)!.errorLoggingOut); // Usar texto localizado
     }
   }
 
@@ -183,6 +198,21 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
       _notesCtrl.text = _employeeProfile!['notes'] ?? '';
     }
     setState(() => _isPopupOpen = true);
+  }
+
+  // Navega a la página de cambio de contraseña
+  void _navigateToChangePassword() {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user != null && user.email != null) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ResetPasswordPage(userEmail: user.email!),
+        ),
+      );
+    } else {
+      _showError(AppLocalizations.of(context)!.errorLoadingUserData); // Usar texto localizado
+    }
   }
 
   // Cierra el popup y reinicia el formulario
@@ -443,7 +473,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
               children: [
                 const SizedBox(height: 8),
                 AnimatedAppearance(
-                  delay: 0,
+                  delay: 0, // Animación inmediata
                   child: _buildProfileHeader(isDark, localizations),
                 ),
                 const SizedBox(height: 24),
@@ -453,27 +483,55 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                 ),
                 const SizedBox(height: 32),
                 AnimatedAppearance(
-                  delay: 300,
+                  delay: 300, // Retraso para que aparezca después de la información
                   child: Center(
-                    child: SizedBox(
-                      width: isWide ? 300 : double.infinity,
-                      height: 50,
-                      child: ElevatedButton.icon(
-                        onPressed: _openEditProfilePopup,
-                        icon: const Icon(Icons.edit, color: Colors.black),
-                        label: Text(
-                          localizations.editProfile, // Usar texto localizado
-                          style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: primaryColor,
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(borderRadius),
+                    child: Wrap( // Usar Wrap para que los botones se ajusten
+                      spacing: 16, // Espacio horizontal entre botones
+                      runSpacing: 16, // Espacio vertical entre filas de botones
+                      alignment: WrapAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: isWide ? 300 : double.infinity,
+                          height: 50,
+                          child: ElevatedButton.icon(
+                            onPressed: _openEditProfilePopup,
+                            icon: const Icon(Icons.edit, color: Colors.black),
+                            label: Text(
+                              localizations.editProfile, // Usar texto localizado
+                              style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: primaryColor,
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(borderRadius),
+                              ),
+                              elevation: 4,
+                            ),
                           ),
-                          elevation: 4,
                         ),
-                      ),
+                        if (!_isGoogleUser) // Condición para mostrar el botón
+                          SizedBox(
+                            width: isWide ? 300 : double.infinity,
+                            height: 50,
+                            child: ElevatedButton.icon(
+                              onPressed: _navigateToChangePassword,
+                              icon: const Icon(Icons.lock_reset, color: Colors.black),
+                              label: Text(
+                                localizations.changePassword, // Usar texto localizado
+                                style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: primaryColor.withValues(alpha: 0.8),
+                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(borderRadius),
+                                ),
+                                elevation: 4,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ),
@@ -762,6 +820,14 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                 borderRadius: BorderRadius.circular(12),
                 borderSide: const BorderSide(color: primaryColor, width: 2),
               ),
+              errorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: errorColor),
+              ),
+              focusedErrorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: errorColor, width: 2),
+              ),
               filled: true,
               fillColor: isDark ? Colors.grey[800]?.withValues(alpha:   0.5) : Colors.grey[50],
               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -951,25 +1017,25 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
     final localizations = AppLocalizations.of(context)!;
     if (value == null || value.isEmpty) return localizations.username;
     if (value.length < 3 || value.length > 50) {
-      return 'El nombre de usuario debe tener entre 3 y 50 caracteres'; // No localizado
+      return localizations.nameLengthError; // Localizado
     }
     return null;
   }
 
   String? _validatePhone(String? value) {
-    // final localizations = AppLocalizations.of(context)!; // No se usa
+    final localizations = AppLocalizations.of(context)!;
     if (value == null || value.isEmpty) return null;
     if (!RegExp(r'^\+?[\d\s\-()]{7,15}$').hasMatch(value)) {
-      return 'Formato de teléfono no válido'; // No localizado
+      return localizations.phoneFormatError; // Localizado
     }
     return null;
   }
 
   String? _validateEmail(String? value) {
-    // final localizations = AppLocalizations.of(context)!; // No se usa
+    final localizations = AppLocalizations.of(context)!;
     if (value == null || value.isEmpty) return null;
     if (!RegExp(r'^[\w\.-]+@[\w\.-]+\.\w+$').hasMatch(value)) {
-      return 'Formato de email no válido'; // No localizado
+      return localizations.emailFormatError; // Localizado
     }
     return null;
   }
@@ -1085,7 +1151,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
                 ),
               ),
               Text(
-                'Actualiza tu información personal y profesional', // No localizado
+                localizations.modifyClientInfo, // Usar texto localizado
                 style: TextStyle(
                   fontSize: 14,
                   color: isDark ? hintColor : Colors.grey[600],
@@ -1237,7 +1303,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
                     label: localizations.customSpecialty, // Usar texto localizado
                     icon: Icons.edit,
                     isDark: isDark,
-                    validator: (value) => value == null || value.isEmpty ? 'Ingresa una especialidad personalizada' : null, // No localizado
+                    validator: (value) => value == null || value.isEmpty ? localizations.customSpecialty : null, // Localizado
                     delay: 250,
                     autovalidateMode: AutovalidateMode.onUserInteraction,
                   ),
@@ -1509,7 +1575,7 @@ class _AnimatedAppearanceState extends State<AnimatedAppearance> with SingleTick
     super.initState();
     // Configura animaciones de opacidad y deslizamiento
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 600),
+      duration: const Duration(milliseconds: 400), // Animación más rápida
       vsync: this,
     );
     _opacity = Tween<double>(

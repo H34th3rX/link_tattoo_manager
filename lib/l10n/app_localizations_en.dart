@@ -565,4 +565,116 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get alreadyHaveAccount => 'Already have an account? ';
+
+  @override
+  String get passwordRecovery => 'Password Recovery';
+
+  @override
+  String get passwordRecoveryTitle => 'Reset Password';
+
+  @override
+  String get passwordRecoverySubtitle =>
+      'Enter your email address to reset your password';
+
+  @override
+  String get enterEmail => 'Enter your email address';
+
+  @override
+  String get sendRecoveryEmail => 'Send Recovery Email';
+
+  @override
+  String get backToLogin => 'Back to Login';
+
+  @override
+  String get emailSent => 'Email Sent';
+
+  @override
+  String get recoveryEmailSent =>
+      'A recovery email has been sent to your email address. Please check your inbox.';
+
+  @override
+  String get userNotFoundOrGoogle => 'User not found or registered with Google';
+
+  @override
+  String get googleUserNoPassword =>
+      'This user is registered with Google and doesn\'t need to reset password';
+
+  @override
+  String get verifyingUser => 'Verifying user...';
+
+  @override
+  String get sendingEmail => 'Sending email...';
+
+  @override
+  String get emailNotValid => 'The email format is not valid';
+
+  @override
+  String get recoveryError => 'Error sending recovery email';
+
+  @override
+  String get checkYourEmail => 'Check your email';
+
+  @override
+  String get recoveryLinkSent => 'A recovery link has been sent to';
+
+  @override
+  String get didntReceiveEmail => 'Didn\'t receive the email?';
+
+  @override
+  String get resendEmail => 'Resend email';
+
+  @override
+  String get setNewPassword => 'Set New Password';
+
+  @override
+  String get setNewPasswordSubtitle => 'Enter your new password below';
+
+  @override
+  String get newPassword => 'New Password';
+
+  @override
+  String get confirmPassword => 'Confirm Password';
+
+  @override
+  String get updatePassword => 'Update Password';
+
+  @override
+  String get passwordUpdatedTitle => 'Password Updated!';
+
+  @override
+  String get passwordUpdatedMessage =>
+      'Your password has been successfully updated. You will be redirected to the login page.';
+
+  @override
+  String get newPasswordDifferent =>
+      'New password should be different from the old one';
+
+  @override
+  String get passwordUpdateError => 'Error updating password';
+
+  @override
+  String get passwordMaxLength => 'Password must be less than 72 characters';
+
+  @override
+  String get passwordRequirements =>
+      'Password must contain at least one letter and one number';
+
+  @override
+  String get passwordsDoNotMatch => 'Passwords do not match';
+
+  @override
+  String get verifyAndContinue => 'Verify and Continue';
+
+  @override
+  String get cannotResetPassword => 'Cannot reset password for this user.';
+
+  @override
+  String get back => 'Back';
+
+  @override
+  String get contactAdminError =>
+      'Could not update password. Contact administrator.';
+
+  @override
+  String get changePassword => 'Change Password';
 }

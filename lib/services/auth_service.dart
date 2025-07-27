@@ -1,13 +1,13 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter/foundation.dart';
-// CAMBIO IMPORTANTE: Usar conditional imports
-import 'stub_html.dart' if (dart.library.html) 'dart:html' as html;
+// CAMBIO IMPORTANTE: Usar importación condicional para las utilidades web
+import 'web_utils_stub.dart' if (dart.library.html) 'web_utils.dart' as web_utils;
 
 //[-------------SERVICIO DE AUTENTICACIÓN CON SOLUCIÓN WEB DEFINITIVA--------------]
 class AuthService {
   static final _supabase = Supabase.instance.client;
-  
+
   // Configuración diferente para Web y Mobile
   static GoogleSignIn get _googleSignIn {
     if (kIsWeb) {
@@ -49,7 +49,7 @@ class AuthService {
       if (kDebugMode) {
         print('Error detallado en Google Sign-In: $e');
       }
-      throw Exception('Error al iniciar sesión con Google: $e');
+      rethrow;
     }
   }
 
@@ -60,21 +60,38 @@ class AuthService {
         print('Iniciando Google OAuth para Web...');
       }
       
-      // SOLUCIÓN 1: Limpiar URL antes del OAuth
+      // Asegurar que las utilidades web estén inicializadas
+      if (kIsWeb) {
+        web_utils.ensureWebUtilsInitialized();
+      }
+
+      // RESTAURAR: Limpiar estado de Google antes del OAuth
+      await _clearWebGoogleAuth();
       await _cleanUrlAndNavigate();
       
-      // SOLUCIÓN 2: OAuth directo con Supabase (sin Google plugin)
+      // Forzar desconexión del plugin de Google si existe
+      try {
+        if (await _googleSignIn.isSignedIn()) {
+          await _googleSignIn.disconnect();
+          await Future.delayed(const Duration(milliseconds: 300));
+        }
+      } catch (e) {
+        // Ignorar errores del plugin en web
+      }
+      
+      // OAuth directo con Supabase con parámetros para forzar selección de cuenta
       await _supabase.auth.signInWithOAuth(
         OAuthProvider.google,
         redirectTo: _getRedirectUrl(),
         queryParams: {
-          'prompt': 'select_account', // Esto permite seleccionar cuenta cada vez
+          'prompt': 'select_account consent', // Forzar selección de cuenta y consentimiento
           'access_type': 'offline',
+          'include_granted_scopes': 'true',
         },
       );
       
       if (kDebugMode) {
-        print('OAuth redirect iniciado...');
+        print('OAuth redirect iniciado con prompt=select_account...');
       }
       
       // En Web OAuth, el redirect manejará el login
@@ -83,37 +100,15 @@ class AuthService {
       if (kDebugMode) {
         print('Error en Google OAuth Web: $e');
       }
-      throw Exception('Error en Google OAuth Web: $e');
+      rethrow;
     }
   }
 
   //[-------------OBTENER URL DE REDIRECT CORRECTA--------------]
   static String _getRedirectUrl() {
     if (kIsWeb) {
-      // CAMBIO: Usar función helper para obtener la URL
-      return _getWebLocationHref();
-    }
-    return '';
-  }
-
-  //[-------------HELPER PARA OBTENER URL ACTUAL--------------]
-  static String _getWebLocationHref() {
-    if (kIsWeb) {
-      try {
-        final uri = Uri.parse(html.window.location.href);
-        final baseUrl = '${uri.scheme}://${uri.host}${uri.port != 80 && uri.port != 443 ? ':${uri.port}' : ''}';
-        
-        if (kDebugMode) {
-          print('Redirect URL: $baseUrl');
-        }
-        
-        return baseUrl;
-      } catch (e) {
-        if (kDebugMode) {
-          print('Error obteniendo URL: $e');
-        }
-        return '';
-      }
+      // CAMBIO: Usar función helper de web_utils para obtener la URL
+      return web_utils.getWebLocationHrefUtil();
     }
     return '';
   }
@@ -122,7 +117,10 @@ class AuthService {
   static Future<void> _cleanUrlAndNavigate() async {
     if (kIsWeb) {
       try {
-        final currentHref = _getCurrentHref();
+        // Asegurar que las utilidades web estén inicializadas
+        web_utils.ensureWebUtilsInitialized();
+
+        final currentHref = web_utils.getCurrentHrefUtil();
         if (currentHref.isEmpty) return;
         
         final uri = Uri.parse(currentHref);
@@ -134,7 +132,7 @@ class AuthService {
           }
           
           // Usar replaceState para no crear nueva entrada en historial
-          _replaceHistoryState(cleanUrl);
+          web_utils.replaceHistoryStateUtil(cleanUrl);
           
           if (kDebugMode) {
             print('URL limpiada exitosamente');
@@ -143,42 +141,6 @@ class AuthService {
       } catch (e) {
         if (kDebugMode) {
           print('Error limpiando URL: $e');
-        }
-      }
-    }
-  }
-
-  //[-------------HELPERS PARA FUNCIONES WEB--------------]
-  static String _getCurrentHref() {
-    if (kIsWeb) {
-      try {
-        return html.window.location.href;
-      } catch (e) {
-        return '';
-      }
-    }
-    return '';
-  }
-
-  static void _replaceHistoryState(String url) {
-    if (kIsWeb) {
-      try {
-        html.window.history.replaceState(null, '', url);
-      } catch (e) {
-        if (kDebugMode) {
-          print('Error replacing history state: $e');
-        }
-      }
-    }
-  }
-
-  static void _reloadWindow() {
-    if (kIsWeb) {
-      try {
-        html.window.location.reload();
-      } catch (e) {
-        if (kDebugMode) {
-          print('Error reloading window: $e');
         }
       }
     }
@@ -230,7 +192,7 @@ class AuthService {
 
       return response;
     } catch (e) {
-      throw Exception('Error en Google Sign-In Mobile: $e');
+      rethrow;
     }
   }
 
@@ -260,6 +222,7 @@ class AuthService {
       
       // 1. En Web, limpiar Google OAuth primero
       if (kIsWeb) {
+        web_utils.ensureWebUtilsInitialized(); // Asegurar inicialización
         await _clearWebGoogleAuth();
       } else {
         // 2. En Mobile, cerrar sesión de Google
@@ -278,13 +241,12 @@ class AuthService {
         print('Sesión de Supabase cerrada');
       }
       
-      // 4. Limpiar URL en Web
+      // 4. Limpiar URL y recargar en Web
       if (kIsWeb) {
         await _cleanUrlAndNavigate();
-        
-        // 5. Recargar página para limpiar completamente el estado
+        // Esperar un momento para asegurar que la limpieza se complete antes de recargar
         await Future.delayed(const Duration(milliseconds: 300));
-        _reloadWindow();
+        web_utils.reloadWindowUtil(); // Usar el helper de web_utils
       }
       
       if (kDebugMode) {
@@ -299,7 +261,7 @@ class AuthService {
       try {
         await _supabase.auth.signOut();
         if (kIsWeb) {
-          _reloadWindow();
+          web_utils.reloadWindowUtil(); // Usar el helper de web_utils
         }
       } catch (emergencyError) {
         if (kDebugMode) {
@@ -317,7 +279,7 @@ class AuthService {
           print('Limpiando autenticación web de Google...');
         }
         
-        // Intentar logout del plugin de Google si está disponible
+        // 1. Intentar logout del plugin de Google si está disponible
         try {
           if (await _googleSignIn.isSignedIn()) {
             await _googleSignIn.disconnect();
@@ -331,8 +293,24 @@ class AuthService {
           }
         }
         
-        // Limpiar cookies de Google manualmente
-        await _clearGoogleCookies();
+        // Asegurar que las utilidades web estén inicializadas
+        web_utils.ensureWebUtilsInitialized();
+        
+        // 2. Limpiar cookies y storage de Google usando la nueva utilidad
+        web_utils.clearGoogleCookiesWeb(); // Usar el helper de web_utils
+        
+        // 3. Limpiar cualquier token de Supabase relacionado con Google
+        try {
+          final currentUser = _supabase.auth.currentUser;
+          if (currentUser != null) {
+            // Solo hacer signOut si hay un usuario activo
+            await _supabase.auth.signOut(scope: SignOutScope.local);
+          }
+        } catch (e) {
+          if (kDebugMode) {
+            print('Error limpiando sesión local: $e');
+          }
+        }
         
         if (kDebugMode) {
           print('Limpieza web de Google completada');
@@ -340,60 +318,6 @@ class AuthService {
       } catch (e) {
         if (kDebugMode) {
           print('Error limpiando auth web de Google: $e');
-        }
-      }
-    }
-  }
-
-  //[-------------LIMPIAR COOKIES DE GOOGLE--------------]
-  static Future<void> _clearGoogleCookies() async {
-    if (kIsWeb) {
-      try {
-        // Limpiar cookies relacionadas con Google
-        final cookiesToClear = [
-          'accounts.google.com',
-          '.google.com',
-          '.googleapis.com',
-        ];
-        
-        // ignore: unused_local_variable
-        for (String domain in cookiesToClear) {
-          try {
-            // En Flutter Web, las cookies se manejan automáticamente
-            // pero podemos intentar limpiar el localStorage
-            _clearWebStorage();
-          } catch (e) {
-            // Ignorar errores de limpieza individual
-          }
-        }
-        
-        if (kDebugMode) {
-          print('Cookies y storage de Google limpiados');
-        }
-      } catch (e) {
-        if (kDebugMode) {
-          print('Error limpiando cookies de Google: $e');
-        }
-      }
-    }
-  }
-
-  //[-------------HELPER PARA LIMPIAR WEB STORAGE--------------]
-  static void _clearWebStorage() {
-    if (kIsWeb) {
-      try {
-        html.window.localStorage.removeWhere((key, value) => 
-          key.contains('google') || 
-          key.contains('oauth') || 
-          key.contains('gapi'));
-        
-        html.window.sessionStorage.removeWhere((key, value) => 
-          key.contains('google') || 
-          key.contains('oauth') || 
-          key.contains('gapi'));
-      } catch (e) {
-        if (kDebugMode) {
-          print('Error clearing web storage: $e');
         }
       }
     }
@@ -475,6 +399,7 @@ class AuthService {
             if (session?.user != null) {
               // Limpiar URL después de login exitoso
               if (kIsWeb) {
+                web_utils.ensureWebUtilsInitialized(); // Asegurar inicialización
                 _cleanUrlAndNavigate();
               }
               onSignIn(session!.user);
@@ -503,6 +428,7 @@ class AuthService {
   static Future<void> initializeAuthState() async {
     if (kIsWeb) {
       try {
+        web_utils.ensureWebUtilsInitialized(); // Asegurar inicialización
         // Limpiar URL de parámetros OAuth al inicializar
         await _cleanUrlAndNavigate();
         
@@ -541,6 +467,130 @@ class AuthService {
       }
     } catch (e) {
       return null;
+    }
+  }
+
+  //[-------------VERIFICAR SI USUARIO EXISTE Y PUEDE RESETEAR CONTRASEÑA (USANDO RPC)--------------]
+  static Future<Map<String, dynamic>> checkUserCanResetPassword(String email) async {
+    try {
+      if (kDebugMode) {
+        print('Verificando usuario para reset de contraseña: $email');
+      }
+
+      // Llamar a la nueva función RPC para obtener el estado del usuario
+      final response = await _supabase.rpc('check_user_for_password_reset', params: {
+        'user_email': email,
+      });
+      
+      if (kDebugMode) {
+        print('Respuesta RPC check_user_for_password_reset: $response');
+      }
+
+      // La función RPC ya devuelve el formato deseado
+      return {
+        'exists': response['exists'] as bool,
+        'isGoogleUser': response['is_google_user'] as bool,
+        'canReset': response['can_reset'] as bool,
+        'message': response['message'] as String,
+      };
+      
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error en checkUserCanResetPassword RPC: $e');
+      }
+      // En caso de error, devolver que no puede resetear
+      return {
+        'exists': false,
+        'isGoogleUser': false,
+        'canReset': false,
+        'message': 'Error inesperado al verificar usuario: $e',
+      };
+    }
+  }
+
+  //[-------------ACTUALIZAR CONTRASEÑA SIN SESIÓN ACTIVA (USANDO RPC)--------------]
+  static Future<void> updatePasswordDirectly(String email, String newPassword) async {
+    try {
+      if (kDebugMode) {
+        print('Actualizando contraseña directamente para: $email');
+      }
+
+      // Llamar a la función RPC para actualizar la contraseña
+      final response = await _supabase.rpc('update_user_password', params: {
+        'user_email': email,
+        'new_password': newPassword,
+      });
+      
+      if (kDebugMode) {
+        print('Contraseña actualizada exitosamente via RPC');
+        print('Response: $response');
+      }
+      
+      // Si la RPC devuelve un error, lanzarlo
+      if (response != null && response['success'] == false) {
+        throw Exception(response['error'] ?? 'Error desconocido al actualizar contraseña');
+      }
+      
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error actualizando contraseña directamente: $e');
+      }
+      rethrow; // Relanzar el error para que sea manejado por la UI
+    }
+  }
+
+  //[-------------RECUPERACIÓN DE CONTRASEÑA (MÉTODO ORIGINAL - MANTENIDO PARA COMPATIBILIDAD)--------------]
+  static Future<void> resetPassword(String email) async {
+    try {
+      await _supabase.auth.resetPasswordForEmail(
+        email,
+        redirectTo: kIsWeb 
+          ? '${Uri.base.origin}/reset-password' 
+          : 'io.supabase.flutterquickstart://reset-password',
+      );
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error enviando email de recuperación: $e');
+      }
+      rethrow;
+    }
+  }
+
+  //[-------------VERIFICAR SI USUARIO EXISTE Y ES LOCAL (MÉTODO ORIGINAL - MANTENIDO)--------------]
+  static Future<Map<String, dynamic>?> checkUserByEmail(String email) async {
+    try {
+      final response = await _supabase
+          .from('users') // o el nombre de tu tabla de usuarios
+          .select('id, email, provider')
+          .eq('email', email)
+          .maybeSingle();
+      
+      return response;
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error verificando usuario: $e');
+      }
+      return null;
+    }
+  }
+
+  //[-------------ACTUALIZAR CONTRASEÑA (para cuando el usuario use el link)--------------]
+  static Future<UserResponse> updatePassword(String newPassword) async {
+    try {
+      final response = await _supabase.auth.updateUser(
+        UserAttributes(password: newPassword),
+      );
+      
+      if (kDebugMode) {
+        print('Contraseña actualizada exitosamente');
+      }
+      
+      return response;
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error actualizando contraseña: $e');
+      }
+      rethrow;
     }
   }
 }

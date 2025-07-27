@@ -84,7 +84,7 @@
     "trySearchingAll": "Intenta buscar en todos los clientes o revisa los filtros",
     "onlyActiveClients": "Solo clientes activos",
     "inactiveClientsAvailable": "Hay clientes inactivos disponibles. Toca 'Mostrar todos' para verlos.",
-    "noClientsRegisteredMessage": "No hay clientes registrados",
+    "noClientsRegisteredMessage": "No clientes registrados",
     "addFirstClient": "Agrega tu primer cliente para comenzar",
     "active": "Activo",
     "inactive": "Inactivo",
@@ -138,9 +138,7 @@
     "phoneRequired": "El teléfono es requerido",
     "phoneFormatError": "Formato de teléfono no válido",
     "emailFormatError": "Formato de email no válido",
-
-
-     "appTitle": "LinkTattoo Manager",
+    "appTitle": "LinkTattoo Manager",
     "emailOrUsername": "Email o Nombre de usuario",
     "password": "Contraseña",
     "signIn": "Iniciar Sesión",
@@ -149,12 +147,10 @@
     "or": "O",
     "dontHaveAccount": "¿No tienes una cuenta? ",
     "signUp": "Regístrate",
-
     "emailOrUsernameRequired": "El email o nombre de usuario es requerido",
     "invalidEmailOrUsername": "Ingresa un email válido o un nombre de usuario\n(mínimo 3 caracteres, solo letras, números, - y _)",
     "passwordRequired": "La contraseña es requerida",
     "passwordMinLength": "La contraseña debe tener al menos 6 caracteres",
-
     "userSignedOut": "Usuario cerró sesión",
     "authError": "Error de autenticación: {error}",
     "@authError": {
@@ -174,7 +170,6 @@
     "databaseConnectionError": "Error de conexión con la base de datos. Intenta de nuevo.",
     "unexpectedLoginError": "Error inesperado al iniciar sesión. Intenta de nuevo.",
     "profileVerificationError": "Error al verificar el perfil. Intenta de nuevo.",
-
     "signingInWithGoogle": "Iniciando sesión con Google...",
     "signInCancelled": "Inicio de sesión cancelado",
     "connectionError": "Error de conexión. Verifica tu internet",
@@ -193,9 +188,7 @@
     "changeAccountMessage": "Podría haber un problema con tu cuenta de Google. ¿Te gustaría intentar con una cuenta diferente o usar el método alternativo?",
     "changeAccount": "Cambiar Cuenta",
     "retryError": "Error al reintentar el inicio de sesión",
-
     "passwordRecoveryInDevelopment": "Función de recuperación en desarrollo",
-
     "authErrorInvalidLogin": "Credenciales inválidas. Verifica tu email o nombre de usuario y contraseña.",
     "authErrorEmailNotConfirmed": "Email no confirmado. Revisa tu bandeja de entrada y confirma tu cuenta.",
     "authErrorTooManyRequests": "Demasiados intentos fallidos. Espera unos minutos antes de intentar de nuevo.",
@@ -210,9 +203,6 @@
         }
     },
     "unexpectedGoogleError": "Error inesperado en el inicio de sesión con Google",
-
-
-        
     "emailLabel": "Dirección de correo",
     "passwordLabel": "Contraseña",
     "registerTitle": "Registro",
@@ -228,5 +218,40 @@
     "userAlreadyRegistered": "Este correo ya está registrado. Intenta iniciar sesión.",
     "invalidEmailFormat": "El formato del correo es inválido.",
     "ok": "OK",
-    "alreadyHaveAccount": "¿Ya tienes una cuenta? "
+    "alreadyHaveAccount": "¿Ya tienes una cuenta? ",
+    "passwordRecovery": "Recuperar Contraseña",
+    "passwordRecoveryTitle": "Restablecer Contraseña",
+    "passwordRecoverySubtitle": "Ingresa tu correo electrónico para restablecer tu contraseña",
+    "enterEmail": "Ingresa tu correo electrónico",
+    "sendRecoveryEmail": "Enviar Correo de Recuperación",
+    "backToLogin": "Volver al Inicio de Sesión",
+    "emailSent": "Correo Enviado",
+    "recoveryEmailSent": "Se ha enviado un correo de recuperación a tu dirección de email. Revisa tu bandeja de entrada.",
+    "userNotFoundOrGoogle": "Usuario no encontrado o registrado con Google",
+    "googleUserNoPassword": "Este usuario está registrado con Google y no necesita restablecer contraseña",
+    "verifyingUser": "Verificando usuario...",
+    "sendingEmail": "Enviando correo...",
+    "emailNotValid": "El formato del correo electrónico no es válido",
+    "recoveryError": "Error al enviar el correo de recuperación",
+    "checkYourEmail": "Revisa tu correo",
+    "recoveryLinkSent": "Se ha enviado un enlace de recuperación a",
+    "didntReceiveEmail": "¿No recibiste el correo?",
+    "resendEmail": "Reenviar correo",
+    "setNewPassword": "Establecer Nueva Contraseña",
+    "setNewPasswordSubtitle": "Ingresa tu nueva contraseña a continuación",
+    "newPassword": "Nueva Contraseña",
+    "confirmPassword": "Confirmar Contraseña",
+    "updatePassword": "Actualizar Contraseña",
+    "passwordUpdatedTitle": "¡Contraseña Actualizada!",
+    "passwordUpdatedMessage": "Tu contraseña ha sido actualizada exitosamente. Serás redirigido a la página de inicio de sesión.",
+    "newPasswordDifferent": "La nueva contraseña debe ser diferente a la anterior",
+    "passwordUpdateError": "Error al actualizar la contraseña",
+    "passwordMaxLength": "La contraseña debe tener menos de 72 caracteres",
+    "passwordRequirements": "La contraseña debe contener al menos una letra y un número",
+    "passwordsDoNotMatch": "Las contraseñas no coinciden",
+    "verifyAndContinue": "Verificar y Continuar",
+    "cannotResetPassword": "No se puede restablecer la contraseña para este usuario.",
+    "back": "Volver",
+    "contactAdminError": "No se pudo actualizar la contraseña. Contacte al administrador.",
+    "changePassword": "Cambiar Contraseña"
 }

@@ -138,9 +138,6 @@
     "phoneRequired": "The phone is required",
     "phoneFormatError": "Invalid phone format",
     "emailFormatError": "Invalid email format",
-
-
-
     "appTitle": "LinkTattoo Manager",
     "emailOrUsername": "Email or Username",
     "password": "Password",
@@ -150,12 +147,10 @@
     "or": "OR",
     "dontHaveAccount": "Don't have an account? ",
     "signUp": "Sign Up",
-
     "emailOrUsernameRequired": "Email or username is required",
     "invalidEmailOrUsername": "Enter a valid email or username\n(minimum 3 characters, only letters, numbers, - and _)",
     "passwordRequired": "Password is required",
     "passwordMinLength": "Password must be at least 6 characters",
-
     "userSignedOut": "User signed out",
     "authError": "Authentication error: {error}",
     "@authError": {
@@ -175,7 +170,6 @@
     "databaseConnectionError": "Database connection error. Try again.",
     "unexpectedLoginError": "Unexpected login error. Try again.",
     "profileVerificationError": "Error verifying profile. Try again.",
-
     "signingInWithGoogle": "Signing in with Google...",
     "signInCancelled": "Sign in cancelled",
     "connectionError": "Connection error. Check your internet",
@@ -190,9 +184,7 @@
             "error": {}
         }
     },
-
     "passwordRecoveryInDevelopment": "Password recovery feature in development",
-
     "authErrorInvalidLogin": "Invalid credentials. Check your email or username and password.",
     "authErrorEmailNotConfirmed": "Email not confirmed. Check your inbox and confirm your account.",
     "authErrorTooManyRequests": "Too many failed attempts. Wait a few minutes before trying again.",
@@ -211,9 +203,6 @@
     "changeAccountMessage": "There might be an issue with your Google account. Would you like to try with a different account or use the alternative method?",
     "changeAccount": "Change Account",
     "retryError": "Error retrying login",
-
-
-    
     "emailLabel": "Email address",
     "passwordLabel": "Password",
     "registerTitle": "Register",
@@ -229,5 +218,40 @@
     "userAlreadyRegistered": "This email is already registered. Please try logging in.",
     "invalidEmailFormat": "The email format is invalid.",
     "ok": "OK",
-    "alreadyHaveAccount": "Already have an account? "
+    "alreadyHaveAccount": "Already have an account? ",
+    "passwordRecovery": "Password Recovery",
+    "passwordRecoveryTitle": "Reset Password",
+    "passwordRecoverySubtitle": "Enter your email address to reset your password",
+    "enterEmail": "Enter your email address",
+    "sendRecoveryEmail": "Send Recovery Email",
+    "backToLogin": "Back to Login",
+    "emailSent": "Email Sent",
+    "recoveryEmailSent": "A recovery email has been sent to your email address. Please check your inbox.",
+    "userNotFoundOrGoogle": "User not found or registered with Google",
+    "googleUserNoPassword": "This user is registered with Google and doesn't need to reset password",
+    "verifyingUser": "Verifying user...",
+    "sendingEmail": "Sending email...",
+    "emailNotValid": "The email format is not valid",
+    "recoveryError": "Error sending recovery email",
+    "checkYourEmail": "Check your email",
+    "recoveryLinkSent": "A recovery link has been sent to",
+    "didntReceiveEmail": "Didn't receive the email?",
+    "resendEmail": "Resend email",
+    "setNewPassword": "Set New Password",
+    "setNewPasswordSubtitle": "Enter your new password below",
+    "newPassword": "New Password",
+    "confirmPassword": "Confirm Password",
+    "updatePassword": "Update Password",
+    "passwordUpdatedTitle": "Password Updated!",
+    "passwordUpdatedMessage": "Your password has been successfully updated. You will be redirected to the login page.",
+    "newPasswordDifferent": "New password should be different from the old one",
+    "passwordUpdateError": "Error updating password",
+    "passwordMaxLength": "Password must be less than 72 characters",
+    "passwordRequirements": "Password must contain at least one letter and one number",
+    "passwordsDoNotMatch": "Passwords do not match",
+    "verifyAndContinue": "Verify and Continue",
+    "cannotResetPassword": "Cannot reset password for this user.",
+    "back": "Back",
+    "contactAdminError": "Could not update password. Contact administrator.",
+    "changePassword": "Change Password"
 }

@@ -14,6 +14,8 @@ import 'reports_page.dart';
 import 'client_profile_page.dart' show ClientProfilePage;
 import 'client_history_page.dart' show ClientHistoryPage;
 import 'calendar_page.dart' show CalendarPage;
+import 'password_recovery_page.dart'; // Importar la página de recuperación
+import 'reset_password_page.dart'; // Importar la página de restablecimiento
 import 'package:flutter_localizations/flutter_localizations.dart';
 import './l10n/app_localizations.dart';
 import 'localization_provider.dart';
@@ -76,6 +78,7 @@ class MyApp extends StatelessWidget {
           routes: {
             '/login': (_) => const LoginPage(),
             '/register': (_) => const RegisterPage(),
+            '/password_recovery': (_) => const PasswordRecoveryPage(), // Ruta para la página de recuperación
             '/complete_profile': (_) => const CompleteProfilePage(),
             '/dashboard': (_) => const DashboardPage(),
             '/profile': (context) => const ProfilePage(),
@@ -91,6 +94,20 @@ class MyApp extends StatelessWidget {
               return ClientHistoryPage(client: client);
             },
             '/calendar': (_) => const CalendarPage(),
+          },
+          onGenerateRoute: (settings) {
+            // Manejar rutas con parámetros, como la página de restablecimiento de contraseña
+            if (settings.name == '/reset_password') {
+              final args = settings.arguments as Map<String, dynamic>?;
+              final userEmail = args?['userEmail'] as String?;
+              
+              if (userEmail != null) {
+                return MaterialPageRoute(
+                  builder: (context) => ResetPasswordPage(userEmail: userEmail),
+                );
+              }
+            }
+            return null;
           },
         );
       },
