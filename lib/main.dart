@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'profile_page.dart';
 import 'supabase_service.dart';
 import 'theme_provider.dart';
@@ -14,35 +13,34 @@ import 'reports_page.dart';
 import 'client_profile_page.dart' show ClientProfilePage;
 import 'client_history_page.dart' show ClientHistoryPage;
 import 'calendar_page.dart' show CalendarPage;
-import 'password_recovery_page.dart'; // Importar la página de recuperación
-import 'reset_password_page.dart'; // Importar la página de restablecimiento
+import 'password_recovery_page.dart'; 
+import 'reset_password_page.dart'; 
 import 'package:flutter_localizations/flutter_localizations.dart';
 import './l10n/app_localizations.dart';
 import 'localization_provider.dart';
-import 'services/auth_service.dart';
+
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SupabaseService.initialize();
-  await AuthService.initializeAuthState();
   
-  final user = Supabase.instance.client.auth.currentUser;
+  // Inicializar ThemeProvider y esperar a que cargue el tema
+  final themeProvider = ThemeProvider();
+  await themeProvider.initialize(); // Esperar la inicialización del tema
+
+  // Inicializar LocalizationProvider (asumiendo que también podría tener una inicialización asíncrona)
+  final localizationProvider = LocalizationProvider();
+  // Si LocalizationProvider también carga datos asíncronamente, descomenta la siguiente línea:
+  // await localizationProvider.initialize(); 
+
   String initialRoute = '/login';
-  
-  if (user != null) {
-    final response = await Supabase.instance.client
-        .from('employees')
-        .select('id')
-        .eq('id', user.id)
-        .maybeSingle();
-    initialRoute = response != null ? '/dashboard' : '/complete_profile';
-  }
   
   runApp(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => ThemeProvider()),
-        ChangeNotifierProvider(create: (_) => LocalizationProvider()),
+        // Usar .value para proporcionar la instancia ya inicializada
+        ChangeNotifierProvider.value(value: themeProvider),
+        ChangeNotifierProvider.value(value: localizationProvider),
       ],
       child: MyApp(initialRoute: initialRoute),
     ),

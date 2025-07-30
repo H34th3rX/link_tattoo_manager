@@ -1,9 +1,11 @@
 // Importaciones necesarias para animaciones, UI y matemáticas
 import 'dart:ui' as ui;
 import 'dart:math' as math;
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 
-//[-------------PANTALLA DE CARGA ANIMADA--------------]
+//[-------------PANTALLA DE CARGA ANIMADA OPTIMIZADA--------------]
 class LoadingScreen extends StatefulWidget {
   final String userName; // Nombre del usuario recibido como parámetro
   const LoadingScreen({super.key, required this.userName});
@@ -31,13 +33,25 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
   late Animation<double> _fadeAnimation; // Animación de opacidad para el texto
   late Animation<Offset> _slideAnimation; // Animación de deslizamiento para el texto
 
+  // Timer para garantizar duración mínima
+  Timer? _minimumDurationTimer;
+  bool _animationCompleted = false;
+  bool _minimumTimeElapsed = false;
+
   @override
   void initState() {
     super.initState();
     
-    // Inicialización del controlador principal (4 segundos)
+    // Establecer duración mínima garantizada (incluso en release)
+    _startMinimumDurationTimer();
+    
+    // Inicialización del controlador principal (duración extendida para release)
+    final duration = kDebugMode 
+        ? const Duration(seconds: 4) 
+        : const Duration(seconds: 6); // Más tiempo en release
+    
     _mainController = AnimationController(
-      duration: const Duration(seconds: 4),
+      duration: duration,
       vsync: this,
     );
     
@@ -61,64 +75,94 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
     
     // Controlador para la animación del texto de bienvenida
     _textController = AnimationController(
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 1200), // Duración extendida
       vsync: this,
     );
 
-    // Configuración de las animaciones
+    // Configuración de las animaciones con curvas más lentas
     _progressAnimation = CurvedAnimation(
       parent: _mainController, 
-      curve: const Interval(0.2, 1.0, curve: Curves.easeInOutCubic), // Progreso suave
+      curve: const Interval(0.3, 1.0, curve: Curves.easeInOutCubic), // Inicio más tardío
     );
     
     _borderAnimation = CurvedAnimation(
       parent: _mainController, 
-      curve: Curves.easeInOut, // Animación del borde
+      curve: Curves.easeInOut,
     );
     
     _pulseAnimation = CurvedAnimation(
       parent: _pulseController, 
-      curve: Curves.easeInOut, // Efecto de pulso suave
+      curve: Curves.easeInOut,
     );
     
     _rotationAnimation = CurvedAnimation(
       parent: _rotationController, 
-      curve: Curves.linear, // Rotación continua
+      curve: Curves.linear,
     );
     
     _scaleAnimation = CurvedAnimation(
       parent: _textController, 
-      curve: Curves.elasticOut, // Efecto elástico para el texto
+      curve: Curves.elasticOut,
     );
     
     _fadeAnimation = CurvedAnimation(
       parent: _textController, 
-      curve: const Interval(0.0, 0.6, curve: Curves.easeIn), // Fundido del texto
+      curve: const Interval(0.0, 0.8, curve: Curves.easeIn), // Más lento
     );
     
     _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.3),
+      begin: const Offset(0, 0.5), // Movimiento más pronunciado
       end: Offset.zero,
     ).animate(CurvedAnimation(
       parent: _textController, 
-      curve: Curves.easeOutBack, // Deslizamiento suave
+      curve: Curves.easeOutBack,
     ));
 
-    // Iniciar las animaciones principales
-    _mainController.forward();
-    _textController.forward();
-
-    // Redirigir al dashboard cuando la animación principal llegue al 100%
-    _mainController.addStatusListener((status) {
-      if (status == AnimationStatus.completed && mounted) {
-        Navigator.pushReplacementNamed(context, '/dashboard');
+    // Iniciar las animaciones principales con delay
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (mounted) {
+        _mainController.forward();
+        _textController.forward();
       }
     });
+
+    // Listener mejorado para la redirección
+    _mainController.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        _animationCompleted = true;
+        _checkForRedirect();
+      }
+    });
+  }
+
+  // Timer para garantizar duración mínima visible
+  void _startMinimumDurationTimer() {
+    final minimumDuration = kDebugMode 
+        ? const Duration(seconds: 3) 
+        : const Duration(seconds: 5); // Duración mínima garantizada
+    
+    _minimumDurationTimer = Timer(minimumDuration, () {
+      _minimumTimeElapsed = true;
+      _checkForRedirect();
+    });
+  }
+
+  // Verificar si se puede redirigir (ambas condiciones cumplidas)
+  void _checkForRedirect() {
+    if (_animationCompleted && _minimumTimeElapsed && mounted) {
+      // Delay adicional para suavizar la transición
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) {
+          Navigator.pushReplacementNamed(context, '/dashboard');
+        }
+      });
+    }
   }
 
   @override
   void dispose() {
     // Liberar recursos al destruir el widget
+    _minimumDurationTimer?.cancel();
     _mainController.dispose();
     _pulseController.dispose();
     _rotationController.dispose();
@@ -152,16 +196,16 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
                 ),
               ),
               child: BackdropFilter(
-                filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10), // Efecto de desenfoque
+                filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                 child: Container(
-                  color: const Color.fromRGBO(0, 0, 0, 0.4), // Capa de opacidad
+                  color: const Color.fromRGBO(0, 0, 0, 0.4),
                 ),
               ),
             ),
           ),
           
-          // Generar 8 partículas flotantes animadas
-          ...List.generate(8, (index) => _buildFloatingParticle(index, accentColor)),
+          // Generar 12 partículas flotantes animadas (más partículas para más tiempo)
+          ...List.generate(12, (index) => _buildFloatingParticle(index, accentColor)),
           
           // Contenedor central con animaciones
           Center(
@@ -171,37 +215,37 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
                 _pulseController, 
                 _rotationController,
                 _textController
-              ]), // Escucha múltiples controladores
+              ]),
               builder: (context, child) {
                 return Transform.scale(
-                  scale: 1.0 + (_pulseAnimation.value * 0.02), // Efecto de pulso
+                  scale: 1.0 + (_pulseAnimation.value * 0.03), // Pulso más visible
                   child: Container(
-                    width: 340,
-                    padding: const EdgeInsets.all(30),
+                    width: 360, // Contenedor ligeramente más grande
+                    padding: const EdgeInsets.all(35),
                     decoration: BoxDecoration(
                       color: cardColor,
-                      borderRadius: BorderRadius.circular(25),
+                      borderRadius: BorderRadius.circular(30),
                       boxShadow: [
                         BoxShadow(
-                          color: accentColor.withValues(alpha: 0.3 + (_pulseAnimation.value * 0.2)),
-                          blurRadius: 30 + (_pulseAnimation.value * 10),
-                          offset: const Offset(0, 15),
+                          color: accentColor.withValues(alpha: 0.4 + (_pulseAnimation.value * 0.3)),
+                          blurRadius: 40 + (_pulseAnimation.value * 15),
+                          offset: const Offset(0, 20),
                         ),
                         BoxShadow(
-                          color: accentColor.withValues(alpha: 0.1),
-                          blurRadius: 60,
-                          offset: const Offset(0, 30),
+                          color: accentColor.withValues(alpha: 0.15),
+                          blurRadius: 80,
+                          offset: const Offset(0, 40),
                         ),
                       ],
                       border: Border.all(
-                        color: accentColor.withValues(alpha: _borderAnimation.value * 0.8),
-                        width: 3,
+                        color: accentColor.withValues(alpha: _borderAnimation.value * 0.9),
+                        width: 3.5,
                       ),
                     ),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Icono animado con anillos rotatorios
+                        // Icono animado con anillos rotatorios más elaborados
                         Stack(
                           alignment: Alignment.center,
                           children: [
@@ -209,104 +253,148 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
                             Transform.rotate(
                               angle: _rotationAnimation.value * 2 * math.pi,
                               child: Container(
-                                width: 120,
-                                height: 120,
+                                width: 140,
+                                height: 140,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
                                   border: Border.all(
-                                    color: accentColor.withValues(alpha: 0.3),
+                                    color: accentColor.withValues(alpha: 0.4),
+                                    width: 2.5,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            // Anillo intermedio (rotación en sentido antihorario)
+                            Transform.rotate(
+                              angle: -_rotationAnimation.value * 1.5 * math.pi,
+                              child: Container(
+                                width: 110,
+                                height: 110,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: accentColor.withValues(alpha: 0.6),
                                     width: 2,
                                   ),
                                 ),
                               ),
                             ),
-                            // Anillo externo 2 (rotación en sentido antihorario)
+                            // Anillo interno (rotación rápida)
                             Transform.rotate(
-                              angle: -_rotationAnimation.value * 1.5 * math.pi,
+                              angle: _rotationAnimation.value * 3 * math.pi,
                               child: Container(
-                                width: 100,
-                                height: 100,
+                                width: 85,
+                                height: 85,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
                                   border: Border.all(
-                                    color: accentColor.withValues(alpha: 0.5),
+                                    color: accentColor.withValues(alpha: 0.7),
                                     width: 1.5,
                                   ),
                                 ),
                               ),
                             ),
-                            // Icono central con gradiente
+                            // Icono central con gradiente mejorado
                             Container(
-                              width: 80,
-                              height: 80,
+                              width: 90,
+                              height: 90,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 gradient: RadialGradient(
                                   colors: [
-                                    accentColor.withValues(alpha: 0.8),
-                                    accentColor.withValues(alpha: 0.3),
+                                    accentColor.withValues(alpha: 0.9),
+                                    accentColor.withValues(alpha: 0.5),
+                                    accentColor.withValues(alpha: 0.2),
                                   ],
                                 ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: accentColor.withValues(alpha: 0.6),
+                                    blurRadius: 20,
+                                    offset: const Offset(0, 0),
+                                  ),
+                                ],
                               ),
                               child: const Icon(
                                 Icons.waving_hand, 
-                                size: 40, 
+                                size: 45, 
                                 color: Colors.white,
                               ),
                             ),
                           ],
                         ),
                         
-                        const SizedBox(height: 30),
+                        const SizedBox(height: 35),
                         
-                        // Texto de bienvenida con animaciones
+                        // Texto de bienvenida con animaciones mejoradas
                         SlideTransition(
                           position: _slideAnimation,
                           child: FadeTransition(
                             opacity: _fadeAnimation,
                             child: ScaleTransition(
                               scale: _scaleAnimation,
-                              child: Text(
-                                '¡Bienvenido,\n${widget.userName}!',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.bold,
-                                  color: textColor,
-                                  shadows: [
-                                    Shadow(
-                                      color: accentColor.withValues(alpha: 0.5),
-                                      blurRadius: 10,
-                                      offset: const Offset(0, 2),
+                              child: Column(
+                                children: [
+                                  Text(
+                                    '¡Bienvenido!',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 32,
+                                      fontWeight: FontWeight.bold,
+                                      color: textColor,
+                                      shadows: [
+                                        Shadow(
+                                          color: accentColor.withValues(alpha: 0.6),
+                                          blurRadius: 15,
+                                          offset: const Offset(0, 3),
+                                        ),
+                                      ],
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    widget.userName,
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.w600,
+                                      color: accentColor,
+                                      shadows: [
+                                        Shadow(
+                                          color: accentColor.withValues(alpha: 0.4),
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
                         ),
                         
-                        const SizedBox(height: 40),
+                        const SizedBox(height: 45),
                         
-                        // Barra de progreso animada
+                        // Barra de progreso animada mejorada
                         Stack(
                           children: [
                             // Contenedor base de la barra
                             Container(
-                              height: 12,
+                              height: 14,
                               width: double.infinity,
                               decoration: BoxDecoration(
-                                color: hintColor.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(6),
+                                color: hintColor.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(7),
                                 border: Border.all(
-                                  color: accentColor.withValues(alpha: 0.3),
+                                  color: accentColor.withValues(alpha: 0.4),
                                   width: 1,
                                 ),
                               ),
                             ),
-                            // Barra de progreso con gradiente
+                            // Barra de progreso con gradiente mejorado
                             SizedBox(
-                              height: 12,
+                              height: 14,
                               child: FractionallySizedBox(
                                 alignment: Alignment.centerLeft,
                                 widthFactor: _progressAnimation.value,
@@ -314,19 +402,19 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
                                   decoration: BoxDecoration(
                                     gradient: LinearGradient(
                                       colors: [
-                                        accentColor.withValues(alpha: 0.8),
+                                        accentColor.withValues(alpha: 0.7),
                                         accentColor,
                                         Colors.white.withValues(alpha: 0.9),
                                       ],
-                                      stops: const [0.0, 0.7, 1.0],
+                                      stops: const [0.0, 0.6, 1.0],
                                       begin: Alignment.centerLeft,
                                       end: Alignment.centerRight,
                                     ),
-                                    borderRadius: BorderRadius.circular(6),
+                                    borderRadius: BorderRadius.circular(7),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: accentColor.withValues(alpha: 0.6),
-                                        blurRadius: 8,
+                                        color: accentColor.withValues(alpha: 0.7),
+                                        blurRadius: 12,
                                         offset: const Offset(0, 0),
                                       ),
                                     ],
@@ -337,26 +425,26 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
                             // Efecto de brillo móvil en la barra
                             if (_progressAnimation.value > 0)
                               Positioned(
-                                left: (_progressAnimation.value * 280) - 20,
+                                left: (_progressAnimation.value * 290) - 25,
                                 child: Container(
-                                  height: 12,
-                                  width: 20,
+                                  height: 14,
+                                  width: 25,
                                   decoration: BoxDecoration(
                                     gradient: LinearGradient(
                                       colors: [
                                         Colors.transparent,
-                                        Colors.white.withValues(alpha: 0.7),
+                                        Colors.white.withValues(alpha: 0.8),
                                         Colors.transparent,
                                       ],
                                     ),
-                                    borderRadius: BorderRadius.circular(6),
+                                    borderRadius: BorderRadius.circular(7),
                                   ),
                                 ),
                               ),
                           ],
                         ),
                         
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 25),
                         
                         // Porcentaje de progreso animado
                         AnimatedBuilder(
@@ -365,19 +453,31 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
                             return Text(
                               '${(_progressAnimation.value * 100).toInt()}%',
                               style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
                                 color: accentColor,
                                 shadows: [
                                   Shadow(
-                                    color: accentColor.withValues(alpha: 0.5),
-                                    blurRadius: 5,
-                                    offset: const Offset(0, 1),
+                                    color: accentColor.withValues(alpha: 0.6),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
                                   ),
                                 ],
                               ),
                             );
                           },
+                        ),
+                        
+                        const SizedBox(height: 15),
+                        
+                        // Mensaje de estado
+                        Text(
+                          'Preparando tu experiencia...',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: hintColor,
+                            fontStyle: FontStyle.italic,
+                          ),
                         ),
                       ],
                     ),
@@ -391,34 +491,35 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
     );
   }
 
-  // Construye una partícula flotante con animación
+    // Construye una partícula flotante con animación mejorada
   Widget _buildFloatingParticle(int index, Color accentColor) {
     final random = math.Random(index);
-    final startX = random.nextDouble() * 400; // Posición inicial X aleatoria
-    final startY = random.nextDouble() * 800; // Posición inicial Y aleatoria
-    final size = 3.0 + random.nextDouble() * 4.0; // Tamaño aleatorio
+    final startX = random.nextDouble() * 400;
+    final startY = random.nextDouble() * 800;
+    final size = 2.0 + random.nextDouble() * 6.0; // Partículas más variadas
+    final speed = 0.5 + random.nextDouble() * 0.5; // Velocidades diferentes
     
     return AnimatedBuilder(
       animation: _particleController,
       builder: (context, child) {
-        final progress = (_particleController.value + (index * 0.1)) % 1.0;
-        final x = startX + (math.sin(progress * 2 * math.pi) * 50); // Movimiento sinusoidal en X
-        final y = startY - (progress * 100); // Movimiento ascendente
-        final opacity = math.sin(progress * math.pi); // Opacidad variable
+        final progress = ((_particleController.value * speed) + (index * 0.1)) % 1.0;
+        final x = startX + (math.sin(progress * 2 * math.pi + index) * 60);
+        final y = startY - (progress * 120);
+        final opacity = math.sin(progress * math.pi);
         
         return Positioned(
           left: x,
-          top: y % MediaQuery.of(context).size.height, // Asegura que la partícula permanezca en pantalla
+          top: y % MediaQuery.of(context).size.height,
           child: Container(
             width: size,
             height: size,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: accentColor.withValues(alpha: opacity * 0.6),
+              color: accentColor.withValues(alpha: opacity * 0.7),
               boxShadow: [
                 BoxShadow(
-                  color: accentColor.withValues(alpha: opacity * 0.3),
-                  blurRadius: size * 2,
+                  color: accentColor.withValues(alpha: opacity * 0.4),
+                  blurRadius: size * 2.5,
                   offset: Offset.zero,
                 ),
               ],

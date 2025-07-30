@@ -7,8 +7,10 @@ import 'theme_provider.dart';
 import './l10n/app_localizations.dart';
 import 'services/auth_service.dart';
 
-// Duración constante para las animaciones de transición
+// Duración constante para las animaciones de transición del tema general
 const Duration themeAnimationDuration = Duration(milliseconds: 300);
+// Nueva duración más corta para la animación del botón de alternar tema
+const Duration buttonAnimationDuration = Duration(milliseconds: 150);
 
 //[-------------PANEL DE NAVEGACIÓN--------------]
 class NavPanel extends StatefulWidget {
@@ -371,7 +373,7 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
           GestureDetector(
             onTap: () => themeProvider.toggle(),
             child: AnimatedContainer(
-              duration: themeAnimationDuration,
+              duration: buttonAnimationDuration, // Usar la duración más corta aquí
               width: 50,
               height: 26,
               decoration: BoxDecoration(
@@ -383,7 +385,7 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
               child: Stack(
                 children: [
                   AnimatedPositioned(
-                    duration: themeAnimationDuration,
+                    duration: buttonAnimationDuration, // Usar la duración más corta aquí
                     left: themeProvider.isDark ? 26 : 2,
                     top: 2,
                     child: Container(
