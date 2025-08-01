@@ -1351,6 +1351,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Account created. Check your email and click the confirmation link. The page will refresh automatically.'**
   String get accountCreatedWeb;
+
+  /// No description provided for @menu.
+  ///
+  /// In en, this message translates to:
+  /// **'Menu'**
+  String get menu;
+
+  /// No description provided for @upcomingAppointmentNotification.
+  ///
+  /// In en, this message translates to:
+  /// **'Upcoming appointment in 30 minutes'**
+  String get upcomingAppointmentNotification;
+
+  /// No description provided for @newClientRegisteredNotification.
+  ///
+  /// In en, this message translates to:
+  /// **'New client registered'**
+  String get newClientRegisteredNotification;
+
+  /// No description provided for @reminderNotification.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminder'**
+  String get reminderNotification;
+
+  /// No description provided for @checkTomorrowAppointments.
+  ///
+  /// In en, this message translates to:
+  /// **'Check tomorrow\'s appointments'**
+  String get checkTomorrowAppointments;
 }
 
 class _AppLocalizationsDelegate

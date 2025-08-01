@@ -254,5 +254,11 @@
     "cannotResetPassword": "No se puede restablecer la contraseña para este usuario.",
     "back": "Volver",
     "contactAdminError": "No se pudo actualizar la contraseña. Contacte al administrador.",
-    "changePassword": "Cambiar Contraseña"
+    "changePassword": "Cambiar Contraseña",
+    "menu": "Menú",
+    "upcomingAppointmentNotification": "Próxima cita en 30 minutos",
+    "newClientRegisteredNotification": "Nuevo cliente registrado",
+    "reminderNotification": "Recordatorio",
+    "checkTomorrowAppointments": "Revisar citas de mañana"
+
 }

@@ -697,4 +697,19 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get accountCreatedWeb =>
       'Cuenta creada. Revisa tu correo y haz clic en el enlace de confirmación. La página se actualizará automáticamente.';
+
+  @override
+  String get menu => 'Menú';
+
+  @override
+  String get upcomingAppointmentNotification => 'Próxima cita en 30 minutos';
+
+  @override
+  String get newClientRegisteredNotification => 'Nuevo cliente registrado';
+
+  @override
+  String get reminderNotification => 'Recordatorio';
+
+  @override
+  String get checkTomorrowAppointments => 'Revisar citas de mañana';
 }

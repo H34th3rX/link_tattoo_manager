@@ -681,4 +681,20 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get accountCreatedWeb =>
       'Account created. Check your email and click the confirmation link. The page will refresh automatically.';
+
+  @override
+  String get menu => 'Menu';
+
+  @override
+  String get upcomingAppointmentNotification =>
+      'Upcoming appointment in 30 minutes';
+
+  @override
+  String get newClientRegisteredNotification => 'New client registered';
+
+  @override
+  String get reminderNotification => 'Reminder';
+
+  @override
+  String get checkTomorrowAppointments => 'Check tomorrow\'s appointments';
 }

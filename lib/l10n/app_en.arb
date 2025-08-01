@@ -254,5 +254,11 @@
     "back": "Back",
     "contactAdminError": "Could not update password. Contact administrator.",
     "changePassword": "Change Password",
-    "accountCreatedWeb": "Account created. Check your email and click the confirmation link. The page will refresh automatically."
+    "accountCreatedWeb": "Account created. Check your email and click the confirmation link. The page will refresh automatically.",
+    "menu": "Menu",
+    "upcomingAppointmentNotification": "Upcoming appointment in 30 minutes",
+    "newClientRegisteredNotification": "New client registered",
+    "reminderNotification": "Reminder",
+    "checkTomorrowAppointments": "Check tomorrow's appointments"
+
 }
