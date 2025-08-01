@@ -253,5 +253,6 @@
     "cannotResetPassword": "Cannot reset password for this user.",
     "back": "Back",
     "contactAdminError": "Could not update password. Contact administrator.",
-    "changePassword": "Change Password"
+    "changePassword": "Change Password",
+    "accountCreatedWeb": "Account created. Check your email and click the confirmation link. The page will refresh automatically."
 }

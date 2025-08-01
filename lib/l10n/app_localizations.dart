@@ -1345,6 +1345,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Change Password'**
   String get changePassword;
+
+  /// No description provided for @accountCreatedWeb.
+  ///
+  /// In en, this message translates to:
+  /// **'Account created. Check your email and click the confirmation link. The page will refresh automatically.'**
+  String get accountCreatedWeb;
 }
 
 class _AppLocalizationsDelegate

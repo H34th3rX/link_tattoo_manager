@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'profile_page.dart';
 import 'supabase_service.dart';
 import 'theme_provider.dart';
@@ -24,6 +25,9 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SupabaseService.initialize();
   
+  // Configurar el listener de deep links para manejar confirmaciones de email
+  _setupDeepLinkListener();
+  
   // Inicializar ThemeProvider y esperar a que cargue el tema
   final themeProvider = ThemeProvider();
   await themeProvider.initialize(); // Esperar la inicialización del tema
@@ -47,6 +51,19 @@ Future<void> main() async {
   );
 }
 
+// Configurar listener para deep links
+void _setupDeepLinkListener() {
+  // Escuchar cambios en el estado de autenticación para manejar confirmaciones
+  Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+    final event = data.event;
+    final session = data.session;
+    
+    if (event == AuthChangeEvent.signedIn && session != null) {
+      // Si el usuario se registró y confirmó su email, redirigir al dashboard
+      print('Usuario confirmado y logueado: ${session.user.email}');
+    }
+  });
+}
 class MyApp extends StatelessWidget {
   final String initialRoute;
   const MyApp({required this.initialRoute, super.key});

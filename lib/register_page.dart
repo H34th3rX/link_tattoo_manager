@@ -1,5 +1,6 @@
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import './l10n/app_localizations.dart';
 
@@ -82,16 +83,29 @@ class _RegisterPageState extends State<RegisterPage> with SingleTickerProviderSt
       final response = await Supabase.instance.client.auth.signUp(
         email: _emailCtrl.text.trim(),
         password: _passwordCtrl.text.trim(),
+        emailRedirectTo: kIsWeb 
+            ? '${Uri.base.origin}/login' // En web, redirigir a la misma ventana
+            : 'io.supabase.flutterquickstart://login', // En mobile, usar deep link
       );
 
       if (response.user != null && mounted) {
         final l10n = AppLocalizations.of(context);
-        _showSuccessDialog(l10n?.accountCreated ?? 'Account created. A verification email has been sent.');
-        Future.delayed(const Duration(seconds: 2), () {
-          if (mounted) {
-            Navigator.pushReplacementNamed(context, '/login');
-          }
-        });
+        
+        // Mostrar mensaje diferente según la plataforma
+        final String successMessage = kIsWeb 
+            ? (l10n?.accountCreatedWeb ?? 'Cuenta creada. Revisa tu correo y haz clic en el enlace de confirmación. La página se actualizará automáticamente.')
+            : (l10n?.accountCreated ?? 'Cuenta creada. Se ha enviado un correo de verificación.');
+        
+        _showSuccessDialog(successMessage);
+        
+        if (!kIsWeb) {
+          // Solo en mobile redirigir inmediatamente al login
+          Future.delayed(const Duration(seconds: 3), () {
+            if (mounted) {
+              Navigator.pushReplacementNamed(context, '/login');
+            }
+          });
+        }
       } else if (mounted) {
         final l10n = AppLocalizations.of(context);
         _setError(l10n?.accountCreationFailed ?? 'Could not create account. Please try again.');

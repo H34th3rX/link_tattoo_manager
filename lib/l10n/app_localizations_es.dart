@@ -693,4 +693,8 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get changePassword => 'Cambiar Contraseña';
+
+  @override
+  String get accountCreatedWeb =>
+      'Cuenta creada. Revisa tu correo y haz clic en el enlace de confirmación. La página se actualizará automáticamente.';
 }

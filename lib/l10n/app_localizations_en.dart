@@ -677,4 +677,8 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get changePassword => 'Change Password';
+
+  @override
+  String get accountCreatedWeb =>
+      'Account created. Check your email and click the confirmation link. The page will refresh automatically.';
 }

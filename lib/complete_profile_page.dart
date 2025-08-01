@@ -111,83 +111,88 @@ class _CompleteProfilePageState extends State<CompleteProfilePage>
 
   // Guarda el perfil del usuario en Supabase
   Future<void> _saveProfile() async {
-  if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) return;
 
-  setState(() {
-    _loading = true;
-    _error = null;
-  });
-
-  try {
-    final user = Supabase.instance.client.auth.currentUser;
-    if (user == null) {
-      if (mounted) _setError('Usuario no autenticado');
-      return;
-    }
-
-    // Verifica si el perfil ya existe antes de intentar insertar
-    final existingProfile = await Supabase.instance.client
-        .from('employees')
-        .select('id')
-        .eq('id', user.id)
-        .maybeSingle();
-
-    if (existingProfile != null) {
-      if (mounted) _setError('El perfil ya existe. Contacta al soporte si necesitas modificarlo.');
-      return;
-    }
-
-    // Actualiza los atributos del usuario en Supabase Auth
-    await Supabase.instance.client.auth.updateUser(UserAttributes(data: {
-      'username': _usernameCtrl.text.trim(),
-    }));
-
-    // Inserta los datos del empleado en la tabla 'employees'
-    await Supabase.instance.client.from('employees').insert({
-      'id': user.id,
-      'username': _usernameCtrl.text.trim(),
-      'phone': _phoneCtrl.text.trim(),
-      'email': user.email,
-      'specialty': _isCustomSpecialty && _specialtyCtrl.text.isNotEmpty
-          ? _specialtyCtrl.text.trim()
-          : _selectedSpecialty,
-      'start_date': DateTime.now().toIso8601String().split('T')[0],
-      'is_active': true,
-      'notes': null,
+    setState(() {
+      _loading = true;
+      _error = null;
     });
 
-    if (mounted) {
-      _showSuccessDialog('Perfil completado exitosamente');
-      Future.delayed(const Duration(seconds: 2), () {
-        if (mounted) {
-          Navigator.pop(context); // Cierra el diálogo
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => LoadingScreen(userName: _usernameCtrl.text.trim()),
-            ),
-          );
-        }
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) {
+        if (mounted) _setError('Usuario no autenticado');
+        return;
+      }
+
+      // Verifica si el perfil ya existe antes de intentar insertar
+      final existingProfile = await Supabase.instance.client
+          .from('employees')
+          .select('id')
+          .eq('id', user.id)
+          .maybeSingle();
+
+      if (existingProfile != null) {
+        if (mounted) _setError('El perfil ya existe. Contacta al soporte si necesitas modificarlo.');
+        return;
+      }
+
+      // Actualiza los atributos del usuario en Supabase Auth
+      await Supabase.instance.client.auth.updateUser(UserAttributes(data: {
+        'username': _usernameCtrl.text.trim(),
+      }));
+
+      // Inserta los datos del empleado en la tabla 'employees'
+      await Supabase.instance.client.from('employees').insert({
+        'id': user.id,
+        'username': _usernameCtrl.text.trim(),
+        'phone': _phoneCtrl.text.trim(),
+        'email': user.email,
+        'specialty': _isCustomSpecialty && _specialtyCtrl.text.isNotEmpty
+            ? _specialtyCtrl.text.trim()
+            : _selectedSpecialty,
+        'start_date': DateTime.now().toIso8601String().split('T')[0],
+        'is_active': true,
+        'notes': null,
       });
-    }
-  } on PostgrestException catch (e) {
-    if (mounted) {
-      if (e.code == '42501') {
-        _setError('Error de permisos al guardar el perfil. Contacta al soporte.');
-      } else {
-        _setError('Error al guardar el perfil: ${e.message}. Verifica los datos o contacta al soporte.');
+
+      if (mounted) {
+        // SOLUCIÓN: Navegar directamente sin diálogo intermedio
+        _navigateToLoadingScreen();
+      }
+    } on PostgrestException catch (e) {
+      if (mounted) {
+        if (e.code == '42501') {
+          _setError('Error de permisos al guardar el perfil. Contacta al soporte.');
+        } else {
+          _setError('Error al guardar el perfil: ${e.message}. Verifica los datos o contacta al soporte.');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        _setError('Error inesperado al guardar el perfil: $e. Contacta al soporte.');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
       }
     }
-  } catch (e) {
-    if (mounted) {
-      _setError('Error inesperado al guardar el perfil: $e. Contacta al soporte.');
-    }
-  } finally {
-    if (mounted) {
-      setState(() => _loading = false);
-    }
   }
-}
+
+  // NUEVA FUNCIÓN: Navegar directamente a la pantalla de carga
+  void _navigateToLoadingScreen() {
+    // Usar WidgetsBinding para asegurar que la navegación ocurra en el próximo frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => LoadingScreen(userName: _usernameCtrl.text.trim()),
+          ),
+        );
+      }
+    });
+  }
 
   // Establece un mensaje de error y lo elimina tras 5 segundos
   void _setError(String error) {
@@ -199,42 +204,7 @@ class _CompleteProfilePageState extends State<CompleteProfilePage>
     });
   }
 
-  // Muestra un diálogo de éxito tras guardar el perfil
-  void _showSuccessDialog(String message) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => Dialog(
-        backgroundColor: _cardColor,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.check_circle, color: Colors.green, size: 48),
-              const SizedBox(height: 16),
-              Text(
-                message,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: _textColor, fontSize: 16),
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: () => Navigator.of(context).pop(),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _accentColor,
-                  foregroundColor: _backgroundColor,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                child: const Text('OK'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  // FUNCIÓN ELIMINADA: _showSuccessDialog ya no se usa
 
   @override
   Widget build(BuildContext context) {

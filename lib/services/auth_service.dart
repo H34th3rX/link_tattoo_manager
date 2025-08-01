@@ -405,6 +405,13 @@ class AuthService {
               onSignIn(session!.user);
             }
             break;
+          case AuthChangeEvent.passwordRecovery:
+            // Manejar el evento de recuperación de contraseña
+            if (kDebugMode) {
+              print('Password recovery event detected');
+            }
+            // El usuario será redirigido automáticamente por el deep link
+            break;
           case AuthChangeEvent.signedOut:
             onSignOut();
             break;
@@ -542,11 +549,14 @@ class AuthService {
   //[-------------RECUPERACIÓN DE CONTRASEÑA (MÉTODO ORIGINAL - MANTENIDO PARA COMPATIBILIDAD)--------------]
   static Future<void> resetPassword(String email) async {
     try {
+      // Configurar URL de redirección según la plataforma
+      final String redirectUrl = kIsWeb 
+          ? '${Uri.base.origin}/reset_password' // En web, usar la misma ventana
+          : 'io.supabase.flutterquickstart://reset_password'; // En mobile, usar deep link
+      
       await _supabase.auth.resetPasswordForEmail(
         email,
-        redirectTo: kIsWeb 
-          ? '${Uri.base.origin}/reset-password' 
-          : 'io.supabase.flutterquickstart://reset-password',
+        redirectTo: redirectUrl,
       );
     } catch (e) {
       if (kDebugMode) {
