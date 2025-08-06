@@ -7,19 +7,22 @@ import 'theme_provider.dart';
 import 'login_page.dart' show LoginPage;
 import 'register_page.dart' show RegisterPage;
 import 'dashboard_page.dart' show DashboardPage;
-import 'complete_profile_page.dart' show CompleteProfilePage;
+import 'complete_profile_page.dart'; // Importación simplificada
+import 'loading_screen.dart' show LoadingScreen;
 import 'appointments_page.dart' show AppointmentsPage;
 import 'clients_page.dart' show ClientsPage;
 import 'reports_page.dart';
 import 'client_profile_page.dart' show ClientProfilePage;
 import 'client_history_page.dart' show ClientHistoryPage;
 import 'calendar_page.dart' show CalendarPage;
-import 'password_recovery_page.dart'; 
-import 'reset_password_page.dart'; 
+import 'password_recovery_page.dart';
+import 'reset_password_page.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import './l10n/app_localizations.dart';
 import 'localization_provider.dart';
 
+// Definir una GlobalKey para el Navigator
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,17 +35,14 @@ Future<void> main() async {
   final themeProvider = ThemeProvider();
   await themeProvider.initialize(); // Esperar la inicialización del tema
 
-  // Inicializar LocalizationProvider (asumiendo que también podría tener una inicialización asíncrona)
+  // Inicializar LocalizationProvider
   final localizationProvider = LocalizationProvider();
-  // Si LocalizationProvider también carga datos asíncronamente, descomenta la siguiente línea:
-  // await localizationProvider.initialize(); 
 
-  String initialRoute = '/login';
+  String initialRoute = '/loading'; // Cambiar a loading para verificar usuario
   
   runApp(
     MultiProvider(
       providers: [
-        // Usar .value para proporcionar la instancia ya inicializada
         ChangeNotifierProvider.value(value: themeProvider),
         ChangeNotifierProvider.value(value: localizationProvider),
       ],
@@ -53,17 +53,20 @@ Future<void> main() async {
 
 // Configurar listener para deep links
 void _setupDeepLinkListener() {
-  // Escuchar cambios en el estado de autenticación para manejar confirmaciones
   Supabase.instance.client.auth.onAuthStateChange.listen((data) {
     final event = data.event;
     final session = data.session;
-    
+
     if (event == AuthChangeEvent.signedIn && session != null) {
-      // Si el usuario se registró y confirmó su email, redirigir al dashboard
-      print('Usuario confirmado y logueado: ${session.user.email}');
+      // Si el usuario se ha autenticado (ej. después de la confirmación de email o login directo)
+      // Navegar a la pantalla de carga para determinar la ruta correcta
+      if (navigatorKey.currentContext != null && navigatorKey.currentContext!.mounted) {
+        Navigator.of(navigatorKey.currentContext!).pushReplacementNamed('/loading');
+      }
     }
   });
 }
+
 class MyApp extends StatelessWidget {
   final String initialRoute;
   const MyApp({required this.initialRoute, super.key});
@@ -73,6 +76,7 @@ class MyApp extends StatelessWidget {
     return Consumer2<ThemeProvider, LocalizationProvider>(
       builder: (context, themeProvider, localizationProvider, child) {
         return MaterialApp(
+          navigatorKey: navigatorKey, // Añadir esta línea
           title: 'LinkTattoo Manager',
           debugShowCheckedModeBanner: false,
           themeMode: themeProvider.mode,
@@ -91,11 +95,13 @@ class MyApp extends StatelessWidget {
             return localizationProvider.resolveLocale(supportedLocales, deviceLocale);
           },
           routes: {
+            '/loading': (_) => const LoadingScreen(),
             '/login': (_) => const LoginPage(),
             '/register': (_) => const RegisterPage(),
-            '/password_recovery': (_) => const PasswordRecoveryPage(), // Ruta para la página de recuperación
-            '/complete_profile': (_) => const CompleteProfilePage(),
+            '/password_recovery': (_) => const PasswordRecoveryPage(),
+            '/complete_profile': (_) => const CompleteProfilePage(), // Usar la página unificada
             '/dashboard': (_) => const DashboardPage(),
+            '/client_dashboard': (_) => const ClientDashboardPage(),
             '/profile': (context) => const ProfilePage(),
             '/appointments': (_) => const AppointmentsPage(),
             '/clients': (_) => const ClientsPage(),
@@ -157,6 +163,199 @@ class MyApp extends StatelessWidget {
           TargetPlatform.android: CupertinoPageTransitionsBuilder(),
           TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
         },
+      ),
+    );
+  }
+}
+
+// Dashboard de cliente mejorado
+class ClientDashboardPage extends StatelessWidget {
+  const ClientDashboardPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        title: const Text(
+          'Dashboard Cliente',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        backgroundColor: const Color(0xFFBDA206),
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout, color: Colors.black),
+            onPressed: () async {
+              await Supabase.instance.client.auth.signOut();
+              if (context.mounted) {
+                Navigator.pushNamedAndRemoveUntil(
+                  context,
+                  '/login',
+                  (route) => false,
+                );
+              }
+            },
+          ),
+        ],
+      ),
+      body: Container(
+        decoration: const BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage('assets/images/logo.png'),
+            fit: BoxFit.cover,
+            colorFilter: ColorFilter.mode(
+              Color.fromRGBO(0, 0, 0, 0.7),
+              BlendMode.dstATop,
+            ),
+          ),
+        ),
+        child: Center(
+          child: Container(
+            margin: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(32),
+            decoration: BoxDecoration(
+              color: const Color.fromRGBO(15, 19, 21, 0.9),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: const Color(0xFFBDA206),
+                width: 2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFBDA206).withValues(alpha: 0.3),
+                  blurRadius: 25,
+                  spreadRadius: 8,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFBDA206), Color(0xFF8B7505)],
+                    ),
+                    borderRadius: BorderRadius.circular(50),
+                  ),
+                  child: const Icon(
+                    Icons.person,
+                    size: 60,
+                    color: Colors.black,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Bienvenido Cliente',
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Tu área personal está en desarrollo',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.white.withValues(alpha: 0.7),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 32),
+                // Botones de funcionalidades futuras (restaurados)
+                Wrap(
+                  spacing: 16,
+                  runSpacing: 16,
+                  children: [
+                    _buildFeatureButton(
+                      icon: Icons.calendar_today,
+                      label: 'Mis Citas',
+                      onTap: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Funcionalidad en desarrollo'),
+                            backgroundColor: Color(0xFFBDA206),
+                          ),
+                        );
+                      },
+                    ),
+                    _buildFeatureButton(
+                      icon: Icons.history,
+                      label: 'Historial',
+                      onTap: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Funcionalidad en desarrollo'),
+                            backgroundColor: Color(0xFFBDA206),
+                          ),
+                        );
+                      },
+                    ),
+                    _buildFeatureButton(
+                      icon: Icons.person_outline,
+                      label: 'Mi Perfil',
+                      onTap: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Funcionalidad en desarrollo'),
+                            backgroundColor: Color(0xFFBDA206),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFeatureButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFBDA206).withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: const Color(0xFFBDA206).withValues(alpha: 0.3),
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              color: const Color(0xFFBDA206),
+              size: 24,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

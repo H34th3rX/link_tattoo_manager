@@ -259,6 +259,8 @@
     "upcomingAppointmentNotification": "Próxima cita en 30 minutos",
     "newClientRegisteredNotification": "Nuevo cliente registrado",
     "reminderNotification": "Recordatorio",
-    "checkTomorrowAppointments": "Revisar citas de mañana"
-
+    "checkTomorrowAppointments": "Revisar citas de mañana",
+    "employee": "Empleado",
+    "client": "Cliente",
+     "userType": "Tipo Usuario"
 }

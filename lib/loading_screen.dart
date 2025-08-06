@@ -4,11 +4,12 @@ import 'dart:math' as math;
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 //[-------------PANTALLA DE CARGA ANIMADA OPTIMIZADA--------------]
 class LoadingScreen extends StatefulWidget {
-  final String userName; // Nombre del usuario recibido como parámetro
-  const LoadingScreen({super.key, required this.userName});
+  final String? userName; // Nombre del usuario opcional
+  const LoadingScreen({super.key, this.userName});
 
   @override
   State<LoadingScreen> createState() => _LoadingScreenState();
@@ -28,7 +29,6 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
   late Animation<double> _borderAnimation; // Animación del borde del contenedor
   late Animation<double> _pulseAnimation; // Animación de pulso del contenedor
   late Animation<double> _rotationAnimation; // Animación de rotación de los anillos
-
   late Animation<double> _scaleAnimation; // Animación de escala para el texto
   late Animation<double> _fadeAnimation; // Animación de opacidad para el texto
   late Animation<Offset> _slideAnimation; // Animación de deslizamiento para el texto
@@ -37,6 +37,12 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
   Timer? _minimumDurationTimer;
   bool _animationCompleted = false;
   bool _minimumTimeElapsed = false;
+  bool _userCheckCompleted = false;
+
+  // Variables para el estado del usuario
+  String _statusMessage = 'Iniciando...';
+  String _displayName = '';
+  String? _redirectRoute;
 
   @override
   void initState() {
@@ -47,7 +53,7 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
     
     // Inicialización del controlador principal (duración extendida para release)
     final duration = kDebugMode 
-        ? const Duration(seconds: 4) 
+        ? const Duration(seconds: 4)
         : const Duration(seconds: 6); // Más tiempo en release
     
     _mainController = AnimationController(
@@ -118,6 +124,9 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
       curve: Curves.easeOutBack,
     ));
 
+    // Iniciar verificación de usuario y animaciones
+    _checkUserStatus();
+    
     // Iniciar las animaciones principales con delay
     Future.delayed(const Duration(milliseconds: 300), () {
       if (mounted) {
@@ -135,10 +144,136 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
     });
   }
 
+  // Verificar el estado del usuario y determinar redirección
+  Future<void> _checkUserStatus() async {
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      
+      if (user == null) {
+        setState(() {
+          _statusMessage = 'Redirigiendo al login...';
+          _redirectRoute = '/login';
+        });
+        _userCheckCompleted = true;
+        return;
+      }
+
+      setState(() {
+        _statusMessage = 'Verificando perfil...';
+      });
+
+      // Verificar si el usuario existe en la tabla employees
+      final employeeResponse = await Supabase.instance.client
+          .from('employees')
+          .select('id, username')
+          .eq('id', user.id)
+          .maybeSingle();
+
+      if (employeeResponse != null) {
+        // Es un empleado
+        final username = employeeResponse['username'] as String?;
+        if (username != null && username.isNotEmpty) {
+          // Empleado con perfil completo
+          setState(() {
+            _displayName = username;
+            _statusMessage = 'Preparando dashboard...';
+            _redirectRoute = '/dashboard';
+          });
+        } else {
+          // Empleado sin perfil completo
+          setState(() {
+            _displayName = user.email?.split('@')[0] ?? 'Usuario';
+            _statusMessage = 'Completando perfil...';
+            _redirectRoute = '/complete_profile';
+          });
+        }
+        _userCheckCompleted = true;
+        return;
+      }
+
+      // Verificar si el usuario existe en la tabla clients
+      if (kDebugMode) {
+        print('Checking for client profile for email: ${user.email}');
+        print('Attempting to query clients table...');
+      }
+      final clientResponse = await Supabase.instance.client
+          .from('clients')
+          .select('id, name')
+          .eq('email', user.email!)
+          .maybeSingle();
+
+      if (kDebugMode) {
+        print('Client profile query result: $clientResponse');
+        if (clientResponse == null) {
+          print('Client profile NOT found in "clients" table for email: ${user.email}. This might be an RLS issue or missing data.');
+        }
+      }
+
+      if (clientResponse != null) {
+        // Es un cliente con perfil completo
+        final clientName = clientResponse['name'] as String?;
+        setState(() {
+          _displayName = clientName ?? 'Cliente';
+          _statusMessage = 'Preparando tu área...';
+          _redirectRoute = '/client_dashboard';
+        });
+        _userCheckCompleted = true;
+        return;
+      }
+
+      if (kDebugMode) {
+        print('Client profile NOT found in "clients" table. Checking metadata...');
+      }
+
+      // Usuario autenticado pero sin perfil en ninguna tabla
+      // Verificar el tipo de usuario desde metadata
+      final userType = user.userMetadata?['user_type'] as String?;
+      
+      if (userType == 'client') {
+        setState(() {
+          _displayName = user.email?.split('@')[0] ?? 'Cliente';
+          _statusMessage = 'Completando registro...';
+          _redirectRoute = '/complete_profile'; // Redirigir a la página unificada
+        });
+      } else {
+        // Por defecto, asumir que es empleado
+        setState(() {
+          _displayName = user.email?.split('@')[0] ?? 'Usuario';
+          _statusMessage = 'Completando perfil...';
+          _redirectRoute = '/complete_profile';
+        });
+      }
+      _userCheckCompleted = true;
+
+    } on PostgrestException catch (e) {
+      setState(() {
+        _statusMessage = 'Error de base de datos';
+        _displayName = 'Usuario';
+        _redirectRoute = '/login';
+      });
+      if (kDebugMode) {
+        print('PostgrestException en verificación de usuario: ${e.message} (Code: ${e.code})');
+      }
+      _userCheckCompleted = true;
+    } catch (e) {
+      setState(() {
+        _statusMessage = 'Error al verificar usuario';
+        _displayName = 'Usuario';
+        _redirectRoute = '/login';
+      });
+      
+      if (kDebugMode) {
+        print('Error inesperado en verificación de usuario: $e');
+      }
+      
+      _userCheckCompleted = true;
+    }
+  }
+
   // Timer para garantizar duración mínima visible
   void _startMinimumDurationTimer() {
     final minimumDuration = kDebugMode 
-        ? const Duration(seconds: 3) 
+        ? const Duration(seconds: 3)
         : const Duration(seconds: 5); // Duración mínima garantizada
     
     _minimumDurationTimer = Timer(minimumDuration, () {
@@ -147,13 +282,13 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
     });
   }
 
-  // Verificar si se puede redirigir (ambas condiciones cumplidas)
+  // Verificar si se puede redirigir (todas las condiciones cumplidas)
   void _checkForRedirect() {
-    if (_animationCompleted && _minimumTimeElapsed && mounted) {
+    if (_animationCompleted && _minimumTimeElapsed && _userCheckCompleted && mounted) {
       // Delay adicional para suavizar la transición
       Future.delayed(const Duration(milliseconds: 500), () {
-        if (mounted) {
-          Navigator.pushReplacementNamed(context, '/dashboard');
+        if (mounted && _redirectRoute != null) {
+          Navigator.pushReplacementNamed(context, _redirectRoute!);
         }
       });
     }
@@ -178,6 +313,9 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
     const Color cardColor = Color.fromRGBO(15, 19, 21, 0.9);
     const Color textColor = Colors.white;
     const Color hintColor = Colors.white70;
+
+    // Usar el nombre proporcionado o el determinado por la verificación
+    final displayName = widget.userName ?? _displayName;
 
     return Scaffold(
       body: Stack(
@@ -352,22 +490,23 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
                                     ),
                                   ),
                                   const SizedBox(height: 8),
-                                  Text(
-                                    widget.userName,
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.w600,
-                                      color: accentColor,
-                                      shadows: [
-                                        Shadow(
-                                          color: accentColor.withValues(alpha: 0.4),
-                                          blurRadius: 8,
-                                          offset: const Offset(0, 2),
-                                        ),
-                                      ],
+                                  if (displayName.isNotEmpty)
+                                    Text(
+                                      displayName,
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.w600,
+                                        color: accentColor,
+                                        shadows: [
+                                          Shadow(
+                                            color: accentColor.withValues(alpha: 0.4),
+                                            blurRadius: 8,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
                                     ),
-                                  ),
                                 ],
                               ),
                             ),
@@ -470,13 +609,17 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
                         
                         const SizedBox(height: 15),
                         
-                        // Mensaje de estado
-                        Text(
-                          'Preparando tu experiencia...',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: hintColor,
-                            fontStyle: FontStyle.italic,
+                        // Mensaje de estado dinámico
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 500),
+                          child: Text(
+                            _statusMessage,
+                            key: ValueKey(_statusMessage),
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: hintColor,
+                              fontStyle: FontStyle.italic,
+                            ),
                           ),
                         ),
                       ],
@@ -490,8 +633,8 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
       ),
     );
   }
-
-    // Construye una partícula flotante con animación mejorada
+  
+  // Construye una partícula flotante con animación mejorada
   Widget _buildFloatingParticle(int index, Color accentColor) {
     final random = math.Random(index);
     final startX = random.nextDouble() * 400;

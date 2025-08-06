@@ -1381,6 +1381,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Check tomorrow\'s appointments'**
   String get checkTomorrowAppointments;
+
+  /// No description provided for @employee.
+  ///
+  /// In en, this message translates to:
+  /// **'Employee'**
+  String get employee;
+
+  /// No description provided for @client.
+  ///
+  /// In en, this message translates to:
+  /// **'Cient'**
+  String get client;
+
+  /// No description provided for @userType.
+  ///
+  /// In en, this message translates to:
+  /// **'User Type'**
+  String get userType;
 }
 
 class _AppLocalizationsDelegate

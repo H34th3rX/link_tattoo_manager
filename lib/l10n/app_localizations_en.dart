@@ -697,4 +697,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get checkTomorrowAppointments => 'Check tomorrow\'s appointments';
+
+  @override
+  String get employee => 'Employee';
+
+  @override
+  String get client => 'Cient';
+
+  @override
+  String get userType => 'User Type';
 }

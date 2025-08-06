@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import './l10n/app_localizations.dart';
-import 'loading_screen.dart';
 import 'services/auth_service.dart';
 
 //[-------------PÁGINA DE INICIO DE SESIÓN MULTI-PLATAFORMA--------------]
@@ -52,43 +51,43 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
   //[-------------CONFIGURACIÓN DE LISTENER PARA AUTH--------------]
   void _setupAuthListener() {
-  AuthService.setupAuthListener(
-    onSignIn: (User user) {
-      if (mounted) {
-        setState(() {
-          _loadingGoogleLogin = false; // Importante: limpiar loading state
-          _loadingEmailLogin = false;
-          _error = null;
-        });
-        _checkAndRedirect(user);
-      }
-    },
-    onSignOut: () {
-      if (mounted) {
-        setState(() {
-          _loadingGoogleLogin = false;
-          _loadingEmailLogin = false;
-          _error = null;
-        });
-        
-        if (kDebugMode) {
-          final l10n = AppLocalizations.of(context);
-          print(l10n?.userSignedOut ?? 'User signed out');
+    AuthService.setupAuthListener(
+      onSignIn: (User user) {
+        if (mounted) {
+          setState(() {
+            _loadingGoogleLogin = false; // Importante: limpiar loading state
+            _loadingEmailLogin = false;
+            _error = null;
+          });
+          // Redirigir siempre a LoadingScreen para que maneje la lógica de perfil
+          Navigator.pushReplacementNamed(context, '/loading');
         }
-      }
-    },
-    onError: (String error) {
-      if (mounted) {
-        setState(() {
-          _loadingGoogleLogin = false;
-          _loadingEmailLogin = false;
-        });
-        final l10n = AppLocalizations.of(context);
-        _setError(l10n?.authError(error) ?? 'Authentication error: $error');
-      }
-    },
-  );
-}
+      },
+      onSignOut: () {
+        if (mounted) {
+          setState(() {
+            _loadingGoogleLogin = false;
+            _loadingEmailLogin = false;
+            _error = null;
+          });
+          if (kDebugMode) {
+            final l10n = AppLocalizations.of(context);
+            print(l10n?.userSignedOut ?? 'User signed out');
+          }
+        }
+      },
+      onError: (String error) {
+        if (mounted) {
+          setState(() {
+            _loadingGoogleLogin = false;
+            _loadingEmailLogin = false;
+          });
+          final l10n = AppLocalizations.of(context);
+          _setError(l10n?.authError(error) ?? 'Authentication error: $error');
+        }
+      },
+    );
+  }
 
   //[-------------CONFIGURACIÓN DE ANIMACIONES--------------]
   void _initializeAnimations() {
@@ -96,7 +95,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       duration: const Duration(milliseconds: 800),
       vsync: this,
     );
-
     _slideAnimation = Tween<Offset>(
       begin: const Offset(0, 1),
       end: Offset.zero,
@@ -104,7 +102,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       parent: _animationController,
       curve: Curves.easeOutBack,
     ));
-
     _fadeAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
@@ -112,7 +109,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       parent: _animationController,
       curve: Curves.easeIn,
     ));
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _animationController.forward();
     });
@@ -121,22 +117,17 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   //[-------------LÓGICA DE INICIO DE SESIÓN CON EMAIL/PASSWORD--------------]
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
-
     // Evitar múltiples llamadas simultáneas
     if (_loadingEmailLogin || _loadingGoogleLogin) return;
-
     // Feedback háptico
     HapticFeedback.lightImpact();
-
     setState(() {
       _loadingEmailLogin = true;
       _error = null;
     });
-
     try {
       final credential = _credentialCtrl.text.trim();
       final password = _passCtrl.text.trim();
-
       // Verificar si la credencial es un email usando regex compilado
       final bool isEmail = _emailRegex.hasMatch(credential);
       
@@ -162,7 +153,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     );
     
     if (response.session != null) {
-      // La redirección se maneja por el listener de autenticación global
+      // La redirección se maneja por el listener de autenticación global (_setupAuthListener)
+      // No es necesario hacer nada aquí, el listener se encargará de ir a /loading
     } else if (mounted) {
       final l10n = AppLocalizations.of(context);
       _setError(l10n?.invalidCredentials ?? 'Invalid credentials');
@@ -183,7 +175,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         );
         
         if (response.session != null) {
-          // La redirección se maneja por el listener de autenticación global
+          // La redirección se maneja por el listener de autenticación global (_setupAuthListener)
+          // No es necesario hacer nada aquí, el listener se encargará de ir a /loading
         } else if (mounted) {
           final l10n = AppLocalizations.of(context);
           _setError(l10n?.invalidUsernameCredentials ?? 'Invalid credentials');
@@ -223,20 +216,17 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     
     _setError(errorMessage);
   }
-
-    //[-------------LÓGICA DE INICIO DE SESIÓN CON GOOGLE MEJORADA--------------]
-    Future<void> _signInWithGoogle() async {
+  
+  //[-------------LÓGICA DE INICIO DE SESIÓN CON GOOGLE MEJORADA--------------]
+  Future<void> _signInWithGoogle() async {
     // Evitar múltiples llamadas simultáneas
     if (_loadingEmailLogin || _loadingGoogleLogin) return;
-
     // Feedback háptico
     HapticFeedback.lightImpact();
-
     setState(() {
       _loadingGoogleLogin = true;
       _error = null;
     });
-
     try {
       if (kIsWeb) {
         // En Web, mostrar mensaje y proceder con OAuth directo
@@ -249,12 +239,14 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
           ),
         );
       }
-
       final response = await AuthService.signInWithGoogle();
       
       if (response != null && response.session != null) {
         // Login exitoso con respuesta directa (solo en mobile)
-        await _checkAndRedirect(response.user!);
+        // Redirigir siempre a LoadingScreen para que maneje la lógica de perfil
+        if (mounted) {
+          Navigator.pushReplacementNamed(context, '/loading');
+        }
       } else if (kIsWeb) {
         // En Web, el OAuth redirect manejará la respuesta
         // El listener se encargará del resto
@@ -286,10 +278,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
             errorString.contains('cancelled')) {
           errorMessage = l10n?.signInCancelled ?? 'Sign in cancelled';
         } else if (errorString.contains('network') || 
-                  errorString.contains('connection')) {
+                    errorString.contains('connection')) {
           errorMessage = l10n?.connectionError ?? 'Connection error';
         } else if (errorString.contains('invalid_client') ||
-                  errorString.contains('unauthorized')) {
+                    errorString.contains('unauthorized')) {
           errorMessage = l10n?.configurationError ?? 'Configuration error';
         } else {
           errorMessage = l10n?.unexpectedGoogleError ?? 'Unexpected Google error';
@@ -303,36 +295,9 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     }
   }
 
-
-  //[-------------REDIRECCIÓN POST-LOGIN--------------]
-  Future<void> _checkAndRedirect(User user) async {
-    try {
-      final profileExists = await AuthService.getEmployeeProfile(user.id);
-      
-      if (mounted) {
-        if (profileExists != null) {
-          final userName = profileExists['username'] as String? ?? 
-                          user.email?.split('@')[0] ?? 
-                          (AppLocalizations.of(context)?.username ?? 'User');
-          
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => LoadingScreen(userName: userName),
-            ),
-          );
-        } else {
-          Navigator.pushReplacementNamed(context, '/complete_profile');
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        final l10n = AppLocalizations.of(context);
-        _setError(l10n?.profileVerificationError ?? 'Error verifying profile');
-        debugPrint('Error verificando perfil: $e');
-      }
-    }
-  }
+  //[-------------REDIRECCIÓN POST-LOGIN (ELIMINADA)--------------]
+  // Esta función se elimina ya que la redirección se centraliza en LoadingScreen
+  // Future<void> _checkAndRedirect(User user) async { ... }
 
   //[-------------MANEJO DE ERRORES--------------]
   void _setError(String error) {
@@ -696,27 +661,27 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   }
 
   Widget _buildForgotPasswordLink() {
-  return Align(
-    alignment: Alignment.centerRight,
-    child: TextButton(
-      onPressed: !_isAnyLoginLoading ? () {
-        HapticFeedback.lightImpact();
-        if (mounted) {
-          // Navegar a la página de recuperación de contraseña
-          Navigator.pushNamed(context, '/password_recovery');
-        }
-      } : null,
-      child: Text(
-        AppLocalizations.of(context)?.forgotPassword ?? 'Forgot your password?',
-        style: const TextStyle(
-          fontSize: 12,
-          color: _accentColor,
-          decoration: TextDecoration.underline,
+    return Align(
+      alignment: Alignment.centerRight,
+      child: TextButton(
+        onPressed: !_isAnyLoginLoading ? () {
+          HapticFeedback.lightImpact();
+          if (mounted) {
+            // Navegar a la página de recuperación de contraseña
+            Navigator.pushNamed(context, '/password_recovery');
+          }
+        } : null,
+        child: Text(
+          AppLocalizations.of(context)?.forgotPassword ?? 'Forgot your password?',
+          style: const TextStyle(
+            fontSize: 12,
+            color: _accentColor,
+            decoration: TextDecoration.underline,
+          ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildLoginButton() {
     return SizedBox(

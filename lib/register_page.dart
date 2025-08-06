@@ -25,7 +25,7 @@ class _RegisterPageState extends State<RegisterPage> with SingleTickerProviderSt
   final _passwordCtrl = TextEditingController();
   final _confirmPasswordCtrl = TextEditingController();
   final _formKey = GlobalKey<FormState>();
-  
+
   // Controladores y variables para animaciones y estado
   late AnimationController _animationController;
   late Animation<Offset> _slideAnimation;
@@ -83,21 +83,22 @@ class _RegisterPageState extends State<RegisterPage> with SingleTickerProviderSt
       final response = await Supabase.instance.client.auth.signUp(
         email: _emailCtrl.text.trim(),
         password: _passwordCtrl.text.trim(),
-        emailRedirectTo: kIsWeb 
+        // NO se envía user_type aquí, se manejará en complete_profile_page
+        emailRedirectTo: kIsWeb
             ? '${Uri.base.origin}/login' // En web, redirigir a la misma ventana
             : 'io.supabase.flutterquickstart://login', // En mobile, usar deep link
       );
 
       if (response.user != null && mounted) {
         final l10n = AppLocalizations.of(context);
-        
+
         // Mostrar mensaje diferente según la plataforma
-        final String successMessage = kIsWeb 
+        final String successMessage = kIsWeb
             ? (l10n?.accountCreatedWeb ?? 'Cuenta creada. Revisa tu correo y haz clic en el enlace de confirmación. La página se actualizará automáticamente.')
             : (l10n?.accountCreated ?? 'Cuenta creada. Se ha enviado un correo de verificación.');
-        
+
         _showSuccessDialog(successMessage);
-        
+
         if (!kIsWeb) {
           // Solo en mobile redirigir inmediatamente al login
           Future.delayed(const Duration(seconds: 3), () {
@@ -186,7 +187,7 @@ class _RegisterPageState extends State<RegisterPage> with SingleTickerProviderSt
       final l10n = AppLocalizations.of(context);
       return l10n?.authErrorGeneric('Unknown error') ?? 'Authentication error';
     }
-    
+
     if (!mounted) return 'Authentication error: $message';
     final l10n = AppLocalizations.of(context);
 
@@ -199,7 +200,7 @@ class _RegisterPageState extends State<RegisterPage> with SingleTickerProviderSt
     } else if (message.contains('signup is disabled')) {
       return l10n?.authErrorSignupDisabled ?? 'Registration is temporarily disabled.';
     }
-    
+
     return l10n?.authErrorGeneric(message) ?? message;
   }
 
@@ -207,7 +208,7 @@ class _RegisterPageState extends State<RegisterPage> with SingleTickerProviderSt
   String? _validateEmail(String? value) {
     if (!mounted) return null;
     final l10n = AppLocalizations.of(context);
-    
+
     if (value == null || value.isEmpty) {
       return l10n?.emailRequired ?? 'Email is required';
     }
@@ -220,7 +221,7 @@ class _RegisterPageState extends State<RegisterPage> with SingleTickerProviderSt
   String? _validatePassword(String? value) {
     if (!mounted) return null;
     final l10n = AppLocalizations.of(context);
-    
+
     if (value == null || value.isEmpty) {
       return l10n?.passwordRequired ?? 'Password is required';
     }
@@ -236,7 +237,7 @@ class _RegisterPageState extends State<RegisterPage> with SingleTickerProviderSt
   String? _validateConfirmPassword(String? value) {
     if (!mounted) return null;
     final l10n = AppLocalizations.of(context);
-    
+
     if (value == null || value.isEmpty) {
       return l10n?.confirmPasswordRequired ?? 'Confirm your password';
     }
@@ -356,6 +357,8 @@ class _RegisterPageState extends State<RegisterPage> with SingleTickerProviderSt
                           ),
                         ),
                       ],
+                      // _buildUserTypeSelector() fue eliminado de aquí
+                      const SizedBox(height: 20),
                       _buildEmailField(),
                       const SizedBox(height: 20),
                       _buildPasswordField(),
@@ -497,7 +500,7 @@ class _RegisterPageState extends State<RegisterPage> with SingleTickerProviderSt
       ),
       disabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: _hintColor.withValues(alpha: 0.2)),
+         borderSide: BorderSide(color: _hintColor.withValues(alpha: 0.2)),
       ),
     );
   }

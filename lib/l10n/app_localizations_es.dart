@@ -712,4 +712,13 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get checkTomorrowAppointments => 'Revisar citas de mañana';
+
+  @override
+  String get employee => 'Empleado';
+
+  @override
+  String get client => 'Cliente';
+
+  @override
+  String get userType => 'Tipo Usuario';
 }

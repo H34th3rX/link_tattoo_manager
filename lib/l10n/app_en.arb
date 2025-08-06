@@ -259,6 +259,8 @@
     "upcomingAppointmentNotification": "Upcoming appointment in 30 minutes",
     "newClientRegisteredNotification": "New client registered",
     "reminderNotification": "Reminder",
-    "checkTomorrowAppointments": "Check tomorrow's appointments"
-
+    "checkTomorrowAppointments": "Check tomorrow's appointments",
+    "employee": "Employee",
+    "client": "Cient",
+    "userType": "User Type"
 }
