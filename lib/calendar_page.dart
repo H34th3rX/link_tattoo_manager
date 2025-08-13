@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'appbar.dart';
 import 'nav_panel.dart';
 import 'theme_provider.dart';
+import './integrations/appointments_service.dart';
 
 // [------------- CONSTANTES DE ESTILO Y TEMAS --------------]
 const Color primaryColor = Color(0xFFBDA206);
@@ -35,6 +36,7 @@ class _CalendarPageState extends State<CalendarPage> with TickerProviderStateMix
   late Future<void> _loadUserData;
   late AnimationController _errorAnimationController;
   late AnimationController _successAnimationController;
+  bool _isLoading = false;
 
   DateTime _focusedDay = DateTime.now();
   DateTime _selectedDay = DateTime.now();
@@ -84,19 +86,40 @@ class _CalendarPageState extends State<CalendarPage> with TickerProviderStateMix
     }
   }
 
-  // [------------- CARGA Y AGRUPACIÓN DE CITAS --------------]
+  // [------------- CARGA Y AGRUPACIÓN DE CITAS DESDE SUPABASE --------------]
   Future<void> _fetchAppointments() async {
+    if (_isLoading) return;
+    
+    setState(() {
+      _isLoading = true;
+    });
+
     try {
-      await Future.delayed(const Duration(milliseconds: 500));
+      final user = Supabase.instance.client.auth.currentUser!;
+      
+      // Obtener citas del mes actual
+      final startOfMonth = DateTime(_focusedDay.year, _focusedDay.month, 1);
+      final endOfMonth = DateTime(_focusedDay.year, _focusedDay.month + 1, 0, 23, 59, 59);
+      
+      final appointments = await AppointmentsService.getFilteredAppointments(
+        employeeId: user.id,
+        startDate: startOfMonth,
+        endDate: endOfMonth,
+      );
+
       if (mounted) {
         setState(() {
-          _appointments = _generateSampleAppointments();
+          _appointments = appointments;
           _groupAndMarkAppointments();
+          _isLoading = false;
         });
       }
     } catch (e) {
       if (mounted) {
-        _showError('Error al cargar las citas. Verifica tu conexión.');
+        setState(() {
+          _isLoading = false;
+        });
+        _showError('Error al cargar las citas: ${e.toString()}');
       }
     }
   }
@@ -121,58 +144,6 @@ class _CalendarPageState extends State<CalendarPage> with TickerProviderStateMix
     });
   }
 
-  // [------------- DATOS DE EJEMPLO PARA CITAS --------------]
-  List<Map<String, dynamic>> _generateSampleAppointments() {
-    final now = DateTime.now();
-    return [
-      {
-        'id': '1',
-        'client_name': 'María González',
-        'service': 'Tatuaje pequeño',
-        'start_time': DateTime(now.year, now.month, 15, 14, 0).toIso8601String(),
-        'duration': 120,
-        'status': 'confirmed',
-        'notes': 'Diseño de mariposa en muñeca',
-      },
-      {
-        'id': '2',
-        'client_name': 'Carlos Ruiz',
-        'service': 'Retoque tatuaje',
-        'start_time': DateTime(now.year, now.month, 22, 10, 0).toIso8601String(),
-        'duration': 60,
-        'status': 'confirmed',
-        'notes': 'Retoque de colores en brazo',
-      },
-      {
-        'id': '3',
-        'client_name': 'Ana López',
-        'service': 'Consulta diseño',
-        'start_time': DateTime(now.year, now.month, 28, 16, 0).toIso8601String(),
-        'duration': 30,
-        'status': 'confirmed',
-        'notes': 'Primera consulta para tatuaje grande',
-      },
-      {
-        'id': '4',
-        'client_name': 'Luis Martín',
-        'service': 'Tatuaje mediano',
-        'start_time': DateTime(now.year, now.month, 3, 10, 0).toIso8601String(),
-        'duration': 180,
-        'status': 'confirmed',
-        'notes': 'Diseño geométrico en espalda',
-      },
-      {
-        'id': '5',
-        'client_name': 'Sofia Herrera',
-        'service': 'Tatuaje grande',
-        'start_time': DateTime(now.year, now.month, 2, 15, 0).toIso8601String(),
-        'duration': 240,
-        'status': 'cancelled',
-        'notes': 'Cancelado por cliente',
-      },
-    ];
-  }
-
   // [------------- UTILIDADES PARA MENSAJES Y NAVEGACIÓN --------------]
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -182,6 +153,20 @@ class _CalendarPageState extends State<CalendarPage> with TickerProviderStateMix
         behavior: SnackBarBehavior.floating,
       ),
     );
+  }
+
+  // Método para manejar actualizaciones de citas - CORREGIDO
+Future<void> _handleAppointmentUpdate() async {
+    // Refrescar los datos del calendario INMEDIATAMENTE
+    await _fetchAppointments();
+    
+    // Forzar reconstrucción del widget completo
+    if (mounted) {
+      setState(() {
+        // Esto fuerza una reconstrucción completa de toda la página
+        _selectedDay = _selectedDay; // Trigger rebuild
+      });
+    }
   }
 
   Future<void> _logout() async {
@@ -202,6 +187,154 @@ class _CalendarPageState extends State<CalendarPage> with TickerProviderStateMix
       isScrollControlled: true,
       builder: (context) => const NotificationsBottomSheet(),
     );
+  }
+
+  // [------------- MODAL DE DETALLES DE CITAS - MEJORADO --------------]
+  void _showAppointmentDetails(DateTime selectedDate) {
+    final dateKey = DateFormat('dd/MM/yyyy').format(selectedDate);
+    final appointmentsForDate = _groupedAppointments[dateKey] ?? [];
+
+    if (appointmentsForDate.isEmpty) return;
+
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final isDark = themeProvider.isDark;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.75,
+        ),
+        decoration: BoxDecoration(
+          color: isDark ? const Color.fromRGBO(15, 19, 21, 0.95) : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Handle bar
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: isDark ? Colors.grey[600] : Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            // Header
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.event,
+                    color: primaryColor,
+                    size: 28,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _formatDateHeaderComplete(selectedDate),
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? textColor : Colors.black87,
+                          ),
+                        ),
+                        Text(
+                          '${appointmentsForDate.length} cita${appointmentsForDate.length != 1 ? 's' : ''}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: isDark ? hintColor : Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: Icon(
+                      Icons.close,
+                      color: isDark ? textColor : Colors.black54,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(),
+            // Lista de citas
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                itemCount: appointmentsForDate.length,
+                itemBuilder: (context, index) {
+                  final appointment = appointmentsForDate[index];
+                  return Padding(
+                    padding: EdgeInsets.only(
+                      bottom: index < appointmentsForDate.length - 1 ? 16 : 24,
+                    ),
+                    child: AppointmentDetailCard(
+                      key: ValueKey('appointment_${appointment['id']}_${appointment['status']}'),
+                      appointment: appointment,
+                      isDark: isDark,
+                      onStatusChanged: () async {
+                        // IMPORTANTE: Actualizar INMEDIATAMENTE la página principal
+                       await _handleAppointmentUpdate().then((_) {
+                          // Cerrar el modal después de que se actualice la página
+                          if (mounted) {
+                            // ignore: use_build_context_synchronously
+                            Navigator.of(context).pop();
+                          }
+                        });
+                      },
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    ).whenComplete(() {
+      // CRÍTICO: Cuando el modal se cierre, actualizar la página principal
+      _handleAppointmentUpdate();
+    });
+  }
+
+  String _formatDateHeaderComplete(DateTime date) {
+    final day = date.day;
+    final month = _getMonthName(date.month);
+    final weekday = _getWeekdayName(date.weekday);
+    return '$weekday, $day de $month';
+  }
+
+  String _getWeekdayName(int weekday) {
+    const weekdays = [
+      'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'
+    ];
+    return weekdays[weekday - 1];
+  }
+
+  // [------------- NAVEGACIÓN DEL CALENDARIO --------------]
+  void _goToPreviousMonth() {
+    setState(() {
+      _focusedDay = DateTime(_focusedDay.year, _focusedDay.month - 1, 1);
+    });
+    _fetchAppointments();
+  }
+
+  void _goToNextMonth() {
+    setState(() {
+      _focusedDay = DateTime(_focusedDay.year, _focusedDay.month + 1, 1);
+    });
+    _fetchAppointments();
   }
 
   // [------------- CONSTRUCCIÓN DEL LAYOUT PRINCIPAL --------------]
@@ -258,11 +391,23 @@ class _CalendarPageState extends State<CalendarPage> with TickerProviderStateMix
                           ],
                         )
                       : _buildMainContent(isDark, isWide),
+                  if (_isLoading)
+                    Container(
+                      color: Colors.black.withValues(alpha: 0.3),
+                      child: const Center(
+                        child: CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
+                        ),
+                      ),
+                    ),
                 ],
               ),
               floatingActionButton: FloatingActionButton(
                 onPressed: () {
-                  Navigator.of(context).pushNamed('/appointments');
+                  Navigator.of(context).pushNamed('/appointments').then((_) {
+                    // Recargar citas cuando se regrese de crear una nueva
+                    _fetchAppointments();
+                  });
                 },
                 backgroundColor: primaryColor,
                 foregroundColor: Colors.black,
@@ -277,27 +422,31 @@ class _CalendarPageState extends State<CalendarPage> with TickerProviderStateMix
 
   // [------------- CONTENIDO PRINCIPAL DEL CALENDARIO --------------]
   Widget _buildMainContent(bool isDark, bool isWide) {
-    return SingleChildScrollView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1200),
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: isWide ? 40 : 24,
-              vertical: 16,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildCalendarHeader(isDark),
-                const SizedBox(height: 16),
-                _buildCalendarGrid(isDark),
-                const SizedBox(height: 32),
-                _buildAppointmentsListHeader(isDark),
-                const SizedBox(height: 16),
-                _buildAppointmentsList(isDark, isWide),
-              ],
+    return RefreshIndicator(
+      onRefresh: _fetchAppointments,
+      color: primaryColor,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1200),
+            child: Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: isWide ? 40 : 24,
+                vertical: 16,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildCalendarHeader(isDark),
+                  const SizedBox(height: 16),
+                  _buildCalendarGrid(isDark),
+                  const SizedBox(height: 32),
+                  _buildAppointmentsListHeader(isDark),
+                  const SizedBox(height: 16),
+                  _buildAppointmentsList(isDark, isWide),
+                ],
+              ),
             ),
           ),
         ),
@@ -312,11 +461,7 @@ class _CalendarPageState extends State<CalendarPage> with TickerProviderStateMix
       children: [
         IconButton(
           icon: Icon(Icons.chevron_left, color: isDark ? textColor : Colors.black87),
-          onPressed: () {
-            setState(() {
-              _focusedDay = DateTime(_focusedDay.year, _focusedDay.month - 1, 1);
-            });
-          },
+          onPressed: _goToPreviousMonth,
         ),
         AnimatedDefaultTextStyle(
           duration: themeAnimationDuration,
@@ -329,11 +474,7 @@ class _CalendarPageState extends State<CalendarPage> with TickerProviderStateMix
         ),
         IconButton(
           icon: Icon(Icons.chevron_right, color: isDark ? textColor : Colors.black87),
-          onPressed: () {
-            setState(() {
-              _focusedDay = DateTime(_focusedDay.year, _focusedDay.month + 1, 1);
-            });
-          },
+          onPressed: _goToNextMonth,
         ),
       ],
     );
@@ -404,11 +545,18 @@ class _CalendarPageState extends State<CalendarPage> with TickerProviderStateMix
                                   date.month == _selectedDay.month &&
                                   date.day == _selectedDay.day;
 
+                // Contar citas del día
+                final dateKey = DateFormat('dd/MM/yyyy').format(date);
+                final appointmentCount = _groupedAppointments[dateKey]?.length ?? 0;
+
                 return GestureDetector(
                   onTap: () {
                     setState(() {
                       _selectedDay = date;
                     });
+                    if (hasAppointment) {
+                      _showAppointmentDetails(date);
+                    }
                   },
                   child: AnimatedContainer(
                     duration: themeAnimationDuration,
@@ -439,16 +587,27 @@ class _CalendarPageState extends State<CalendarPage> with TickerProviderStateMix
                                 : (isDark ? textColor : Colors.black87),
                           ),
                         ),
-                        if (hasAppointment)
+                        if (hasAppointment && appointmentCount > 0)
                           Positioned(
-                            top: 2,
-                            right: 2,
+                            top: 4,
+                            right: 4,
                             child: Container(
-                              width: 6,
-                              height: 6,
-                              decoration: const BoxDecoration(
-                                color: Colors.red,
-                                shape: BoxShape.circle,
+                              width: 16,
+                              height: 16,
+                              constraints: const BoxConstraints(minWidth: 16),
+                              decoration: BoxDecoration(
+                                color: primaryColor,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  '$appointmentCount',
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
@@ -466,14 +625,35 @@ class _CalendarPageState extends State<CalendarPage> with TickerProviderStateMix
 
   // [------------- LISTA DE CITAS DEL MES --------------]
   Widget _buildAppointmentsListHeader(bool isDark) {
-    return AnimatedDefaultTextStyle(
-      duration: themeAnimationDuration,
-      style: TextStyle(
-        fontSize: 22,
-        fontWeight: FontWeight.bold,
-        color: isDark ? textColor : Colors.black87,
-      ),
-      child: const Text('Citas del Mes'),
+    return Row(
+      children: [
+        AnimatedDefaultTextStyle(
+          duration: themeAnimationDuration,
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: isDark ? textColor : Colors.black87,
+          ),
+          child: const Text('Citas del Mes'),
+        ),
+        const SizedBox(width: 12),
+        if (_appointments.isNotEmpty)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: primaryColor.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              '${_appointments.length}',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: primaryColor,
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -550,6 +730,10 @@ class _CalendarPageState extends State<CalendarPage> with TickerProviderStateMix
                   child: AppointmentListItem(
                     appointment: appointment,
                     isDark: isDark,
+                    onTap: () {
+                      final appointmentDate = DateTime.parse(appointment['start_time']);
+                      _showAppointmentDetails(appointmentDate);
+                    },
                   ),
                 );
               },
@@ -567,98 +751,731 @@ class _CalendarPageState extends State<CalendarPage> with TickerProviderStateMix
   }
 }
 
+// [------------- COMPONENTE PARA ELEMENTOS DE LA LISTA DE CITAS --------------]
 class AppointmentListItem extends StatelessWidget {
   final Map<String, dynamic> appointment;
   final bool isDark;
+  final VoidCallback? onTap;
 
   const AppointmentListItem({
     super.key,
     required this.appointment,
     required this.isDark,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final startTime = DateTime.parse(appointment['start_time']);
+    final endTime = DateTime.parse(appointment['end_time']);
     final status = appointment['status'] as String;
+    final clientData = appointment['clients'] as Map<String, dynamic>?;
+    final clientName = clientData?['name'] ?? 'Cliente sin nombre';
 
     Color statusColor = primaryColor;
     String statusText = '';
     
     switch (status) {
-      case 'confirmed':
+      case 'confirmada':
         statusColor = confirmedColor;
         statusText = 'Confirmada';
         break;
-      case 'in_progress':
-        statusColor = inProgressColor;
-        statusText = 'En Proceso';
-        break;
-      case 'pending':
+      case 'pendiente':
         statusColor = pendingColor;
         statusText = 'Pendiente';
         break;
-      case 'cancelled':
+      case 'cancelada':
         statusColor = cancelledColor;
         statusText = 'Cancelada';
         break;
+      case 'completa':
+        statusColor = confirmedColor;
+        statusText = 'Completada';
+        break;
     }
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: themeAnimationDuration,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isDark ? Colors.grey[800] : Colors.white,
+          borderRadius: BorderRadius.circular(borderRadius),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 4,
+              height: 50,
+              decoration: BoxDecoration(
+                color: statusColor,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    clientName,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? textColor : Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${DateFormat('HH:mm').format(startTime)} - ${DateFormat('HH:mm').format(endTime)}',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: isDark ? hintColor : Colors.grey[600],
+                    ),
+                  ),
+                  if (appointment['description'] != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        appointment['description'],
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isDark ? hintColor : Colors.grey[500],
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: statusColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: statusColor.withValues(alpha: 0.3),
+                  width: 1,
+                ),
+              ),
+              child: Text(
+                statusText,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: statusColor,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// [------------- COMPONENTE PARA TARJETAS DE DETALLE DE CITAS - CORREGIDO --------------]
+class AppointmentDetailCard extends StatefulWidget {
+  final Map<String, dynamic> appointment;
+  final bool isDark;
+  final VoidCallback? onStatusChanged;
+
+  const AppointmentDetailCard({
+    super.key,
+    required this.appointment,
+    required this.isDark,
+    this.onStatusChanged,
+  });
+
+  @override
+  State<AppointmentDetailCard> createState() => _AppointmentDetailCardState();
+}
+
+class _AppointmentDetailCardState extends State<AppointmentDetailCard> {
+  bool _isUpdating = false;
+
+  // Función auxiliar para formatear precios de forma segura - CORREGIDA PARA DECIMAL
+
+  Future<void> _updateAppointmentStatus(String newStatus) async {
+    if (_isUpdating) return;
+    
+    setState(() {
+      _isUpdating = true;
+    });
+
+    try {
+      final user = Supabase.instance.client.auth.currentUser!;
+      
+      await AppointmentsService.updateAppointmentStatus(
+        appointmentId: widget.appointment['id'],
+        employeeId: user.id,
+        newStatus: newStatus,
+      );
+      
+      if (mounted) {
+        // Actualizar el estado local inmediatamente
+        setState(() {
+          widget.appointment['status'] = newStatus;
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Estado actualizado correctamente'),
+            backgroundColor: successColor,
+            duration: Duration(seconds: 1),
+          ),
+        );
+        
+        // Llamar al callback para actualizar la vista padre
+        widget.onStatusChanged?.call();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al actualizar: ${e.toString()}'),
+            backgroundColor: errorColor,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUpdating = false;
+        });
+      }
+    }
+  }
+
+  void _showStatusChangeDialog() {
+  final currentStatus = widget.appointment['status'] as String;
+  
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      backgroundColor: widget.isDark ? const Color.fromRGBO(15, 19, 21, 0.95) : Colors.white,
+      title: Text(
+        'Cambiar Estado',
+        style: TextStyle(
+          color: widget.isDark ? textColor : Colors.black87,
+        ),
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildStatusOption('pendiente', 'Pendiente', pendingColor, currentStatus),
+          _buildStatusOption('confirmada', 'Confirmada', confirmedColor, currentStatus),
+          _buildStatusOption('completa', 'Completada', confirmedColor, currentStatus),
+          _buildStatusOption('cancelada', 'Cancelada', cancelledColor, currentStatus),
+        ],
+      ),
+    ),
+  );
+}
+
+  Widget _buildStatusOption(String value, String label, Color color, String currentStatus) {
+    final isSelected = value == currentStatus;
+    
+    return ListTile(
+      leading: Container(
+        width: 20,
+        height: 20,
+        decoration: BoxDecoration(
+          color: isSelected ? color : Colors.transparent,
+          shape: BoxShape.circle,
+          border: Border.all(color: color, width: 2),
+        ),
+        child: isSelected 
+          ? const Icon(Icons.check, size: 14, color: Colors.white)
+          : null,
+      ),
+      title: Text(
+        label,
+        style: TextStyle(
+          color: widget.isDark ? textColor : Colors.black87,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        ),
+      ),
+      onTap: () {
+        Navigator.of(context).pop();
+        if (value != currentStatus) {
+          _updateAppointmentStatus(value);
+        }
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final startTime = DateTime.parse(widget.appointment['start_time']);
+    final endTime = DateTime.parse(widget.appointment['end_time']);
+    final status = widget.appointment['status'] as String;
+    final clientData = widget.appointment['clients'] as Map<String, dynamic>?;
+    final clientName = clientData?['name'] ?? 'Cliente sin nombre';
+    final clientPhone = clientData?['phone'];
+    final clientEmail = clientData?['email'];
+    final description = widget.appointment['description'];
+    final notes = widget.appointment['notes'];
+    final price = widget.appointment['price'];
+    final depositPaid = widget.appointment['deposit_paid'];
+
+    Color statusColor = primaryColor;
+    String statusText = '';
+    
+    switch (status) {
+      case 'confirmada':
+        statusColor = confirmedColor;
+        statusText = 'Confirmada';
+        break;
+      case 'en_progreso':
+        statusColor = inProgressColor;
+        statusText = 'En Progreso';
+        break;
+      case 'pendiente':
+        statusColor = pendingColor;
+        statusText = 'Pendiente';
+        break;
+      case 'cancelada':
+        statusColor = cancelledColor;
+        statusText = 'Cancelada';
+        break;
+      case 'completa':
+        statusColor = confirmedColor;
+        statusText = 'Completada';
+        break;
+    }
+
+    final duration = endTime.difference(startTime);
+    final durationText = '${duration.inHours}h ${duration.inMinutes % 60}min';
 
     return AnimatedContainer(
       duration: themeAnimationDuration,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: isDark ? Colors.grey[800] : Colors.white,
+        color: widget.isDark ? Colors.grey[800] : Colors.white,
         borderRadius: BorderRadius.circular(borderRadius),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  appointment['client_name'] ?? 'Cliente',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? textColor : Colors.black87,
+          // Header con información principal
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: primaryColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.person,
+                  color: primaryColor,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      clientName,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: widget.isDark ? textColor : Colors.black87,
+                      ),
+                    ),
+                    Text(
+                      '${DateFormat('HH:mm').format(startTime)} - ${DateFormat('HH:mm').format(endTime)} ($durationText)',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: widget.isDark ? hintColor : Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              GestureDetector(
+                onTap: _isUpdating ? null : _showStatusChangeDialog,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: statusColor.withValues(alpha: 0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_isUpdating)
+                        SizedBox(
+                          width: 12,
+                          height: 12,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(statusColor),
+                          ),
+                        )
+                      else
+                        Text(
+                          statusText,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: statusColor,
+                          ),
+                        ),
+                      if (!_isUpdating) ...[
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.keyboard_arrow_down,
+                          size: 16,
+                          color: statusColor,
+                        ),
+                      ],
+                    ],
                   ),
                 ),
-                const SizedBox(height: 4),
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: 16),
+          const Divider(),
+          const SizedBox(height: 16),
+          
+          // Información de contacto
+          if (clientPhone != null || clientEmail != null) ...[
+            Row(
+              children: [
+                Icon(
+                  Icons.contact_phone,
+                  size: 18,
+                  color: widget.isDark ? hintColor : Colors.grey[600],
+                ),
+                const SizedBox(width: 8),
                 Text(
-                  '${DateFormat('HH:mm').format(startTime)} - ${appointment['service'] ?? 'Servicio'}',
+                  'Contacto',
                   style: TextStyle(
                     fontSize: 14,
-                    color: isDark ? hintColor : Colors.grey[600],
+                    fontWeight: FontWeight.w600,
+                    color: widget.isDark ? textColor : Colors.black87,
                   ),
                 ),
               ],
             ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: statusColor.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: statusColor.withValues(alpha: 0.3),
-                width: 1,
+            const SizedBox(height: 8),
+            if (clientPhone != null)
+              Padding(
+                padding: const EdgeInsets.only(left: 26),
+                child: Text(
+                  'Teléfono: $clientPhone',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: widget.isDark ? hintColor : Colors.grey[600],
+                  ),
+                ),
+              ),
+            if (clientEmail != null)
+              Padding(
+                padding: const EdgeInsets.only(left: 26),
+                child: Text(
+                  'Email: $clientEmail',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: widget.isDark ? hintColor : Colors.grey[600],
+                  ),
+                ),
+              ),
+            const SizedBox(height: 16),
+          ],
+          
+          // Descripción del servicio
+          if (description != null && description.toString().isNotEmpty) ...[
+            Row(
+              children: [
+                Icon(
+                  Icons.description,
+                  size: 18,
+                  color: widget.isDark ? hintColor : Colors.grey[600],
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Servicio',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: widget.isDark ? textColor : Colors.black87,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.only(left: 26),
+              child: Text(
+                description.toString(),
+                style: TextStyle(
+                  fontSize: 14,
+                  color: widget.isDark ? hintColor : Colors.grey[600],
+                ),
               ),
             ),
+            const SizedBox(height: 16),
+          ],
+          
+          // Información financiera - CORREGIDA PARA DECIMAL
+          if (price != null) ...[
+  Row(
+    children: [
+      Icon(
+        Icons.attach_money,
+        size: 18,
+        color: widget.isDark ? hintColor : Colors.grey[600],
+      ),
+      const SizedBox(width: 8),
+      Text(
+        'Información Financiera',
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: widget.isDark ? textColor : Colors.black87,
+        ),
+      ),
+    ],
+  ),
+  const SizedBox(height: 8),
+  Padding(
+    padding: const EdgeInsets.only(left: 26),
+    child: Builder(
+      builder: (context) {
+        // Convertir price y depositPaid a double de forma segura
+        double totalPrice = 0.0;
+        double deposit = 0.0;
+        
+        // Procesar precio total
+        if (price is String) {
+          totalPrice = double.tryParse(price) ?? 0.0;
+        } else if (price is num) {
+          totalPrice = price.toDouble();
+        }
+        
+        // Procesar adelanto
+        if (depositPaid != null) {
+          if (depositPaid is String) {
+            deposit = double.tryParse(depositPaid) ?? 0.0;
+          } else if (depositPaid is num) {
+            deposit = depositPaid.toDouble();
+          }
+        }
+        
+        final pending = totalPrice - deposit;
+        
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Precio total
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: widget.isDark ? Colors.grey[700] : Colors.grey[100],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Total:',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                  ),
+                  Text(
+                    '\$${totalPrice.toStringAsFixed(2)}',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: widget.isDark ? textColor : Colors.black87,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            const SizedBox(height: 8),
+            
+            // Adelanto
+            if (deposit > 0) ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Adelanto pagado:',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: widget.isDark ? hintColor : Colors.grey[600],
+                    ),
+                  ),
+                  Text(
+                    '\$${deposit.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: confirmedColor,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+            ],
+            
+            // Pendiente o estado de pago
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  pending > 0 ? 'Pendiente:' : 'Estado:',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: widget.isDark ? hintColor : Colors.grey[600],
+                  ),
+                ),
+                if (pending > 0)
+                  Text(
+                    '\$${pending.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: pendingColor,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  )
+                else
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.check_circle,
+                        size: 16,
+                        color: confirmedColor,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        deposit > 0 ? 'Pagado completo' : 'Sin adelanto',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: deposit > 0 ? confirmedColor : pendingColor,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ],
+        );
+      },
+    ),
+  ),
+  const SizedBox(height: 16),
+],
+          
+          // Notas adicionales
+          if (notes != null && notes.toString().isNotEmpty) ...[
+            Row(
+              children: [
+                Icon(
+                  Icons.note,
+                  size: 18,
+                  color: widget.isDark ? hintColor : Colors.grey[600],
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Notas',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: widget.isDark ? textColor : Colors.black87,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.only(left: 26),
+              child: Text(
+                notes.toString(),
+                style: TextStyle(
+                  fontSize: 14,
+                  color: widget.isDark ? hintColor : Colors.grey[600],
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// [------------- COMPONENTE PARA NOTIFICACIONES --------------]
+class NotificationsBottomSheet extends StatelessWidget {
+  const NotificationsBottomSheet({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.6,
+      decoration: const BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 40,
+            height: 4,
+            margin: const EdgeInsets.symmetric(vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.grey[600],
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const Padding(
+            padding: EdgeInsets.all(24),
             child: Text(
-              statusText,
+              'Notificaciones',
               style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: statusColor,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: textColor,
+              ),
+            ),
+          ),
+          const Expanded(
+            child: Center(
+              child: Text(
+                'No hay notificaciones',
+                style: TextStyle(
+                  color: hintColor,
+                  fontSize: 16,
+                ),
               ),
             ),
           ),
@@ -668,6 +1485,7 @@ class AppointmentListItem extends StatelessWidget {
   }
 }
 
+// [------------- COMPONENTE PARA FONDO DIFUMINADO --------------]
 class BlurredBackground extends StatelessWidget {
   final bool isDark;
 

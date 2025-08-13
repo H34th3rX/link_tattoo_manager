@@ -8,6 +8,7 @@ import 'appbar.dart';
 import 'package:intl/intl.dart';
 import 'dart:collection';
 import './integrations/clients_service.dart';
+import './integrations/appointments_service.dart';
 
 //[------------- CONSTANTES GLOBALES DE ESTILO --------------]
 const Color primaryColor = Color(0xFFBDA206);
@@ -17,6 +18,7 @@ const Color hintColor = Colors.white70;
 const Color errorColor = Color(0xFFCF6679);
 const Color successColor = Color(0xFF4CAF50);
 const Color confirmedColor = Color(0xFF4CAF50);
+const Color completeColor = Color(0xFF2196F3);
 const Color inProgressColor = Color(0xFFFF9800);
 const Color pendingColor = Color(0xFFFF5722);
 const Color cancelledColor = Color(0xFF9E9E9E);
@@ -43,7 +45,7 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
   LinkedHashMap<String, List<Map<String, dynamic>>> _groupedAppointments = LinkedHashMap();
   List<Map<String, dynamic>> _filteredAppointments = [];
   String _selectedFilter = 'all'; // all, today, week, month
-  String _selectedStatus = 'all'; // all, confirmed, in_progress, pending, cancelled
+  String _selectedStatus = 'all'; // all, confirmada, completa, pendiente, cancelada
   late AnimationController _errorAnimationController;
   late AnimationController _successAnimationController;
 
@@ -120,146 +122,78 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
   }
 
   Future<void> _fetchAppointments() async {
+    if (!mounted) return;
+    
     setState(() {
       _loading = true;
       _error = null;
     });
+    
     try {
-      // Simulación de datos de citas
-      await Future.delayed(const Duration(milliseconds: 500));
+      final user = Supabase.instance.client.auth.currentUser!;
+      
+      List<Map<String, dynamic>> appointments;
+      
+      // Aplicar filtros de fecha y estado
+      if (_selectedFilter != 'all' || _selectedStatus != 'all') {
+        DateTime? startDate;
+        DateTime? endDate;
+        final now = DateTime.now();
+        
+        switch (_selectedFilter) {
+          case 'today':
+            startDate = DateTime(now.year, now.month, now.day);
+            endDate = DateTime(now.year, now.month, now.day, 23, 59, 59);
+            break;
+          case 'week':
+            startDate = now.subtract(Duration(days: now.weekday - 1));
+            endDate = startDate.add(const Duration(days: 6, hours: 23, minutes: 59, seconds: 59));
+            break;
+          case 'month':
+            startDate = DateTime(now.year, now.month, 1);
+            endDate = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
+            break;
+        }
+        
+        appointments = await AppointmentsService.getFilteredAppointments(
+          employeeId: user.id,
+          startDate: startDate,
+          endDate: endDate,
+          status: _selectedStatus,
+        );
+      } else {
+        appointments = await AppointmentsService.getAppointments(user.id);
+      }
+
       if (mounted) {
         setState(() {
-          _appointments = _generateSampleAppointments();
+          _appointments = appointments;
           _filterAppointments();
           _loading = false;
         });
       }
     } catch (e) {
       if (mounted) {
-        _showError('Error al cargar las citas. Verifica tu conexión.');
+        setState(() {
+          _loading = false;
+        });
+        _showError('Error al cargar las citas: ${e.toString()}');
       }
     }
-  }
-
-  List<Map<String, dynamic>> _generateSampleAppointments() {
-    final now = DateTime.now();
-    return [
-      {
-        'id': '1',
-        'client_name': 'María González',
-        'service': 'Tatuaje pequeño de mariposa en muñeca con muchos detalles y colores vibrantes',
-        'start_time': DateTime(now.year, now.month, now.day, 9, 0).toIso8601String(),
-        'duration': 120,
-        'status': 'confirmed',
-        'notes': 'Diseño de mariposa en muñeca, cliente prefiere colores pastel y un estilo delicado. Traer referencias.',
-        'client_phone': '+1 234-567-8901',
-        'client_email': 'maria@email.com',
-      },
-      {
-        'id': '2',
-        'client_name': 'Carlos Ruiz',
-        'service': 'Retoque de tatuaje de brazo completo con sombreado y líneas finas',
-        'start_time': DateTime(now.year, now.month, now.day, 11, 30).toIso8601String(),
-        'duration': 60,
-        'status': 'in_progress',
-        'notes': 'Retoque de colores en brazo, específicamente en la zona del hombro. Cliente quiere un negro más intenso.',
-        'client_phone': '+1 234-567-8902',
-        'client_email': 'carlos@email.com',
-      },
-      {
-        'id': '3',
-        'client_name': 'Ana López',
-        'service': 'Consulta de diseño para un tatuaje grande en la espalda con temática floral',
-        'start_time': DateTime(now.year, now.month, now.day, 14, 30).toIso8601String(),
-        'duration': 30,
-        'status': 'pending',
-        'notes': 'Primera consulta para tatuaje grande en la espalda. Cliente busca un diseño floral con elementos abstractos.',
-        'client_phone': '+1 234-567-8903',
-        'client_email': 'ana@email.com',
-      },
-      {
-        'id': '4',
-        'client_name': 'Luis Martín',
-        'service': 'Tatuaje mediano de un lobo aullando en el antebrazo con estilo realista',
-        'start_time': DateTime(now.year, now.month, now.day + 1, 10, 0).toIso8601String(),
-        'duration': 180,
-        'status': 'confirmed',
-        'notes': 'Diseño geométrico en espalda, con líneas muy definidas y sombreado sutil. Confirmar tamaño final.',
-        'client_phone': '+1 234-567-8904',
-        'client_email': 'luis@email.com',
-      },
-      {
-        'id': '5',
-        'client_name': 'Sofia Herrera',
-        'service': 'Tatuaje grande de un dragón oriental en la pierna con escamas detalladas',
-        'start_time': DateTime(now.year, now.month, now.day - 1, 15, 0).toIso8601String(),
-        'duration': 240,
-        'status': 'cancelled',
-        'notes': 'Cancelado por cliente debido a un viaje inesperado. Reagendar para el próximo mes.',
-        'client_phone': '+1 234-567-8905',
-        'client_email': 'sofia@email.com',
-      },
-      {
-        'id': '6',
-        'client_name': 'Juan Pérez',
-        'service': 'Piercing en la oreja',
-        'start_time': DateTime(now.year, now.month, now.day, 16, 0).toIso8601String(),
-        'duration': 30,
-        'status': 'confirmed',
-        'notes': 'Piercing helix, cliente ya tiene la joya.',
-        'client_phone': '+1 234-567-8906',
-        'client_email': 'juan@email.com',
-      },
-      {
-        'id': '7',
-        'client_name': 'Laura Gómez',
-        'service': 'Diseño de cover-up para tatuaje antiguo en el hombro',
-        'start_time': DateTime(now.year, now.month, now.day + 2, 13, 0).toIso8601String(),
-        'duration': 90,
-        'status': 'pending',
-        'notes': 'Cover-up de un tatuaje tribal. Cliente quiere algo floral y femenino.',
-        'client_phone': '+1 234-567-8907',
-        'client_email': 'laura@email.com',
-      },
-    ];
   }
 
   void _filterAppointments() {
     final query = _searchCtrl.text.toLowerCase();
     List<Map<String, dynamic>> tempFilteredList = _appointments.where((appointment) {
-      final clientName = appointment['client_name']?.toString().toLowerCase() ?? '';
-      final service = appointment['service']?.toString().toLowerCase() ?? '';
-      final notes = appointment['notes']?.toString().toLowerCase() ?? '';
+      final clientName = _getClientName(appointment).toLowerCase();
+      final description = (appointment['description']?.toString() ?? '').toLowerCase();
+      final notes = (appointment['notes']?.toString() ?? '').toLowerCase();
 
       final matchesSearch = clientName.contains(query) ||
-                           service.contains(query) ||
+                           description.contains(query) ||
                            notes.contains(query);
 
-      final matchesStatus = _selectedStatus == 'all' || appointment['status'] == _selectedStatus;
-
-      final appointmentDate = DateTime.parse(appointment['start_time']);
-      final now = DateTime.now();
-      bool matchesDateFilter = true;
-
-      switch (_selectedFilter) {
-        case 'today':
-          matchesDateFilter = appointmentDate.year == now.year &&
-                             appointmentDate.month == now.month &&
-                             appointmentDate.day == now.day;
-          break;
-        case 'week':
-          final weekStart = now.subtract(Duration(days: now.weekday - 1));
-          final weekEnd = weekStart.add(const Duration(days: 6));
-          matchesDateFilter = appointmentDate.isAfter(weekStart.subtract(const Duration(days: 1))) &&
-                             appointmentDate.isBefore(weekEnd.add(const Duration(days: 1)));
-          break;
-        case 'month':
-          matchesDateFilter = appointmentDate.year == now.year &&
-                             appointmentDate.month == now.month;
-          break;
-      }
-
-      return matchesSearch && matchesStatus && matchesDateFilter;
+      return matchesSearch;
     }).toList();
 
     // Ordenar por fecha y hora
@@ -285,13 +219,35 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
     });
   }
 
+  String _getClientName(Map<String, dynamic> appointment) {
+    final clientsData = appointment['clients'];
+    if (clientsData is List && clientsData.isNotEmpty) {
+      return clientsData[0]['name']?.toString() ?? 'Cliente Desconocido';
+    } else if (clientsData is Map) {
+      return clientsData['name']?.toString() ?? 'Cliente Desconocido';
+    }
+    return 'Cliente Desconocido';
+  }
+
+  int _calculateDuration(Map<String, dynamic> appointment) {
+    try {
+      final startTime = DateTime.parse(appointment['start_time']);
+      final endTime = DateTime.parse(appointment['end_time']);
+      return endTime.difference(startTime).inMinutes;
+    } catch (e) {
+      return 60; // Valor por defecto
+    }
+  }
+
   void _showError(String message) {
+    // Verificar mounted before de usar setState
+    if (!mounted) return;
+    
     setState(() {
       _error = message;
-      _loading = false;
     });
     _errorAnimationController.forward().then((_) {
-      Future.delayed(const Duration(seconds: 3), () {
+      Future.delayed(const Duration(seconds: 4), () {
         if (mounted) {
           _errorAnimationController.reverse();
           setState(() => _error = null);
@@ -301,9 +257,12 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
   }
 
   void _showSuccess(String message) {
+    // Verificar mounted before de usar setState y ScaffoldMessenger
+    if (!mounted) return;
+    
     setState(() => _successMessage = message);
     _successAnimationController.forward().then((_) {
-      Future.delayed(const Duration(seconds: 2), () {
+      Future.delayed(const Duration(seconds: 3), () {
         if (mounted) {
           _successAnimationController.reverse();
           setState(() => _successMessage = null);
@@ -349,13 +308,15 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
     });
   }
 
-  void _closePopup() {
+ void _closePopup() {
+  if (mounted) {
     setState(() {
       _isPopupOpen = false;
       _appointmentToEdit = null;
       _initialClientForNewAppointment = null;
     });
   }
+}
 
   void _viewAppointmentDetails(Map<String, dynamic> appointment) {
     showDialog(
@@ -363,17 +324,78 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
       builder: (context) => AppointmentDetailsDialog(
         appointment: appointment,
         isDark: Provider.of<ThemeProvider>(context, listen: false).isDark,
+        onEdit: () {
+          Navigator.of(context).pop();
+          _openEditAppointmentPopup(appointment);
+        },
       ),
     );
   }
 
-  void _deleteAppointment(String id) {
-    _showSuccess('Cita $id eliminada con éxito (simulado).');
-    setState(() {
-      _appointments.removeWhere((app) => app['id'] == id);
-      _filterAppointments();
-    });
+  Future<void> _deleteAppointment(String id) async {
+    try {
+      final user = Supabase.instance.client.auth.currentUser!;
+      
+      // Mostrar diálogo de confirmación
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: Provider.of<ThemeProvider>(context).isDark 
+              ? const Color(0xFF1E1E1E) 
+              : Colors.white,
+          title: Text(
+            'Confirmar eliminación',
+            style: TextStyle(
+              color: Provider.of<ThemeProvider>(context).isDark ? textColor : Colors.black87,
+            ),
+          ),
+          content: Text(
+            '¿Estás seguro de que quieres eliminar esta cita? Esta acción no se puede deshacer.',
+            style: TextStyle(
+              color: Provider.of<ThemeProvider>(context).isDark ? hintColor : Colors.grey[600],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text(
+                'Cancelar',
+                style: TextStyle(
+                  color: Provider.of<ThemeProvider>(context).isDark ? textColor : Colors.black87,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: errorColor,
+              ),
+              child: const Text(
+                'Eliminar',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed == true) {
+        await AppointmentsService.deleteAppointment(id, user.id);
+        _showSuccess('Cita eliminada exitosamente');
+        _fetchAppointments(); // Recargar la lista
+      }
+    } catch (e) {
+      _showError('Error al eliminar la cita: ${e.toString()}');
+    }
   }
+Future<void> _onAppointmentSaved() async {
+  _closePopup(); // Cerrar el popup primero
+  await Future.delayed(const Duration(milliseconds: 100)); // Pequeña pausa
+  if (mounted) {
+    _showSuccess('Cita guardada exitosamente');
+    await _fetchAppointments(); // Actualizar la lista
+  }
+}
 
   //[------------- CONSTRUCCIÓN DE LA INTERFAZ DE USUARIO --------------]
   @override
@@ -439,6 +461,7 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
                         employeeId: user.id,
                         initialAppointment: _appointmentToEdit,
                         initialClientData: _initialClientForNewAppointment,
+                        onSaved: _onAppointmentSaved,
                       ),
                     ),
                   // Mensajes de error y éxito
@@ -688,58 +711,65 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
           _buildFilterChip('Todos', 'all', _selectedFilter, isDark, (value) {
             setState(() {
               _selectedFilter = value;
-              _filterAppointments();
             });
+            _fetchAppointments();
           }),
           const SizedBox(width: 8),
           _buildFilterChip('Hoy', 'today', _selectedFilter, isDark, (value) {
             setState(() {
               _selectedFilter = value;
-              _filterAppointments();
             });
+            _fetchAppointments();
           }),
           const SizedBox(width: 8),
           _buildFilterChip('Esta Semana', 'week', _selectedFilter, isDark, (value) {
             setState(() {
               _selectedFilter = value;
-              _filterAppointments();
             });
+            _fetchAppointments();
           }),
           const SizedBox(width: 8),
           _buildFilterChip('Este Mes', 'month', _selectedFilter, isDark, (value) {
             setState(() {
               _selectedFilter = value;
-              _filterAppointments();
             });
+            _fetchAppointments();
           }),
           const SizedBox(width: 16),
           // Filtros de estado
           _buildStatusFilterChip('Todos', 'all', _selectedStatus, isDark, (value) {
             setState(() {
               _selectedStatus = value;
-              _filterAppointments();
             });
+            _fetchAppointments();
           }),
           const SizedBox(width: 8),
-          _buildStatusFilterChip('Confirmadas', 'confirmed', _selectedStatus, isDark, (value) {
+          _buildStatusFilterChip('Confirmadas', 'confirmada', _selectedStatus, isDark, (value) {
             setState(() {
               _selectedStatus = value;
-              _filterAppointments();
             });
+            _fetchAppointments();
           }),
           const SizedBox(width: 8),
-          _buildStatusFilterChip('En Proceso', 'in_progress', _selectedStatus, isDark, (value) {
+          _buildStatusFilterChip('Completadas', 'completa', _selectedStatus, isDark, (value) {
             setState(() {
               _selectedStatus = value;
-              _filterAppointments();
             });
+            _fetchAppointments();
           }),
           const SizedBox(width: 8),
-          _buildStatusFilterChip('Pendientes', 'pending', _selectedStatus, isDark, (value) {
+          _buildStatusFilterChip('Pendientes', 'pendiente', _selectedStatus, isDark, (value) {
             setState(() {
               _selectedStatus = value;
-              _filterAppointments();
             });
+            _fetchAppointments();
+          }),
+          const SizedBox(width: 8),
+          _buildStatusFilterChip('Canceladas', 'cancelada', _selectedStatus, isDark, (value) {
+            setState(() {
+              _selectedStatus = value;
+            });
+            _fetchAppointments();
           }),
         ],
       ),
@@ -784,16 +814,16 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
     Color chipColor = primaryColor;
 
     switch (value) {
-      case 'confirmed':
+      case 'confirmada':
         chipColor = confirmedColor;
         break;
-      case 'in_progress':
-        chipColor = inProgressColor;
+      case 'completa':
+        chipColor = completeColor;
         break;
-      case 'pending':
+      case 'pendiente':
         chipColor = pendingColor;
         break;
-      case 'cancelled':
+      case 'cancelada':
         chipColor = cancelledColor;
         break;
     }
@@ -829,9 +859,9 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
   }
 
   Widget _buildAppointmentStats(bool isDark) {
-    final confirmedCount = _appointments.where((a) => a['status'] == 'confirmed').length;
-    final inProgressCount = _appointments.where((a) => a['status'] == 'in_progress').length;
-    final pendingCount = _appointments.where((a) => a['status'] == 'pending').length;
+    final confirmedCount = _appointments.where((a) => a['status'] == 'confirmada').length;
+    final completeCount = _appointments.where((a) => a['status'] == 'completa').length;
+    final pendingCount = _appointments.where((a) => a['status'] == 'pendiente').length;
 
     return AnimatedContainer(
       duration: themeAnimationDuration,
@@ -848,7 +878,7 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
         children: [
           _buildStatDot(confirmedColor, confirmedCount),
           const SizedBox(width: 12),
-          _buildStatDot(inProgressColor, inProgressCount),
+          _buildStatDot(completeColor, completeCount),
           const SizedBox(width: 12),
           _buildStatDot(pendingColor, pendingCount),
         ],
@@ -995,6 +1025,8 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
                                     onEdit: () => _openEditAppointmentPopup(appointment),
                                     onDelete: () => _deleteAppointment(appointment['id']),
                                     isLoading: _loading,
+                                    getClientName: _getClientName,
+                                    calculateDuration: _calculateDuration,
                                   ),
                                 );
                               },
@@ -1016,6 +1048,8 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
                                       onEdit: () => _openEditAppointmentPopup(appointment),
                                       onDelete: () => _deleteAppointment(appointment['id']),
                                       isLoading: _loading,
+                                      getClientName: _getClientName,
+                                      calculateDuration: _calculateDuration,
                                     ),
                                   ),
                                 );
@@ -1042,6 +1076,8 @@ class AppointmentCard extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final bool isLoading;
+  final String Function(Map<String, dynamic>) getClientName;
+  final int Function(Map<String, dynamic>) calculateDuration;
 
   const AppointmentCard({
     super.key,
@@ -1051,12 +1087,14 @@ class AppointmentCard extends StatelessWidget {
     required this.onEdit,
     required this.onDelete,
     required this.isLoading,
+    required this.getClientName,
+    required this.calculateDuration,
   });
 
   @override
   Widget build(BuildContext context) {
     final startTime = DateTime.parse(appointment['start_time']);
-    final duration = appointment['duration'] as int;
+    final duration = calculateDuration(appointment);
     final status = appointment['status'] as String;
     final bool isWide = MediaQuery.of(context).size.width >= 800;
 
@@ -1064,19 +1102,19 @@ class AppointmentCard extends StatelessWidget {
     String statusText = '';
 
     switch (status) {
-      case 'confirmed':
+      case 'confirmada':
         statusColor = confirmedColor;
         statusText = 'Confirmada';
         break;
-      case 'in_progress':
-        statusColor = inProgressColor;
-        statusText = 'En Proceso';
+      case 'completa':
+        statusColor = completeColor;
+        statusText = 'Completada';
         break;
-      case 'pending':
+      case 'pendiente':
         statusColor = pendingColor;
         statusText = 'Pendiente';
         break;
-      case 'cancelled':
+      case 'cancelada':
         statusColor = cancelledColor;
         statusText = 'Cancelada';
         break;
@@ -1154,7 +1192,7 @@ class AppointmentCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        appointment['client_name'] ?? 'Cliente',
+                        getClientName(appointment),
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -1162,15 +1200,16 @@ class AppointmentCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        appointment['service'] ?? 'Servicio',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: isDark ? hintColor : Colors.grey[700],
+                      if (appointment['description'] != null && appointment['description'].isNotEmpty)
+                        Text(
+                          appointment['description'],
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: isDark ? hintColor : Colors.grey[700],
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
                       if (appointment['notes'] != null && appointment['notes'].isNotEmpty) ...[
                         const SizedBox(height: 4),
                         Text(
@@ -1181,6 +1220,17 @@ class AppointmentCard extends StatelessWidget {
                           ),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                      if (appointment['price'] != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          '\$${appointment['price']?.toString() ?? '0.00'}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: primaryColor,
+                          ),
                         ),
                       ],
                     ],
@@ -1304,6 +1354,7 @@ class AppointmentPopup extends StatefulWidget {
   final String employeeId;
   final Map<String, dynamic>? initialAppointment;
   final Map<String, dynamic>? initialClientData;
+  final VoidCallback onSaved;
 
   const AppointmentPopup({
     super.key,
@@ -1312,6 +1363,7 @@ class AppointmentPopup extends StatefulWidget {
     required this.employeeId,
     this.initialAppointment,
     this.initialClientData,
+    required this.onSaved,
   });
 
   @override
@@ -1326,19 +1378,23 @@ class _AppointmentPopupState extends State<AppointmentPopup>
   late Animation<Offset> _slideAnimation;
 
   final _formKey = GlobalKey<FormState>();
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
   final _clientNameCtrl = TextEditingController();
   final _clientPhoneCtrl = TextEditingController();
   final _clientEmailCtrl = TextEditingController();
-  final _serviceCtrl = TextEditingController();
+  final _descriptionCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
+  final _priceCtrl = TextEditingController();
+  final _depositCtrl = TextEditingController();
 
   DateTime _selectedDate = DateTime.now();
   TimeOfDay _selectedTime = TimeOfDay.now();
   int _selectedDuration = 60;
-  String _selectedStatus = 'pending';
+  String _selectedStatus = 'pendiente';
 
   Map<String, dynamic>? _selectedClient;
   bool _isClientSelectionPopupOpen = false;
+  bool _isSaving = false;
 
   @override
   void initState() {
@@ -1377,27 +1433,52 @@ class _AppointmentPopupState extends State<AppointmentPopup>
 
     // Rellenar campos si está en modo edición o con datos iniciales de cliente
     if (widget.initialAppointment != null) {
-      _clientNameCtrl.text = widget.initialAppointment!['client_name'] ?? '';
-      _clientPhoneCtrl.text = widget.initialAppointment!['client_phone'] ?? '';
-      _clientEmailCtrl.text = widget.initialAppointment!['client_email'] ?? '';
-      _serviceCtrl.text = widget.initialAppointment!['service'] ?? '';
-      _notesCtrl.text = widget.initialAppointment!['notes'] ?? '';
+      final appointment = widget.initialAppointment!;
+      
+      // Obtener datos del cliente de la relación
+      final clientsData = appointment['clients'];
+      if (clientsData != null) {
+        if (clientsData is List && clientsData.isNotEmpty) {
+          final client = clientsData[0];
+          _clientNameCtrl.text = client['name']?.toString() ?? '';
+          _clientPhoneCtrl.text = client['phone']?.toString() ?? '';
+          _clientEmailCtrl.text = client['email']?.toString() ?? '';
+          _selectedClient = {
+            'id': client['id'],
+            'name': client['name'],
+            'phone': client['phone'],
+            'email': client['email'],
+          };
+        } else if (clientsData is Map) {
+          _clientNameCtrl.text = clientsData['name']?.toString() ?? '';
+          _clientPhoneCtrl.text = clientsData['phone']?.toString() ?? '';
+          _clientEmailCtrl.text = clientsData['email']?.toString() ?? '';
+          _selectedClient = {
+            'id': clientsData['id'],
+            'name': clientsData['name'],
+            'phone': clientsData['phone'],
+            'email': clientsData['email'],
+          };
+        }
+      }
 
-      _selectedDate = DateTime.parse(widget.initialAppointment!['start_time']);
+      _descriptionCtrl.text = appointment['description']?.toString() ?? '';
+      _notesCtrl.text = appointment['notes']?.toString() ?? '';
+      _priceCtrl.text = appointment['price']?.toString() ?? '';
+      _depositCtrl.text = appointment['deposit_paid']?.toString() ?? '0.00';
+
+      _selectedDate = DateTime.parse(appointment['start_time']);
       _selectedTime = TimeOfDay.fromDateTime(_selectedDate);
-      _selectedDuration = widget.initialAppointment!['duration'] ?? 60;
-      _selectedStatus = widget.initialAppointment!['status'] ?? 'pending';
-
-      _selectedClient = {
-        'id': widget.initialAppointment!['client_id'],
-        'name': widget.initialAppointment!['client_name'],
-        'phone': widget.initialAppointment!['client_phone'],
-        'email': widget.initialAppointment!['client_email'],
-      };
+      
+      final startTime = DateTime.parse(appointment['start_time']);
+      final endTime = DateTime.parse(appointment['end_time']);
+      _selectedDuration = endTime.difference(startTime).inMinutes;
+      
+      _selectedStatus = appointment['status'] ?? 'pendiente';
     } else if (widget.initialClientData != null) {
-      _clientNameCtrl.text = widget.initialClientData!['name'] ?? '';
-      _clientPhoneCtrl.text = widget.initialClientData!['phone'] ?? '';
-      _clientEmailCtrl.text = widget.initialClientData!['email'] ?? '';
+      _clientNameCtrl.text = widget.initialClientData!['name']?.toString() ?? '';
+      _clientPhoneCtrl.text = widget.initialClientData!['phone']?.toString() ?? '';
+      _clientEmailCtrl.text = widget.initialClientData!['email']?.toString() ?? '';
       _selectedClient = widget.initialClientData;
     }
   }
@@ -1408,8 +1489,10 @@ class _AppointmentPopupState extends State<AppointmentPopup>
     _clientNameCtrl.dispose();
     _clientPhoneCtrl.dispose();
     _clientEmailCtrl.dispose();
-    _serviceCtrl.dispose();
+    _descriptionCtrl.dispose();
     _notesCtrl.dispose();
+    _priceCtrl.dispose();
+    _depositCtrl.dispose();
     super.dispose();
   }
 
@@ -1428,9 +1511,9 @@ class _AppointmentPopupState extends State<AppointmentPopup>
     setState(() {
       _selectedClient = client;
       if (client != null) {
-        _clientNameCtrl.text = client['name'] ?? '';
-        _clientPhoneCtrl.text = client['phone'] ?? '';
-        _clientEmailCtrl.text = client['email'] ?? '';
+        _clientNameCtrl.text = client['name']?.toString() ?? '';
+        _clientPhoneCtrl.text = client['phone']?.toString() ?? '';
+        _clientEmailCtrl.text = client['email']?.toString() ?? '';
       }
       _isClientSelectionPopupOpen = false;
     });
@@ -1443,6 +1526,139 @@ class _AppointmentPopupState extends State<AppointmentPopup>
       _clientPhoneCtrl.clear();
       _clientEmailCtrl.clear();
     });
+  }
+
+  Future<void> _saveAppointment() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    if (_selectedClient == null) {
+      _showSafeMessage('Debes seleccionar un cliente', isError: true);
+      return;
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      _isSaving = true;
+    });
+
+    try {
+      final selectedDateTime = DateTime(
+        _selectedDate.year,
+        _selectedDate.month,
+        _selectedDate.day,
+        _selectedTime.hour,
+        _selectedTime.minute,
+      );
+
+      final endDateTime = selectedDateTime.add(Duration(minutes: _selectedDuration));
+
+      // Verificar disponibilidad de horario
+      final isAvailable = await AppointmentsService.isTimeSlotAvailable(
+        employeeId: widget.employeeId,
+        startTime: selectedDateTime,
+        endTime: endDateTime,
+        excludeAppointmentId: widget.initialAppointment?['id'],
+      );
+
+      // Verificar mounted after each asynchronous operation
+      if (!mounted) return;
+
+      if (!isAvailable) {
+        if (mounted) {
+          setState(() {
+            _isSaving = false;
+          });
+        }
+        _showSafeMessage('El horario seleccionado no está disponible', isError: true);
+        return;
+      }
+
+      double? price;
+      double? depositPaid;
+
+      if (_priceCtrl.text.isNotEmpty) {
+        price = double.tryParse(_priceCtrl.text);
+      }
+
+      if (_depositCtrl.text.isNotEmpty) {
+        depositPaid = double.tryParse(_depositCtrl.text);
+      }
+
+      // Perform the database operation and verify mounted afterwards
+      if (widget.initialAppointment != null) {
+        // Actualizar cita existente
+        await AppointmentsService.updateAppointment(
+          appointmentId: widget.initialAppointment!['id'],
+          employeeId: widget.employeeId,
+          clientId: _selectedClient!['id'],
+          startTime: selectedDateTime,
+          endTime: endDateTime,
+          description: _descriptionCtrl.text.isEmpty ? null : _descriptionCtrl.text,
+          status: _selectedStatus,
+          price: price,
+          depositPaid: depositPaid ?? 0.00,
+          notes: _notesCtrl.text.isEmpty ? null : _notesCtrl.text,
+        );
+      } else {
+        // Crear nueva cita
+        await AppointmentsService.createAppointment(
+          clientId: _selectedClient!['id'],
+          employeeId: widget.employeeId,
+          startTime: selectedDateTime,
+          endTime: endDateTime,
+          description: _descriptionCtrl.text.isEmpty ? null : _descriptionCtrl.text,
+          status: _selectedStatus,
+          price: price,
+          depositPaid: depositPaid ?? 0.00,
+          notes: _notesCtrl.text.isEmpty ? null : _notesCtrl.text,
+        );
+      }
+
+      // Verify mounted before any operation with context or setState
+      if (!mounted) return;
+
+      // Reset saving state before closing
+      setState(() {
+        _isSaving = false;
+      });
+
+      // Call callback that is responsible for closing the popup and updating
+      widget.onSaved();
+      
+    } catch (e) {
+      // Verify mounted before showing error
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
+      
+      _showSafeMessage('Error al guardar la cita: ${e.toString()}', isError: true);
+    }
+  }
+
+  void _showSafeMessage(String message, {bool isError = false}) {
+    debugPrint('Message: $message');
+    
+    // Only try to show SnackBar if we have a valid scaffold state and are mounted
+    final scaffoldState = _scaffoldKey.currentState;
+    if (scaffoldState != null && mounted) {
+      try {
+        final scaffoldMessenger = ScaffoldMessenger.of(scaffoldState.context);
+        scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: isError ? errorColor : successColor,
+            duration: Duration(seconds: isError ? 4 : 3),
+          ),
+        );
+      } catch (e) {
+        debugPrint('Could not show SnackBar: $e');
+      }
+    }
   }
 
   @override
@@ -1570,7 +1786,7 @@ class _AppointmentPopupState extends State<AppointmentPopup>
           ),
           child: IconButton(
             icon: const Icon(Icons.close),
-            onPressed: _closeWithAnimation,
+            onPressed: _isSaving ? null : _closeWithAnimation,
             color: widget.isDark ? textColor : Colors.black87,
           ),
         ),
@@ -1614,7 +1830,7 @@ class _AppointmentPopupState extends State<AppointmentPopup>
                     tooltip: 'Deseleccionar cliente',
                   ),
                 ElevatedButton.icon(
-                  onPressed: _selectClient,
+                  onPressed: _isSaving ? null : _selectClient,
                   icon: Icon(Icons.search, color: Colors.black, size: 18),
                   label: Text(
                     _selectedClient != null ? 'Cambiar Cliente' : 'Buscar Cliente',
@@ -1710,12 +1926,12 @@ class _AppointmentPopupState extends State<AppointmentPopup>
         ),
         const SizedBox(height: 16),
         TextFormField(
-          controller: _serviceCtrl,
+          controller: _descriptionCtrl,
           style: TextStyle(color: widget.isDark ? textColor : Colors.black87),
-          decoration: _buildInputDecoration('Servicio *', Icons.work_outline),
+          decoration: _buildInputDecoration('Servicio/Descripción *', Icons.work_outline),
           validator: (value) {
             if (value == null || value.isEmpty) {
-              return 'El servicio es requerido';
+              return 'La descripción del servicio es requerida';
             }
             return null;
           },
@@ -1725,7 +1941,7 @@ class _AppointmentPopupState extends State<AppointmentPopup>
           children: [
             Expanded(
               child: GestureDetector(
-                onTap: () async {
+                onTap: _isSaving ? null : () async {
                   final date = await showDatePicker(
                     context: context,
                     initialDate: _selectedDate,
@@ -1768,7 +1984,7 @@ class _AppointmentPopupState extends State<AppointmentPopup>
             const SizedBox(width: 16),
             Expanded(
               child: GestureDetector(
-                onTap: () async {
+                onTap: _isSaving ? null : () async {
                   final time = await showTimePicker(
                     context: context,
                     initialTime: _selectedTime,
@@ -1824,7 +2040,7 @@ class _AppointmentPopupState extends State<AppointmentPopup>
                     child: Text('$duration min'),
                   );
                 }).toList(),
-                onChanged: (value) => setState(() => _selectedDuration = value!),
+                onChanged: _isSaving ? null : (value) => setState(() => _selectedDuration = value!),
               ),
             ),
             const SizedBox(width: 16),
@@ -1836,12 +2052,58 @@ class _AppointmentPopupState extends State<AppointmentPopup>
                 dropdownColor: widget.isDark ? Colors.grey[800] : Colors.white,
                 style: TextStyle(color: widget.isDark ? textColor : Colors.black87),
                 items: const [
-                  DropdownMenuItem(value: 'pending', child: Text('Pendiente')),
-                  DropdownMenuItem(value: 'confirmed', child: Text('Confirmada')),
-                  DropdownMenuItem(value: 'in_progress', child: Text('En Proceso')),
-                  DropdownMenuItem(value: 'cancelled', child: Text('Cancelada')),
+                  DropdownMenuItem(value: 'pendiente', child: Text('Pendiente')),
+                  DropdownMenuItem(value: 'confirmada', child: Text('Confirmada')),
+                  DropdownMenuItem(value: 'completa', child: Text('Completada')),
+                  DropdownMenuItem(value: 'cancelada', child: Text('Cancelada')),
                 ],
-                onChanged: (value) => setState(() => _selectedStatus = value!),
+                onChanged: _isSaving ? null : (value) => setState(() => _selectedStatus = value!),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _priceCtrl,
+                style: TextStyle(color: widget.isDark ? textColor : Colors.black87),
+                decoration: _buildInputDecoration('Precio', Icons.attach_money_outlined),
+                keyboardType: TextInputType.number,
+                validator: (value) {
+                  if (value != null && value.isNotEmpty) {
+                    final price = double.tryParse(value);
+                    if (price == null || price < 0) {
+                      return 'Ingresa un precio válido';
+                    }
+                  }
+                  return null;
+                },
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: TextFormField(
+                controller: _depositCtrl,
+                style: TextStyle(color: widget.isDark ? textColor : Colors.black87),
+                decoration: _buildInputDecoration('Depósito pagado', Icons.payment_outlined),
+                keyboardType: TextInputType.number,
+                validator: (value) {
+                  if (value != null && value.isNotEmpty) {
+                    final deposit = double.tryParse(value);
+                    if (deposit == null || deposit < 0) {
+                      return 'Ingresa un depósito válido';
+                    }
+                    if (_priceCtrl.text.isNotEmpty) {
+                      final price = double.tryParse(_priceCtrl.text);
+                      if (price != null && deposit > price) {
+                        return 'El depósito no puede ser mayor al precio';
+                      }
+                    }
+                  }
+                  return null;
+                },
               ),
             ),
           ],
@@ -1921,7 +2183,7 @@ class _AppointmentPopupState extends State<AppointmentPopup>
               borderRadius: BorderRadius.circular(10),
             ),
             child: TextButton(
-              onPressed: _closeWithAnimation,
+              onPressed: _isSaving ? null : _closeWithAnimation,
               style: TextButton.styleFrom(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 shape: RoundedRectangleBorder(
@@ -1969,12 +2231,7 @@ class _AppointmentPopupState extends State<AppointmentPopup>
               ],
             ),
             child: ElevatedButton(
-              onPressed: () {
-                if (_formKey.currentState!.validate()) {
-                  // Lógica para guardar/actualizar la cita
-                  _closeWithAnimation();
-                }
-              },
+              onPressed: _isSaving ? null : _saveAppointment,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.transparent,
                 shadowColor: Colors.transparent,
@@ -1983,25 +2240,34 @@ class _AppointmentPopupState extends State<AppointmentPopup>
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.save,
-                    color: Colors.black,
-                    size: 18,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    buttonText,
-                    style: const TextStyle(
-                      color: Colors.black,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
+              child: _isSaving
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.black,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.save,
+                          color: Colors.black,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          buttonText,
+                          style: const TextStyle(
+                            color: Colors.black,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
-              ),
             ),
           ),
         ),
@@ -2014,36 +2280,78 @@ class _AppointmentPopupState extends State<AppointmentPopup>
 class AppointmentDetailsDialog extends StatelessWidget {
   final Map<String, dynamic> appointment;
   final bool isDark;
+  final VoidCallback? onEdit;
 
   const AppointmentDetailsDialog({
     super.key,
     required this.appointment,
     required this.isDark,
+    this.onEdit,
   });
+
+  String _getClientName(Map<String, dynamic> appointment) {
+    final clientsData = appointment['clients'];
+    if (clientsData is List && clientsData.isNotEmpty) {
+      return clientsData[0]['name']?.toString() ?? 'Cliente Desconocido';
+    } else if (clientsData is Map) {
+      return clientsData['name']?.toString() ?? 'Cliente Desconocido';
+    }
+    return 'Cliente Desconocido';
+  }
+
+  String _getClientPhone(Map<String, dynamic> appointment) {
+    final clientsData = appointment['clients'];
+    if (clientsData is List && clientsData.isNotEmpty) {
+      return clientsData[0]['phone']?.toString() ?? '';
+    } else if (clientsData is Map) {
+      return clientsData['phone']?.toString() ?? '';
+    }
+    return '';
+  }
+
+  String _getClientEmail(Map<String, dynamic> appointment) {
+    final clientsData = appointment['clients'];
+    if (clientsData is List && clientsData.isNotEmpty) {
+      return clientsData[0]['email']?.toString() ?? '';
+    } else if (clientsData is Map) {
+      return clientsData['email']?.toString() ?? '';
+    }
+    return '';
+  }
+
+  int _calculateDuration(Map<String, dynamic> appointment) {
+    try {
+      final startTime = DateTime.parse(appointment['start_time']);
+      final endTime = DateTime.parse(appointment['end_time']);
+      return endTime.difference(startTime).inMinutes;
+    } catch (e) {
+      return 60; // Valor por defecto
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final startTime = DateTime.parse(appointment['start_time']);
-    final duration = appointment['duration'] as int;
+    final duration = _calculateDuration(appointment);
     final status = appointment['status'] as String;
 
     Color statusColor = primaryColor;
     String statusText = '';
 
     switch (status) {
-      case 'confirmed':
+      case 'confirmada':
         statusColor = confirmedColor;
         statusText = 'Confirmada';
         break;
-      case 'in_progress':
-        statusColor = inProgressColor;
-        statusText = 'En Proceso';
+      case 'completa':
+        statusColor = completeColor;
+        statusText = 'Completada';
         break;
-      case 'pending':
+      case 'pendiente':
         statusColor = pendingColor;
         statusText = 'Pendiente';
         break;
-      case 'cancelled':
+      case 'cancelada':
         statusColor = cancelledColor;
         statusText = 'Cancelada';
         break;
@@ -2136,15 +2444,16 @@ class AppointmentDetailsDialog extends StatelessWidget {
               _buildDetailRow(
                 Icons.person,
                 'Cliente',
-                appointment['client_name'] ?? 'N/A',
+                _getClientName(appointment),
                 isDark,
               ),
-              _buildDetailRow(
-                Icons.work,
-                'Servicio',
-                appointment['service'] ?? 'N/A',
-                isDark,
-              ),
+              if (appointment['description'] != null && appointment['description'].isNotEmpty)
+                _buildDetailRow(
+                  Icons.work,
+                  'Servicio',
+                  appointment['description'],
+                  isDark,
+                ),
               _buildDetailRow(
                 Icons.calendar_today,
                 'Fecha',
@@ -2163,18 +2472,32 @@ class AppointmentDetailsDialog extends StatelessWidget {
                 '$duration minutos',
                 isDark,
               ),
-              if (appointment['client_phone'] != null && appointment['client_phone'].isNotEmpty)
+              if (appointment['price'] != null)
+                _buildDetailRow(
+                  Icons.attach_money,
+                  'Precio',
+                  '\$${appointment['price']?.toString() ?? '0.00'}',
+                  isDark,
+                ),
+              if (appointment['deposit_paid'] != null && appointment['deposit_paid'] > 0)
+                _buildDetailRow(
+                  Icons.payment,
+                  'Depósito pagado',
+                  '\$${appointment['deposit_paid']?.toString() ?? '0.00'}',
+                  isDark,
+                ),
+              if (_getClientPhone(appointment).isNotEmpty)
                 _buildDetailRow(
                   Icons.phone,
                   'Teléfono',
-                  appointment['client_phone'],
+                  _getClientPhone(appointment),
                   isDark,
                 ),
-              if (appointment['client_email'] != null && appointment['client_email'].isNotEmpty)
+              if (_getClientEmail(appointment).isNotEmpty)
                 _buildDetailRow(
                   Icons.email,
                   'Email',
-                  appointment['client_email'],
+                  _getClientEmail(appointment),
                   isDark,
                 ),
               if (appointment['notes'] != null && appointment['notes'].isNotEmpty)
@@ -2200,24 +2523,23 @@ class AppointmentDetailsDialog extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      // Aquí se abriría el popup de edición
-                    },
-                    icon: const Icon(Icons.edit, color: Colors.black),
-                    label: const Text(
-                      'Editar',
-                      style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryColor,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                  if (onEdit != null) ...[
+                    const SizedBox(width: 12),
+                    ElevatedButton.icon(
+                      onPressed: onEdit,
+                      icon: const Icon(Icons.edit, color: Colors.black),
+                      label: const Text(
+                        'Editar',
+                        style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primaryColor,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ],
@@ -2325,6 +2647,12 @@ class _AnimatedAppearanceState extends State<AnimatedAppearance>
         _controller.forward();
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
   }
 
   @override

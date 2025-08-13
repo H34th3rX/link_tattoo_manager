@@ -9,7 +9,7 @@ void clearGoogleCookiesWeb() {
     // Usar JavaScript directo para limpiar cookies de Google
     _clearGoogleCookiesJS();
   } catch (e) {
-    // Si falla, intentar método alternativo
+    // ignore: avoid_print
     print('Error limpiando cookies de Google: $e');
   }
 }
