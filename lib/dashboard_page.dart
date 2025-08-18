@@ -8,6 +8,7 @@ import 'nav_panel.dart';
 import 'theme_provider.dart';
 import 'appbar.dart';
 import './integrations/clients_service.dart';
+import './integrations/appointments_service.dart';
 import './l10n/app_localizations.dart'; // Importar el archivo generado
 
 class DashboardPage extends StatefulWidget {
@@ -229,11 +230,18 @@ class MainContent extends StatefulWidget {
 class _MainContentState extends State<MainContent> {
   late Future<List<dynamic>> _activityData;
   late Future<int> _clientCount;
+  late Future<double> _totalRevenue;
+  late Future<int> _todayConfirmedCount;
+  late Future<Map<String, dynamic>?> _nextConfirmedAppointment;
+  // NUEVO: Agregar datos del gráfico semanal
+  late Future<List<Map<String, dynamic>>> _weeklyRevenueData;
 
   @override
   void initState() {
     super.initState();
     final userId = widget.user.id;
+    
+    // Datos existentes
     _activityData = Future.wait([
       ClientsService.getLatestClient(userId),
       ClientsService.getLatestAppointment(userId),
@@ -250,7 +258,16 @@ class _MainContentState extends State<MainContent> {
       }
       return data;
     });
+    
     _clientCount = ClientsService.getClientCountByEmployee(userId);
+    
+    // Datos dinámicos actualizados
+    _totalRevenue = AppointmentsService.getCompletedAppointmentsRevenue(userId);
+    _todayConfirmedCount = AppointmentsService.getTotalConfirmedAppointmentsCount(userId);
+    _nextConfirmedAppointment = AppointmentsService.getNextConfirmedAppointment(userId);
+    
+    // NUEVO: Cargar datos reales del gráfico semanal
+    _weeklyRevenueData = AppointmentsService.getWeeklyRevenueData(userId);
   }
 
   @override
@@ -281,11 +298,11 @@ class _MainContentState extends State<MainContent> {
                     children: [
                       Expanded(
                         child: StatCard(
-                          title: widget.localizations.appointmentsToday,
-                          value: '8',
-                          icon: Icons.event_available,
-                          isDark: widget.isDark,
-                        ),
+                        title: widget.localizations.appointmentsConfirmed,
+                        valueFuture: _todayConfirmedCount,
+                        icon: Icons.event_available,
+                        isDark: widget.isDark,
+                      ),
                       ),
                       SizedBox(width: spacing),
                       Expanded(
@@ -305,18 +322,19 @@ class _MainContentState extends State<MainContent> {
                   child: Row(
                     children: [
                       Expanded(
-                        child: StatCard(
+                        child: NextAppointmentCard(
                           title: widget.localizations.nextAppointmentShort,
-                          value: '2:30 PM',
+                          appointmentFuture: _nextConfirmedAppointment,
                           icon: Icons.schedule,
                           isDark: widget.isDark,
+                          localizations: widget.localizations,
                         ),
                       ),
                       SizedBox(width: spacing),
                       Expanded(
-                        child: StatCard(
+                        child: RevenueCard(
                           title: widget.localizations.income,
-                          value: '\$12.4K',
+                          revenueFuture: _totalRevenue,
                           icon: Icons.trending_up,
                           isDark: widget.isDark,
                         ),
@@ -391,7 +409,7 @@ class _MainContentState extends State<MainContent> {
                   ),
                 ),
                 const SizedBox(height: 40),
-                // Gráfico de ingresos (delay: 600ms)
+                // Gráfico de ingresos (delay: 600ms) - ACTUALIZADO CON DATOS REALES
                 AnimatedAppearance(
                   delay: 600,
                   child: AnimatedContainer(
@@ -429,72 +447,94 @@ class _MainContentState extends State<MainContent> {
                         const SizedBox(height: 20),
                         SizedBox(
                           height: 220,
-                          child: SfCartesianChart(
-                            plotAreaBorderWidth: 0,
-                            backgroundColor: Colors.transparent,
-                            primaryXAxis: CategoryAxis(
-                              majorGridLines: const MajorGridLines(width: 0),
-                              axisLine: const AxisLine(width: 0),
-                              majorTickLines: const MajorTickLines(size: 0),
-                              labelStyle: TextStyle(
-                                color: widget.isDark ? Colors.white70 : Colors.black87,
-                              ),
-                            ),
-                            primaryYAxis: NumericAxis(
-                              majorGridLines: MajorGridLines(
-                                width: 0.5,
-                                color: widget.isDark ? Colors.grey[700] : Colors.grey[300],
-                                dashArray: const [5, 5],
-                              ),
-                              axisLine: const AxisLine(width: 0),
-                              majorTickLines: const MajorTickLines(size: 0),
-                              labelFormat: '\${value}K',
-                              labelStyle: TextStyle(
-                                color: widget.isDark ? Colors.white70 : Colors.black87,
-                              ),
-                            ),
-                            tooltipBehavior: TooltipBehavior(
-                              enable: true,
-                              canShowMarker: true,
-                              header: '',
-                              format: 'point.x: \$point.yK',
-                            ),
-                            series: <CartesianSeries>[
-                              SplineAreaSeries<_SalesData, String>(
-                                dataSource: [
-                                  _SalesData('Lun', 5.2),
-                                  _SalesData('Mar', 7.8),
-                                  _SalesData('Mié', 6.4),
-                                  _SalesData('Jue', 9.1),
-                                  _SalesData('Vie', 8.7),
-                                  _SalesData('Sáb', 12.4),
-                                  _SalesData('Dom', 4.2),
+                          child: FutureBuilder<List<Map<String, dynamic>>>(
+                            future: _weeklyRevenueData,
+                            builder: (context, snapshot) {
+                              if (snapshot.connectionState == ConnectionState.waiting) {
+                                return const Center(child: CircularProgressIndicator(
+                                  valueColor: AlwaysStoppedAnimation<Color>(ui.Color(0xFFBDA206)),
+                                ));
+                              }
+                              
+                              if (snapshot.hasError) {
+                                return Center(
+                                  child: Text(
+                                    'Error cargando datos',
+                                    style: TextStyle(
+                                      color: widget.isDark ? Colors.white70 : Colors.black87,
+                                    ),
+                                  ),
+                                );
+                              }
+                              
+                              final weeklyData = snapshot.data ?? [];
+                              
+                              // Convertir los datos al formato esperado por el gráfico
+                              final chartData = weeklyData.map((data) => _SalesData(
+                                data['day'] as String,
+                                (data['amount'] as num).toDouble(),
+                              )).toList();
+                              
+                              return SfCartesianChart(
+                                plotAreaBorderWidth: 0,
+                                backgroundColor: Colors.transparent,
+                                primaryXAxis: CategoryAxis(
+                                  majorGridLines: const MajorGridLines(width: 0),
+                                  axisLine: const AxisLine(width: 0),
+                                  majorTickLines: const MajorTickLines(size: 0),
+                                  labelStyle: TextStyle(
+                                    color: widget.isDark ? Colors.white70 : Colors.black87,
+                                  ),
+                                ),
+                                primaryYAxis: NumericAxis(
+                                  majorGridLines: MajorGridLines(
+                                    width: 0.5,
+                                    color: widget.isDark ? Colors.grey[700] : Colors.grey[300],
+                                    dashArray: const [5, 5],
+                                  ),
+                                  axisLine: const AxisLine(width: 0),
+                                  majorTickLines: const MajorTickLines(size: 0),
+                                  labelFormat: '\${value}K',
+                                  labelStyle: TextStyle(
+                                    color: widget.isDark ? Colors.white70 : Colors.black87,
+                                  ),
+                                ),
+                                tooltipBehavior: TooltipBehavior(
+                                  enable: true,
+                                  canShowMarker: true,
+                                  header: '',
+                                  format: 'point.x: \$point.yK',
+                                ),
+                                series: <CartesianSeries>[
+                                  SplineAreaSeries<_SalesData, String>(
+                                    dataSource: chartData,
+                                    xValueMapper: (_SalesData data, _) => data.day,
+                                    yValueMapper: (_SalesData data, _) => data.amount,
+                                    splineType: SplineType.natural,
+                                    cardinalSplineTension: 0.9,
+                                    borderWidth: 3,
+                                    borderColor: const ui.Color(0xFFBDA206),
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        const ui.Color(0xFFBDA206).withValues(alpha: 0.6),
+                                        const ui.Color(0xFFBDA206).withValues(alpha: 0.1),
+                                      ],
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
+                                    ),
+                                    markerSettings: const MarkerSettings(
+                                      isVisible: true,
+                                      shape: DataMarkerType.circle,
+                                      borderWidth: 2,
+                                      borderColor: ui.Color(0xFFBDA206),
+                                      color: Colors.white,
+                                      width: 8,
+                                      height: 8,
+                                    ),
+                                  ),
                                 ],
-                                xValueMapper: (_SalesData data, _) => data.day,
-                                yValueMapper: (_SalesData data, _) => data.amount,
-                                splineType: SplineType.natural,
-                                cardinalSplineTension: 0.9,
-                                borderWidth: 3,
-                                borderColor: const ui.Color(0xFFBDA206),
-                                gradient: LinearGradient(
-                                  colors: [
-                                    const ui.Color(0xFFBDA206).withValues(alpha: 0.6),
-                                    const ui.Color(0xFFBDA206).withValues(alpha: 0.1),
-                                  ],
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                ),
-                                markerSettings: const MarkerSettings(
-                                  isVisible: true,
-                                  shape: DataMarkerType.circle,
-                                  borderWidth: 2,
-                                  borderColor: ui.Color(0xFFBDA206),
-                                  color: Colors.white,
-                                  width: 8,
-                                  height: 8,
-                                ),
-                              ),
-                            ],
+                              );
+                            },
                           ),
                         ),
                       ],
@@ -1032,4 +1072,250 @@ class _SalesData {
   final String day;
   final double amount;
   _SalesData(this.day, this.amount);
+}
+
+class NextAppointmentCard extends StatelessWidget {
+  final String title;
+  final Future<Map<String, dynamic>?> appointmentFuture;
+  final IconData icon;
+  final bool isDark;
+  final AppLocalizations localizations;
+
+  const NextAppointmentCard({
+    super.key,
+    required this.title,
+    required this.appointmentFuture,
+    required this.icon,
+    required this.isDark,
+    required this.localizations,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      height: 100,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.grey[850] : Colors.white.withValues(alpha: 0.95),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const ui.Color(0xFFBDA206).withValues(alpha: 0.3),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: isDark
+                 ? Colors.black.withValues(alpha: 0.3)
+                : Colors.grey.withValues(alpha: 0.15),
+            spreadRadius: 1,
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Flexible(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: isDark ? Colors.grey[400] : Colors.grey[700],
+                    fontWeight: FontWeight.w500,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              Icon(
+                icon,
+                size: 24,
+                color: const ui.Color(0xFFBDA206),
+              ),
+            ],
+          ),
+          FutureBuilder<Map<String, dynamic>?>(
+            future: appointmentFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(ui.Color(0xFFBDA206)),
+                  ),
+                );
+              }
+              
+              if (snapshot.hasError) {
+                return const Text(
+                  'Error',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.red,
+                  ),
+                );
+              }
+              
+              if (snapshot.data == null) {
+                return const Text(
+                  'Sin citas',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: ui.Color(0xFFBDA206),
+                  ),
+                );
+              }
+              
+              final appointment = snapshot.data!;
+              // Mostrar hora UTC (Opción 1)
+              final startTime = DateTime.parse(appointment['start_time']).toUtc();
+              final timeFormat = DateFormat('HH:mm');
+              
+              return Text(
+                timeFormat.format(startTime),
+                style: const TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: ui.Color(0xFFBDA206),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class RevenueCard extends StatelessWidget {
+  final String title;
+  final Future<double> revenueFuture;
+  final IconData icon;
+  final bool isDark;
+
+  const RevenueCard({
+    super.key,
+    required this.title,
+    required this.revenueFuture,
+    required this.icon,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      height: 100,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.grey[850] : Colors.white.withValues(alpha: 0.95),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const ui.Color(0xFFBDA206).withValues(alpha: 0.3),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: isDark
+                 ? Colors.black.withValues(alpha: 0.3)
+                : Colors.grey.withValues(alpha: 0.15),
+            spreadRadius: 1,
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: isDark ? Colors.grey[400] : Colors.grey[700],
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              Icon(
+                icon,
+                size: 24,
+                color: const ui.Color(0xFFBDA206),
+              ),
+            ],
+          ),
+          FutureBuilder<double>(
+            future: revenueFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Text(
+                  '...',
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: ui.Color(0xFFBDA206),
+                  ),
+                );
+              }
+              if (snapshot.hasError) {
+                return const Text(
+                  '\$0',
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: ui.Color(0xFFBDA206),
+                  ),
+                );
+              }
+              final revenue = snapshot.data ?? 0.0;
+              return Text(
+                revenue >= 1000 
+                     ? '\$${(revenue / 1000).toStringAsFixed(1)}K'
+                    : '\$${revenue.toStringAsFixed(0)}',
+                style: const TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: ui.Color(0xFFBDA206),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Falta la clase NotificationsBottomSheet que necesitas definir o importar
+class NotificationsBottomSheet extends StatelessWidget {
+  const NotificationsBottomSheet({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.6,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
+        ),
+      ),
+      child: const Center(
+        child: Text('Notificaciones'),
+      ),
+    );
+  }
 }

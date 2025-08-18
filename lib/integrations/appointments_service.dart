@@ -4,6 +4,35 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class AppointmentsService {
   static final client = Supabase.instance.client;
 
+  static Future<Map> postponeAppointment({
+    required String appointmentId,
+    required String employeeId,
+  }) async {
+    final response = await client
+        .from('appointments')
+        .update({
+          'status': 'aplazada',
+          'updated_at': DateTime.now().toIso8601String(),
+        })
+        .eq('id', appointmentId)
+        .eq('employee_id', employeeId)
+        .select('''
+          *,
+          clients(
+            id,
+            name,
+            phone,
+            email
+          )
+        ''')
+        .single();
+    return response;
+  }
+
+  static List<String> getAvailableStatusesForForm() {
+    return ['pendiente', 'confirmada', 'completa', 'cancelada'];
+  }
+
   //[-------------OPERACIONES CRUD PARA CITAS--------------]
   // Crear una nueva cita en la base de datos
   static Future<Map> createAppointment({
@@ -297,6 +326,7 @@ class AppointmentsService {
       'confirmada': 0,
       'completa': 0,
       'cancelada': 0,
+      'aplazada': 0,
     };
     
     for (final appointment in response) {
@@ -373,7 +403,6 @@ class AppointmentsService {
     return true; // No hay conflictos
   }
 
-
   // Buscar citas por texto
   static Future<List<Map<String, dynamic>>> searchAppointments({
     required String employeeId,
@@ -394,5 +423,152 @@ class AppointmentsService {
         .or('description.ilike.%$searchQuery%,notes.ilike.%$searchQuery%,clients.name.ilike.%$searchQuery%')
         .order('start_time', ascending: true);
     return List<Map<String, dynamic>>.from(response);
+  }
+
+  // Obtener el total de ingresos de citas completadas
+  static Future<double> getCompletedAppointmentsRevenue(String employeeId) async {
+    final response = await client
+        .from('appointments')
+        .select('price')
+        .eq('employee_id', employeeId)
+        .eq('status', 'completa');
+    
+    double total = 0.0;
+    for (final appointment in response) {
+      final price = appointment['price'];
+      if (price != null) {
+        total += (price as num).toDouble();
+      }
+    }
+    
+    return total;
+  }
+
+  // Obtener el conteo total de citas confirmadas
+  static Future<int> getTotalConfirmedAppointmentsCount(String employeeId) async {
+    final response = await client
+        .from('appointments')
+        .select('id')
+        .eq('employee_id', employeeId)
+        .eq('status', 'confirmada');
+    
+    return response.length;
+  }
+
+  // OPCIONAL: Mantener función para citas de hoy si la necesitas en otro lugar
+  static Future<int> getTodayConfirmedAppointmentsCount(String employeeId) async {
+    final now = DateTime.now();
+    final startOfDay = DateTime(now.year, now.month, now.day);
+    final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59);
+    
+    final response = await client
+        .from('appointments')
+        .select('id')
+        .eq('employee_id', employeeId)
+        .eq('status', 'confirmada')
+        .gte('start_time', startOfDay.toIso8601String())
+        .lte('start_time', endOfDay.toIso8601String());
+    
+    return response.length;
+  }
+
+  // CORREGIDO: Obtener la próxima cita confirmada
+  static Future<Map<String, dynamic>?> getNextConfirmedAppointment(String employeeId) async {
+    final now = DateTime.now();
+    
+    final response = await client
+        .from('appointments')
+        .select('''
+          id,
+          start_time,
+          end_time,
+          status,
+          description,
+          clients(
+            id,
+            name
+          )
+        ''')
+        .eq('employee_id', employeeId)
+        .eq('status', 'confirmada')
+        .gte('start_time', now.toIso8601String())  // Removido .toUtc()
+        .order('start_time', ascending: true)
+        .limit(1);
+    
+    if (response.isNotEmpty) {
+      return response.first;  // Removido cast innecesario
+    }
+    
+    return null;
+  }
+
+  // NUEVO: Obtener ingresos de la semana actual de citas completadas
+  static Future<double> getThisWeekCompletedRevenue(String employeeId) async {
+    final now = DateTime.now();
+    
+    // Calcular el inicio y fin de la semana actual (lunes a domingo)
+    final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+    final startOfWeekAtMidnight = DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day);
+    final endOfWeek = startOfWeekAtMidnight.add(const Duration(days: 6, hours: 23, minutes: 59, seconds: 59));
+    
+    final response = await client
+        .from('appointments')
+        .select('price')
+        .eq('employee_id', employeeId)
+        .eq('status', 'completa')  // Solo citas completadas
+        .gte('start_time', startOfWeekAtMidnight.toIso8601String())
+        .lte('start_time', endOfWeek.toIso8601String());
+    
+    double total = 0.0;
+    for (final appointment in response) {
+      final price = appointment['price'];
+      if (price != null) {
+        total += (price as num).toDouble();
+      }
+    }
+    
+    return total;
+  }
+
+  // NUEVO: Obtener datos para el gráfico semanal (últimos 7 días)
+  static Future<List<Map<String, dynamic>>> getWeeklyRevenueData(String employeeId) async {
+    final now = DateTime.now();
+    final weeklyData = <Map<String, dynamic>>[];
+    
+    // Nombres de días en español para el gráfico
+    final dayNames = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+    
+    // Calcular el inicio de la semana actual (lunes)
+    final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+    
+    for (int i = 0; i < 7; i++) {
+      final day = startOfWeek.add(Duration(days: i));
+      final startOfDay = DateTime(day.year, day.month, day.day);
+      final endOfDay = DateTime(day.year, day.month, day.day, 23, 59, 59);
+      
+      final response = await client
+          .from('appointments')
+          .select('price')
+          .eq('employee_id', employeeId)
+          .eq('status', 'completa')
+          .gte('start_time', startOfDay.toIso8601String())
+          .lte('start_time', endOfDay.toIso8601String());
+      
+      double dayTotal = 0.0;
+      for (final appointment in response) {
+        final price = appointment['price'];
+        if (price != null) {
+          dayTotal += (price as num).toDouble();
+        }
+      }
+      
+      weeklyData.add({
+        'day': dayNames[i],
+        'amount': dayTotal / 1000, // Convertir a miles para el gráfico
+        'fullAmount': dayTotal, // Cantidad completa para referencia
+      });
+    }
+    
+    return weeklyData;
   }
 }

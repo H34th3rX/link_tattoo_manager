@@ -5,7 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'nav_panel.dart';
 import 'theme_provider.dart';
 import 'appbar.dart';
-
+import './integrations/reports_service.dart'; // Importar el nuevo servicio
 
 // Constantes globales para la página de reportes
 const Color primaryColor = Color(0xFFBDA206);
@@ -17,67 +17,6 @@ const Color errorColor = Color(0xFFCF6679);
 const Color successColor = Color(0xFF4CAF50);
 const double borderRadius = 12.0;
 const Duration themeAnimationDuration = Duration(milliseconds: 300);
-
-// [------------- DATOS FICTICIOS PARA REPORTES --------------]
-// Lista de reportes simulados con diferentes tipos y parámetros.
-final List<Map<String, dynamic>> _mockReports = [
-  {
-    'id': '1',
-    'title': 'Reporte de Clientes Activos (Julio)',
-    'type': 'clients',
-    'date': '2025-07-01',
-    'parameters': {'include_disabled': false, 'min_clients': 0, 'status_filter': 'active'},
-    'summary': '5 clientes activos, 2 nuevos este mes.',
-  },
-  {
-    'id': '2',
-    'title': 'Ingresos del Mes (Junio)',
-    'type': 'financial',
-    'date': '2025-06-30',
-    'parameters': {'month': 'June', 'year': 2025},
-    'summary': 'Ingresos totales: \$2500.00, 15 transacciones.',
-  },
-  {
-    'id': '3',
-    'title': 'Actividad Semanal (Tatuajes)',
-    'type': 'services',
-    'date': '2025-07-07',
-    'parameters': {'service_type': 'Tatuaje'},
-    'summary': '8 tatuajes realizados, 3 retoques.',
-  },
-  {
-    'id': '4',
-    'title': 'Reporte de Clientes Inactivos',
-    'type': 'clients',
-    'date': '2025-06-15',
-    'parameters': {'include_disabled': true, 'status_filter': 'inactive'},
-    'summary': '3 clientes inactivos, 1 reactivado.',
-  },
-  {
-    'id': '5',
-    'title': 'Citas Canceladas por Mes (Mayo)',
-    'type': 'appointments',
-    'date': '2025-05-31',
-    'parameters': {'status': 'cancelled', 'month': 'May'},
-    'summary': '4 citas canceladas, 2 reagendadas.',
-  },
-  {
-    'id': '6',
-    'title': 'Reporte de Piercings Realizados',
-    'type': 'services',
-    'date': '2025-07-08',
-    'parameters': {'service_type': 'Piercing'},
-    'summary': '10 piercings realizados, 2 con complicaciones menores.',
-  },
-  {
-    'id': '7',
-    'title': 'Ingresos por Servicio (Q2 2025)',
-    'type': 'financial',
-    'date': '2025-06-30',
-    'parameters': {'quarter': 'Q2', 'year': 2025},
-    'summary': 'Tatuajes: \$5000, Piercings: \$1200, Retoques: \$800.',
-  },
-];
 
 class ReportsPage extends StatefulWidget {
   const ReportsPage({super.key});
@@ -92,15 +31,15 @@ class _ReportsPageState extends State<ReportsPage> with TickerProviderStateMixin
   bool _loading = false;
   String? _error;
   String? _successMessage;
-  List<Map<String, dynamic>> _reports = []; // Lista de reportes mostrados
-  List<Map<String, dynamic>> _allReports = _mockReports; // Todos los reportes disponibles
 
   // [------------- ESTADOS DE FILTRO DE REPORTES --------------]
-  String _selectedReportType = 'all'; // 'all', 'clients', 'financial', 'services', 'appointments'
-  bool _includeDisabledClients = false; // Para reportes de clientes
-  int _minClientCount = 0; // Para reportes de clientes
-  String _selectedServiceType = 'all'; // Para reportes de servicios
-  String _selectedMonth = 'all'; // Para reportes financieros/citas
+  String _selectedReportType = 'financial'; // Tipo por defecto
+  String _selectedPeriod = 'monthly'; // 'weekly', 'monthly', 'yearly', 'custom'
+  bool _includeInactiveClients = false;
+  int _minAppointments = 0;
+  String _appointmentStatus = 'all';
+  DateTime? _customStartDate;
+  DateTime? _customEndDate;
 
   late AnimationController _errorAnimationController;
   late AnimationController _successAnimationController;
@@ -117,7 +56,6 @@ class _ReportsPageState extends State<ReportsPage> with TickerProviderStateMixin
       duration: themeAnimationDuration,
       vsync: this,
     );
-    _filterReports(); // Aplicar filtros iniciales
   }
 
   @override
@@ -128,7 +66,6 @@ class _ReportsPageState extends State<ReportsPage> with TickerProviderStateMixin
   }
 
   // [------------- CARGA DE DATOS DE USUARIO --------------]
-  // Obtiene el nombre de usuario del empleado desde Supabase.
   Future<void> _fetchUserData() async {
     try {
       final user = Supabase.instance.client.auth.currentUser!;
@@ -147,50 +84,7 @@ class _ReportsPageState extends State<ReportsPage> with TickerProviderStateMixin
     }
   }
 
-  // [------------- FILTRADO DE REPORTES --------------]
-  // Aplica los filtros seleccionados a la lista de reportes.
-  void _filterReports() {
-    List<Map<String, dynamic>> tempFilteredReports = _allReports.where((report) {
-      bool matchesType = _selectedReportType == 'all' || report['type'] == _selectedReportType;
-      bool matchesClientFilters = true;
-      bool matchesServiceFilters = true;
-      bool matchesFinancialFilters = true;
-
-      // Filtros específicos para reportes de clientes
-      if (report['type'] == 'clients') {
-        if (!_includeDisabledClients && report['parameters']['status_filter'] == 'inactive') {
-          matchesClientFilters = false;
-        }
-        // Simulación de filtro por cantidad de clientes (si el reporte lo tuviera)
-        // if (report['parameters']['client_count'] != null && report['parameters']['client_count'] < _minClientCount) {
-        //   matchesClientFilters = false;
-        // }
-      }
-
-      // Filtros específicos para reportes de servicios
-      if (report['type'] == 'services') {
-        if (_selectedServiceType != 'all' && report['parameters']['service_type'] != _selectedServiceType) {
-          matchesServiceFilters = false;
-        }
-      }
-
-      // Filtros específicos para reportes financieros/citas por mes
-      if ((report['type'] == 'financial' || report['type'] == 'appointments') && _selectedMonth != 'all') {
-        if (report['parameters']['month'] != null && report['parameters']['month'].toLowerCase() != _selectedMonth.toLowerCase()) {
-          matchesFinancialFilters = false;
-        }
-      }
-
-      return matchesType && matchesClientFilters && matchesServiceFilters && matchesFinancialFilters;
-    }).toList();
-
-    setState(() {
-      _reports = tempFilteredReports;
-    });
-  }
-
   // [------------- GESTIÓN DE MENSAJES DE ESTADO --------------]
-  // Muestra un mensaje de error temporal.
   void _showError(String message) {
     setState(() {
       _error = message;
@@ -206,7 +100,7 @@ class _ReportsPageState extends State<ReportsPage> with TickerProviderStateMixin
     });
   }
 
-  // Muestra un mensaje de éxito temporal.
+  // ignore: unused_element
   void _showSuccess(String message) {
     setState(() => _successMessage = message);
     _successAnimationController.forward().then((_) {
@@ -220,7 +114,6 @@ class _ReportsPageState extends State<ReportsPage> with TickerProviderStateMixin
   }
 
   // [------------- LÓGICA DE CIERRE DE SESIÓN --------------]
-  // Cierra la sesión del usuario y navega a la página de inicio de sesión.
   Future<void> _logout() async {
     try {
       await Supabase.instance.client.auth.signOut();
@@ -233,7 +126,6 @@ class _ReportsPageState extends State<ReportsPage> with TickerProviderStateMixin
   }
 
   // [------------- GESTIÓN DE NOTIFICACIONES --------------]
-  // Abre un bottom sheet para mostrar notificaciones.
   void _showNotifications() {
     showModalBottomSheet(
       context: context,
@@ -243,66 +135,96 @@ class _ReportsPageState extends State<ReportsPage> with TickerProviderStateMixin
     );
   }
 
-  // [------------- GENERACIÓN DE NUEVO REPORTE (SIMULADA) --------------]
-  // Abre un diálogo para configurar y "generar" un nuevo reporte.
-  void _generateNewReport() {
+  // [------------- GENERACIÓN DE REPORTE --------------]
+  Future<void> _generateReport() async {
+    final user = Supabase.instance.client.auth.currentUser!;
+    
+    setState(() => _loading = true);
+    
+    try {
+      Map<String, dynamic> reportData;
+      String reportTitle;
+      
+      // Determinar fechas para período personalizado
+      DateTime? startDate = _customStartDate;
+      DateTime? endDate = _customEndDate;
+      
+      if (_selectedPeriod == 'custom' && (startDate == null || endDate == null)) {
+        _showError('Selecciona un rango de fechas válido para el período personalizado');
+        return;
+      }
+
+      switch (_selectedReportType) {
+        case 'financial':
+          reportData = await ReportsService.getFinancialReport(
+            employeeId: user.id,
+            period: _selectedPeriod,
+            startDate: startDate,
+            endDate: endDate,
+          );
+          reportTitle = 'Reporte Financiero';
+          break;
+          
+        case 'clients':
+          reportData = await ReportsService.getClientsReport(
+            employeeId: user.id,
+            includeInactive: _includeInactiveClients,
+            minAppointments: _minAppointments,
+          );
+          reportTitle = 'Reporte de Clientes';
+          break;
+          
+        case 'appointments':
+          reportData = await ReportsService.getAppointmentsReport(
+            employeeId: user.id,
+            period: _selectedPeriod,
+            status: _appointmentStatus == 'all' ? null : _appointmentStatus,
+            startDate: startDate,
+            endDate: endDate,
+          );
+          reportTitle = 'Reporte de Citas';
+          break;
+          
+        case 'services':
+          reportData = await ReportsService.getServicesReport(
+            employeeId: user.id,
+            period: _selectedPeriod,
+            startDate: startDate,
+            endDate: endDate,
+          );
+          reportTitle = 'Reporte de Servicios';
+          break;
+          
+        default:
+          throw Exception('Tipo de reporte no válido');
+      }
+      
+      // Mostrar popup con el reporte
+      if (mounted) {
+        _showReportPopup(reportTitle, reportData);
+      }
+      
+    } catch (e) {
+      _showError('Error al generar el reporte: $e');
+    } finally {
+      setState(() => _loading = false);
+    }
+  }
+
+  // [------------- MOSTRAR POPUP DEL REPORTE --------------]
+  void _showReportPopup(String title, Map<String, dynamic> data) {
+    final bool isWide = MediaQuery.of(context).size.width >= 800;
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    
     showDialog(
       context: context,
-      builder: (context) {
-        final bool isWide = MediaQuery.of(context).size.width >= 800;
-        return ReportGenerationDialog(
-          isDark: Provider.of<ThemeProvider>(context, listen: false).isDark,
-          isWide: isWide, // Pasar el estado isWide al diálogo
-          onGenerate: (reportType, includeDisabled, minClients, serviceType, month) {
-            // Simula la adición de un nuevo reporte a la lista
-            final newReportId = (_allReports.length + 1).toString();
-            String title = '';
-            String summary = '';
-            Map<String, dynamic> parameters = {};
-
-            switch (reportType) {
-              case 'clients':
-                title = 'Reporte de Clientes (${includeDisabled ? 'Todos' : 'Activos'})';
-                summary = '${includeDisabled ? 'Todos' : 'Activos'} los clientes con más de $minClients servicios.';
-                parameters = {'include_disabled': includeDisabled, 'min_clients': minClients, 'status_filter': includeDisabled ? 'all' : 'active'};
-                break;
-              case 'financial':
-                title = 'Reporte Financiero (${month == 'all' ? 'General' : month})';
-                summary = 'Resumen de ingresos y gastos para ${month == 'all' ? 'el período' : 'el mes de $month'}.';
-                parameters = {'month': month, 'year': DateTime.now().year};
-                break;
-              case 'services':
-                title = 'Reporte de Servicios (${serviceType == 'all' ? 'Todos' : serviceType})';
-                summary = 'Análisis de servicios más populares para ${serviceType == 'all' ? 'todos los tipos' : serviceType}.';
-                parameters = {'service_type': serviceType};
-                break;
-              case 'appointments':
-                title = 'Reporte de Citas (${month == 'all' ? 'General' : month})';
-                summary = 'Detalles de citas agendadas y canceladas para ${month == 'all' ? 'el período' : 'el mes de $month'}.';
-                parameters = {'month': month, 'year': DateTime.now().year};
-                break;
-              default:
-                title = 'Reporte Personalizado';
-                summary = 'Reporte generado con opciones personalizadas.';
-                parameters = {};
-                break;
-            }
-
-            setState(() {
-              _allReports.add({
-                'id': newReportId,
-                'title': title,
-                'type': reportType,
-                'date': DateTime.now().toIso8601String().substring(0, 10),
-                'parameters': parameters,
-                'summary': summary,
-              });
-              _filterReports(); // Re-filtrar para incluir el nuevo reporte
-            });
-            _showSuccess('Reporte "$title" generado exitosamente.');
-          },
-        );
-      },
+      builder: (context) => ReportPopup(
+        title: title,
+        data: data,
+        reportType: _selectedReportType,
+        isDark: themeProvider.isDark,
+        isWide: isWide,
+      ),
     );
   }
 
@@ -336,8 +258,6 @@ class _ReportsPageState extends State<ReportsPage> with TickerProviderStateMixin
                 ),
           body: Stack(
             children: [
-              // [------------- FONDO BLURRED --------------]
-              // Fondo con efecto de desenfoque para un diseño moderno.
               BlurredBackground(isDark: isDark),
               isWide
                   ? Row(
@@ -359,7 +279,6 @@ class _ReportsPageState extends State<ReportsPage> with TickerProviderStateMixin
                       ],
                     )
                   : _buildMainContent(isDark, isWide),
-              // Los mensajes de error/éxito ahora se manejan dentro de _buildMainContent
             ],
           ),
         );
@@ -367,8 +286,6 @@ class _ReportsPageState extends State<ReportsPage> with TickerProviderStateMixin
     );
   }
 
-  // [------------- CONSTRUCCIÓN DEL CONTENIDO PRINCIPAL --------------]
-  // Define la estructura principal de la página de reportes, incluyendo los mensajes de estado.
   Widget _buildMainContent(bool isDark, bool isWide) {
     return Stack(
       children: [
@@ -385,170 +302,53 @@ class _ReportsPageState extends State<ReportsPage> with TickerProviderStateMixin
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // [------------- ENCABEZADO DE REPORTES --------------]
-                    // Título, subtítulo y botón para generar nuevo reporte.
                     _buildHeader(isDark),
                     const SizedBox(height: 16),
-                    // [------------- FILTROS DE REPORTES --------------]
-                    // Dropdowns y checkboxes para filtrar la lista de reportes.
                     _buildReportFilters(isDark),
                     const SizedBox(height: 24),
-                    // [------------- LISTA DE REPORTES --------------]
-                    // Muestra las tarjetas de reportes filtrados.
-                    _buildReportsList(isDark),
+                    _buildGenerateButton(isDark),
                   ],
                 ),
               ),
             ),
           ),
         ),
-        // [------------- MENSAJES DE ESTADO (ERROR/ÉXITO) --------------]
-        // Muestra mensajes de error o éxito en la parte inferior del contenedor principal.
-        if (_error != null)
-          Positioned(
-            bottom: 20,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: SlideTransition(
-                position: Tween<Offset>(
-                  begin: const Offset(0, 1),
-                  end: Offset.zero,
-                ).animate(_errorAnimationController),
-                child: Material(
-                  color: Colors.transparent,
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    margin: const EdgeInsets.symmetric(horizontal: 16), // Margen para pantallas pequeñas
-                    decoration: BoxDecoration(
-                      color: errorColor,
-                      borderRadius: BorderRadius.circular(borderRadius),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black26,
-                          blurRadius: 6,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.error, color: Colors.white),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            _error!,
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        if (_successMessage != null)
-          Positioned(
-            bottom: 20,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: SlideTransition(
-                position: Tween<Offset>(
-                  begin: const Offset(0, 1),
-                  end: Offset.zero,
-                ).animate(_successAnimationController),
-                child: Material(
-                  color: Colors.transparent,
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    margin: const EdgeInsets.symmetric(horizontal: 16), // Margen para pantallas pequeñas
-                    decoration: BoxDecoration(
-                      color: successColor,
-                      borderRadius: BorderRadius.circular(borderRadius),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black26,
-                          blurRadius: 6,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.check_circle, color: Colors.white),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            _successMessage!,
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
+        // Mensajes de estado
+        if (_error != null) _buildErrorMessage(),
+        if (_successMessage != null) _buildSuccessMessage(),
       ],
     );
   }
 
-  // Construye el encabezado de la página de reportes.
   Widget _buildHeader(bool isDark) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            AnimatedDefaultTextStyle(
-              duration: themeAnimationDuration,
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                color: isDark ? textColor : Colors.black87,
-              ),
-              child: const Text('Reportes'),
-            ),
-            AnimatedDefaultTextStyle(
-              duration: themeAnimationDuration,
-              style: TextStyle(
-                fontSize: 16,
-                color: isDark ? hintColor : Colors.grey[600],
-              ),
-              child: Text('${_reports.length} reportes disponibles'),
-            ),
-          ],
+        AnimatedDefaultTextStyle(
+          duration: themeAnimationDuration,
+          style: TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.bold,
+            color: isDark ? textColor : Colors.black87,
+          ),
+          child: const Text('Reportes'),
         ),
-        ElevatedButton.icon(
-          onPressed: _loading ? null : _generateNewReport, // Abre el diálogo de generación
-          icon: const Icon(Icons.add, color: Colors.black),
-          label: const Text(
-            'Generar Reporte',
-            style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+        AnimatedDefaultTextStyle(
+          duration: themeAnimationDuration,
+          style: TextStyle(
+            fontSize: 16,
+            color: isDark ? hintColor : Colors.grey[600],
           ),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: primaryColor,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(borderRadius),
-            ),
-            elevation: 4,
-          ),
+          child: const Text('Genera reportes detallados de tu negocio'),
         ),
       ],
     );
   }
 
-  // [------------- CONSTRUCCIÓN DE FILTROS DE REPORTES --------------]
-  // Crea los controles de UI para filtrar los reportes.
   Widget _buildReportFilters(bool isDark) {
     return AnimatedContainer(
       duration: themeAnimationDuration,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: isDark ? Colors.grey[800] : Colors.white,
         borderRadius: BorderRadius.circular(borderRadius),
@@ -564,137 +364,177 @@ class _ReportsPageState extends State<ReportsPage> with TickerProviderStateMixin
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Filtrar Reportes',
+            'Configuración del Reporte',
             style: TextStyle(
-              fontSize: 18,
+              fontSize: 20,
               fontWeight: FontWeight.bold,
               color: isDark ? textColor : Colors.black87,
             ),
           ),
-          const SizedBox(height: 16),
-          // Dropdown para tipo de reporte
+          const SizedBox(height: 20),
+          
+          // Tipo de reporte
           DropdownButtonFormField<String>(
             value: _selectedReportType,
-            decoration: _buildInputDecoration('Tipo de Reporte', Icons.category, isDark, isDropdown: true),
+            decoration: _buildInputDecoration('Tipo de Reporte', Icons.analytics, isDark),
             dropdownColor: isDark ? Colors.grey[800] : Colors.white,
             style: TextStyle(color: isDark ? textColor : Colors.black87),
             items: const [
-              DropdownMenuItem(value: 'all', child: Text('Todos los Tipos')),
-              DropdownMenuItem(value: 'clients', child: Text('Clientes')),
-              DropdownMenuItem(value: 'financial', child: Text('Financieros')),
-              DropdownMenuItem(value: 'services', child: Text('Servicios')),
-              DropdownMenuItem(value: 'appointments', child: Text('Citas')),
+              DropdownMenuItem(value: 'financial', child: Text('Reporte Financiero')),
+              DropdownMenuItem(value: 'clients', child: Text('Reporte de Clientes')),
+              DropdownMenuItem(value: 'appointments', child: Text('Reporte de Citas')),
+              DropdownMenuItem(value: 'services', child: Text('Reporte de Servicios')),
             ],
-            onChanged: (value) {
-              setState(() {
-                _selectedReportType = value!;
-                _filterReports();
-              });
-            },
+            onChanged: (value) => setState(() => _selectedReportType = value!),
           ),
           const SizedBox(height: 16),
-          // Filtros condicionales basados en el tipo de reporte seleccionado
-          if (_selectedReportType == 'clients')
+          
+          // Período (excepto para reporte de clientes)
+          if (_selectedReportType != 'clients')
             Column(
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Incluir clientes inhabilitados:',
-                        style: TextStyle(color: isDark ? textColor : Colors.black87),
-                      ),
-                    ),
-                    Switch(
-                      value: _includeDisabledClients,
-                      onChanged: (value) {
-                        setState(() {
-                          _includeDisabledClients = value;
-                          _filterReports();
-                        });
-                      },
-                      activeColor: primaryColor,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                TextFormField(
-                  initialValue: _minClientCount.toString(),
-                  keyboardType: TextInputType.number,
+                DropdownButtonFormField<String>(
+                  value: _selectedPeriod,
+                  decoration: _buildInputDecoration('Período', Icons.calendar_today, isDark),
+                  dropdownColor: isDark ? Colors.grey[800] : Colors.white,
                   style: TextStyle(color: isDark ? textColor : Colors.black87),
-                  decoration: _buildInputDecoration('Mín. servicios por cliente', Icons.numbers, isDark),
-                  onChanged: (value) {
-                    setState(() {
-                      _minClientCount = int.tryParse(value) ?? 0;
-                      _filterReports();
-                    });
-                  },
+                  items: const [
+                    DropdownMenuItem(value: 'weekly', child: Text('Semanal')),
+                    DropdownMenuItem(value: 'monthly', child: Text('Mensual')),
+                    DropdownMenuItem(value: 'yearly', child: Text('Anual')),
+                    DropdownMenuItem(value: 'custom', child: Text('Personalizado')),
+                  ],
+                  onChanged: (value) => setState(() => _selectedPeriod = value!),
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
+            
+          // Fechas personalizadas
+          if (_selectedPeriod == 'custom' && _selectedReportType != 'clients')
+            Row(
+              children: [
+                Expanded(
+                  child: ListTile(
+                    title: Text(
+                      _customStartDate == null 
+                        ? 'Fecha Inicio' 
+                        : 'Inicio: ${_customStartDate!.day}/${_customStartDate!.month}/${_customStartDate!.year}',
+                      style: TextStyle(color: isDark ? textColor : Colors.black87),
+                    ),
+                    leading: const Icon(Icons.calendar_today, color: primaryColor),
+                    onTap: () async {
+                      final date = await showDatePicker(
+                        context: context,
+                        initialDate: _customStartDate ?? DateTime.now().subtract(const Duration(days: 30)),
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime.now(),
+                      );
+                      if (date != null) setState(() => _customStartDate = date);
+                    },
+                  ),
+                ),
+                Expanded(
+                  child: ListTile(
+                    title: Text(
+                      _customEndDate == null 
+                        ? 'Fecha Fin' 
+                        : 'Fin: ${_customEndDate!.day}/${_customEndDate!.month}/${_customEndDate!.year}',
+                      style: TextStyle(color: isDark ? textColor : Colors.black87),
+                    ),
+                    leading: const Icon(Icons.event, color: primaryColor),
+                    onTap: () async {
+                      final date = await showDatePicker(
+                        context: context,
+                        initialDate: _customEndDate ?? DateTime.now(),
+                        firstDate: _customStartDate ?? DateTime(2020),
+                        lastDate: DateTime.now(),
+                      );
+                      if (date != null) setState(() => _customEndDate = date);
+                    },
+                  ),
                 ),
               ],
             ),
-          if (_selectedReportType == 'services')
+          
+          // Filtros específicos por tipo de reporte
+          if (_selectedReportType == 'clients') ...[
+            SwitchListTile(
+              title: Text(
+                'Incluir clientes inactivos',
+                style: TextStyle(color: isDark ? textColor : Colors.black87),
+              ),
+              value: _includeInactiveClients,
+              onChanged: (value) => setState(() => _includeInactiveClients = value),
+              activeColor: primaryColor,
+            ),
+            TextFormField(
+              initialValue: _minAppointments.toString(),
+              keyboardType: TextInputType.number,
+              style: TextStyle(color: isDark ? textColor : Colors.black87),
+              decoration: _buildInputDecoration('Mínimo de citas', Icons.numbers, isDark),
+              onChanged: (value) => setState(() => _minAppointments = int.tryParse(value) ?? 0),
+            ),
+          ],
+          
+          if (_selectedReportType == 'appointments') ...[
+            const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              value: _selectedServiceType,
-              decoration: _buildInputDecoration('Tipo de Servicio', Icons.design_services, isDark, isDropdown: true),
+              value: _appointmentStatus,
+              decoration: _buildInputDecoration('Estado de Citas', Icons.event_note, isDark),
               dropdownColor: isDark ? Colors.grey[800] : Colors.white,
               style: TextStyle(color: isDark ? textColor : Colors.black87),
               items: const [
-                DropdownMenuItem(value: 'all', child: Text('Todos los Servicios')),
-                DropdownMenuItem(value: 'Tatuaje', child: Text('Tatuaje')),
-                DropdownMenuItem(value: 'Piercing', child: Text('Piercing')),
-                DropdownMenuItem(value: 'Retoque', child: Text('Retoque')),
-                DropdownMenuItem(value: 'Consulta', child: Text('Consulta')),
+                DropdownMenuItem(value: 'all', child: Text('Todos los estados')),
+                DropdownMenuItem(value: 'pendiente', child: Text('Pendientes')),
+                DropdownMenuItem(value: 'confirmada', child: Text('Confirmadas')),
+                DropdownMenuItem(value: 'completa', child: Text('Completadas')),
+                DropdownMenuItem(value: 'cancelada', child: Text('Canceladas')),
+                DropdownMenuItem(value: 'aplazada', child: Text('Aplazadas')),
               ],
-              onChanged: (value) {
-                setState(() {
-                  _selectedServiceType = value!;
-                  _filterReports();
-                });
-              },
+              onChanged: (value) => setState(() => _appointmentStatus = value!),
             ),
-          if (_selectedReportType == 'financial' || _selectedReportType == 'appointments')
-            DropdownButtonFormField<String>(
-              value: _selectedMonth,
-              decoration: _buildInputDecoration('Mes', Icons.calendar_month, isDark, isDropdown: true),
-              dropdownColor: isDark ? Colors.grey[800] : Colors.white,
-              style: TextStyle(color: isDark ? textColor : Colors.black87),
-              items: const [
-                DropdownMenuItem(value: 'all', child: Text('Todos los Meses')),
-                DropdownMenuItem(value: 'January', child: Text('Enero')),
-                DropdownMenuItem(value: 'February', child: Text('Febrero')),
-                DropdownMenuItem(value: 'March', child: Text('Marzo')),
-                DropdownMenuItem(value: 'April', child: Text('Abril')),
-                DropdownMenuItem(value: 'May', child: Text('Mayo')),
-                DropdownMenuItem(value: 'June', child: Text('Junio')),
-                DropdownMenuItem(value: 'July', child: Text('Julio')),
-                DropdownMenuItem(value: 'August', child: Text('Agosto')),
-                DropdownMenuItem(value: 'September', child: Text('Septiembre')),
-                DropdownMenuItem(value: 'October', child: Text('Octubre')),
-                DropdownMenuItem(value: 'November', child: Text('Noviembre')),
-                DropdownMenuItem(value: 'December', child: Text('Diciembre')),
-              ],
-              onChanged: (value) {
-                setState(() {
-                  _selectedMonth = value!;
-                  _filterReports();
-                });
-              },
-            ),
-        // ignore: unnecessary_null_comparison
-        ].where((widget) => widget != null).toList(), // Elimina widgets nulos si no se muestran
+          ],
+        ],
       ),
     );
   }
 
-  // Construye la decoración de entrada para los campos de texto/dropdowns.
-  InputDecoration _buildInputDecoration(String label, IconData icon, bool isDark, {bool isDropdown = false}) {
+  Widget _buildGenerateButton(bool isDark) {
+    return Center(
+      child: ElevatedButton.icon(
+        onPressed: _loading ? null : _generateReport,
+        icon: _loading 
+          ? const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+            )
+          : const Icon(Icons.analytics, color: Colors.black),
+        label: Text(
+          _loading ? 'Generando...' : 'Generar Reporte',
+          style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: primaryColor,
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(borderRadius),
+          ),
+          elevation: 4,
+        ),
+      ),
+    );
+  }
+
+  InputDecoration _buildInputDecoration(String label, IconData icon, bool isDark) {
     return InputDecoration(
       labelText: label,
       labelStyle: TextStyle(
         color: isDark ? hintColor : Colors.grey[600],
         fontSize: 14,
       ),
-      prefixIcon: isDropdown ? null : Container(
+      prefixIcon: Container(
         margin: const EdgeInsets.all(12),
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
@@ -729,214 +569,977 @@ class _ReportsPageState extends State<ReportsPage> with TickerProviderStateMixin
     );
   }
 
-  // [------------- LISTA DE REPORTES --------------]
-  // Muestra la lista de reportes, con mensajes para estados vacíos.
-  Widget _buildReportsList(bool isDark) {
-    if (_loading && _reports.isEmpty) {
-      return const Center(
-        child: CircularProgressIndicator(color: primaryColor),
-      );
+  Widget _buildErrorMessage() {
+    return Positioned(
+      bottom: 20,
+      left: 0,
+      right: 0,
+      child: Center(
+        child: SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0, 1),
+            end: Offset.zero,
+          ).animate(_errorAnimationController),
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                color: errorColor,
+                borderRadius: BorderRadius.circular(borderRadius),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black26,
+                    blurRadius: 6,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.error, color: Colors.white),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      _error!,
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSuccessMessage() {
+    return Positioned(
+      bottom: 20,
+      left: 0,
+      right: 0,
+      child: Center(
+        child: SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0, 1),
+            end: Offset.zero,
+          ).animate(_successAnimationController),
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                color: successColor,
+                borderRadius: BorderRadius.circular(borderRadius),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black26,
+                    blurRadius: 6,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle, color: Colors.white),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      _successMessage!,
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// [------------- FUNCIÓN PARA FORMATEAR PRECIOS --------------]
+// ignore: unused_element
+String _formatPrice(double price) {
+  if (price >= 1000) {
+    return '\$${(price / 1000).toStringAsFixed(1)}K';
+  } else {
+    return '\$${price.toStringAsFixed(0)}';
+  }
+}
+
+// [------------- POPUP DE REPORTE --------------]
+class ReportPopup extends StatelessWidget {
+  final String title;
+  final Map<String, dynamic> data;
+  final String reportType;
+  final bool isDark;
+  final bool isWide;
+
+  const ReportPopup({
+    super.key,
+    required this.title,
+    required this.data,
+    required this.reportType,
+    required this.isDark,
+    required this.isWide,
+  });
+
+  // Función para formatear precios
+  String _formatPrice(double price) {
+    if (price >= 1000) {
+      return '\$${(price / 1000).toStringAsFixed(1)}K';
+    } else {
+      return '\$${price.toStringAsFixed(0)}';
     }
-    if (_reports.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.only(top: 16),
-        child: Center(
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      child: Container(
+        constraints: BoxConstraints(
+          maxWidth: isWide ? 800 : MediaQuery.of(context).size.width * 0.9,
+          maxHeight: MediaQuery.of(context).size.height * 0.8,
+        ),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.3),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header del popup
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: primaryColor,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  topRight: Radius.circular(20),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black,
+                          ),
+                        ),
+                        Text(
+                          _getSubtitle(),
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.black),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+            ),
+            
+            // Contenido del reporte
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: _buildReportContent(),
+              ),
+            ),
+            
+            // Botones de acción
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Funcionalidad de exportación próximamente')),
+                      );
+                    },
+                    icon: const Icon(Icons.download, color: Colors.white),
+                    label: const Text('Exportar PDF', style: TextStyle(color: Colors.white)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blueGrey,
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Funcionalidad de impresión próximamente')),
+                      );
+                    },
+                    icon: const Icon(Icons.print, color: Colors.black),
+                    label: const Text('Imprimir', style: TextStyle(color: Colors.black)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryColor,
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+   String _getSubtitle() {
+    switch (reportType) {
+      case 'financial':
+        final period = data['period'] ?? 'N/A';
+        return 'Período: ${_formatPeriod(period)}';
+      case 'clients':
+        return 'Total de clientes: ${data['total_clients'] ?? 0}';
+      case 'appointments':
+        final period = data['period'] ?? 'N/A';
+        return 'Período: ${_formatPeriod(period)} - Total: ${data['total_appointments'] ?? 0} citas';
+      case 'services':
+        return 'Total de servicios: ${data['total_services'] ?? 0}';
+      default:
+        return '';
+    }
+  }
+
+  String _formatPeriod(String period) {
+    switch (period) {
+      case 'weekly': return 'Semanal';
+      case 'monthly': return 'Mensual';
+      case 'yearly': return 'Anual';
+      case 'custom': return 'Personalizado';
+      default: return period;
+    }
+  }
+
+  Widget _buildReportContent() {
+    switch (reportType) {
+      case 'financial':
+        return _buildFinancialReport();
+      case 'clients':
+        return _buildClientsReport();
+      case 'appointments':
+        return _buildAppointmentsReport();
+      case 'services':
+        return _buildServicesReport();
+      default:
+        return const Text('Tipo de reporte no soportado');
+    }
+  }
+
+  Widget _buildFinancialReport() {
+    final totalRevenue = data['total_revenue'] ?? 0.0;
+    final totalDeposits = data['total_deposits'] ?? 0.0;
+    final pendingRevenue = data['pending_revenue'] ?? 0.0;
+    final totalAppointments = data['total_appointments'] ?? 0;
+    final completedAppointments = data['completed_appointments'] ?? 0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSummaryCards([
+          SummaryCardData(
+            title: 'Ingresos Totales',
+            value: _formatPrice(totalRevenue.toDouble()),
+            icon: Icons.attach_money,
+            color: Colors.green,
+          ),
+          SummaryCardData(
+            title: 'Depósitos Recibidos',
+            value: _formatPrice(totalDeposits.toDouble()),
+            icon: Icons.savings,
+            color: Colors.blue,
+          ),
+          SummaryCardData(
+            title: 'Ingresos Pendientes',
+            value: _formatPrice(pendingRevenue.toDouble()),
+            icon: Icons.schedule,
+            color: Colors.orange,
+          ),
+          SummaryCardData(
+            title: 'Citas Completadas',
+            value: '$completedAppointments/$totalAppointments',
+            icon: Icons.check_circle,
+            color: primaryColor,
+          ),
+        ]),
+        
+        const SizedBox(height: 24),
+        
+        if (data['appointments'] != null && (data['appointments'] as List).isNotEmpty) ...[
+          Text(
+            'Detalles de Transacciones',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: isDark ? textColor : Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 16),
+          _buildTransactionsList(data['appointments'] as List),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildClientsReport() {
+    final totalClients = data['total_clients'] ?? 0;
+    final activeClients = data['active_clients'] ?? 0;
+    final inactiveClients = data['inactive_clients'] ?? 0;
+    final newClientsThisMonth = data['new_clients_this_month'] ?? 0;
+    final avgAppointments = data['average_appointments_per_client'] ?? '0.0';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSummaryCards([
+          SummaryCardData(
+            title: 'Clientes Totales',
+            value: totalClients.toString(),
+            icon: Icons.people,
+            color: Colors.blue,
+          ),
+          SummaryCardData(
+            title: 'Clientes Activos',
+            value: activeClients.toString(),
+            icon: Icons.person,
+            color: Colors.green,
+          ),
+          SummaryCardData(
+            title: 'Clientes Inactivos',
+            value: inactiveClients.toString(),
+            icon: Icons.person_off,
+            color: Colors.red,
+          ),
+          SummaryCardData(
+            title: 'Nuevos Este Mes',
+            value: newClientsThisMonth.toString(),
+            icon: Icons.person_add,
+            color: primaryColor,
+          ),
+        ]),
+        
+        const SizedBox(height: 16),
+        
+        _buildInfoCard('Promedio de Citas por Cliente', avgAppointments, Icons.analytics),
+        
+        const SizedBox(height: 24),
+        
+        if (data['clients'] != null && (data['clients'] as List).isNotEmpty) ...[
+          Text(
+            'Lista de Clientes',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: isDark ? textColor : Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 16),
+          _buildClientsList(data['clients'] as List),
+        ],
+      ],
+    );
+  }
+
+ Widget _buildAppointmentsReport() {
+    final totalAppointments = data['total_appointments'] ?? 0;
+    final statusBreakdown = data['status_breakdown'] as Map<String, int>? ?? {};
+    final totalRevenue = data['total_revenue'] ?? 0.0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSummaryCards([
+          SummaryCardData(
+            title: 'Total de Citas',
+            value: totalAppointments.toString(),
+            icon: Icons.event,
+            color: Colors.blue,
+          ),
+          SummaryCardData(
+            title: 'Completadas',
+            value: statusBreakdown['completa']?.toString() ?? '0',
+            icon: Icons.check_circle,
+            color: Colors.green,
+          ),
+          SummaryCardData(
+            title: 'Canceladas',
+            value: statusBreakdown['cancelada']?.toString() ?? '0',
+            icon: Icons.cancel,
+            color: Colors.red,
+          ),
+          SummaryCardData(
+            title: 'Ingresos Generados',
+            value: _formatPrice(totalRevenue.toDouble()),
+            icon: Icons.attach_money,
+            color: primaryColor,
+          ),
+        ]),
+        
+        const SizedBox(height: 24),
+        
+        Text(
+          'Distribución por Estado',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: isDark ? textColor : Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 16),
+        _buildStatusBreakdown(statusBreakdown),
+        
+        const SizedBox(height: 24),
+        
+        if (data['appointments'] != null && (data['appointments'] as List).isNotEmpty) ...[
+          Text(
+            'Detalles de Citas',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: isDark ? textColor : Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 16),
+          _buildAppointmentsList(data['appointments'] as List),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildServicesReport() {
+    final totalServices = data['total_services'] ?? 0;
+    final uniqueServices = data['unique_services'] ?? 0;
+    final mostPopular = data['most_popular_service'] ?? 'N/A';
+    final servicesBreakdown = data['services_breakdown'] as Map<String, dynamic>? ?? {};
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSummaryCards([
+          SummaryCardData(
+            title: 'Servicios Totales',
+            value: totalServices.toString(),
+            icon: Icons.design_services,
+            color: Colors.blue,
+          ),
+          SummaryCardData(
+            title: 'Tipos Únicos',
+            value: uniqueServices.toString(),
+            icon: Icons.category,
+            color: Colors.green,
+          ),
+          SummaryCardData(
+            title: 'Más Popular',
+            value: mostPopular.length > 15 ? '${mostPopular.substring(0, 15)}...' : mostPopular,
+            icon: Icons.star,
+            color: primaryColor,
+          ),
+        ]),
+        
+        const SizedBox(height: 24),
+        
+        if (servicesBreakdown.isNotEmpty) ...[
+          Text(
+            'Desglose por Servicio',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: isDark ? textColor : Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 16),
+          _buildServicesBreakdown(servicesBreakdown),
+        ],
+      ],
+    );
+  }
+
+ Widget _buildSummaryCards(List<SummaryCardData> cards) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: isWide ? 4 : 2,
+        childAspectRatio: 1.2, // Cambiado de 1.5 a 1.2 para hacer las tarjetas más altas
+        crossAxisSpacing: 16,
+        mainAxisSpacing: 16,
+      ),
+      itemCount: cards.length,
+      itemBuilder: (context, index) {
+        final card = cards[index];
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isDark ? Colors.grey[800] : Colors.grey[50],
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: card.color.withValues(alpha: 0.3)),
+          ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.description_outlined,
-                size: 64,
-                color: isDark ? hintColor : Colors.grey[400],
-              ),
-              const SizedBox(height: 16),
-              AnimatedDefaultTextStyle(
-                duration: themeAnimationDuration,
+              Icon(card.icon, color: card.color, size: 28), // Reducido de 32 a 28
+              const SizedBox(height: 8),
+              Text(
+                card.value,
                 style: TextStyle(
-                  fontSize: 18,
+                  fontSize: 16, // Reducido de 18 a 16
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? textColor : Colors.black87,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                card.title,
+                style: TextStyle(
+                  fontSize: 11, // Reducido de 12 a 11
                   color: isDark ? hintColor : Colors.grey[600],
                 ),
-                child: const Text('No hay reportes registrados'),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: 8),
-              AnimatedDefaultTextStyle(
-                duration: themeAnimationDuration,
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildInfoCard(String title, String value, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.grey[800] : Colors.grey[50],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: primaryColor.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: primaryColor, size: 24),
+          const SizedBox(width: 16),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
                 style: TextStyle(
                   fontSize: 14,
-                  color: isDark ? hintColor : Colors.grey[500],
+                  color: isDark ? hintColor : Colors.grey[600],
                 ),
-                child: const Text(
-                  'Genera tu primer reporte para comenzar o ajusta los filtros.',
-                  textAlign: TextAlign.center,
+              ),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? textColor : Colors.black87,
                 ),
               ),
             ],
           ),
-        ),
-      );
-    }
-    return RefreshIndicator(
-      color: primaryColor,
-      onRefresh: () async {
-        setState(() => _loading = true);
-        await Future.delayed(const Duration(seconds: 1));
-        setState(() {
-          _loading = false;
-          _allReports = _mockReports; // Simulación de recarga de todos los reportes
-          _filterReports(); // Re-aplicar filtros
-        });
-      },
-      child: ListView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: _reports.length,
-        itemBuilder: (context, index) {
-          final report = _reports[index];
-          return AnimatedAppearance(
-            delay: index * 50,
-            child: ReportCard(
-              report: report,
-              isDark: isDark,
-              onView: () {
-                _showSuccess('Reporte "${report['title']}" visualizado (simulado).');
-              },
-              onExport: () {
-                _showSuccess('Reporte "${report['title']}" exportado (simulado).');
-              },
-            ),
-          );
-        },
+        ],
       ),
     );
+  }
+
+ Widget _buildTransactionsList(List transactions) {
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: transactions.length,
+      itemBuilder: (context, index) {
+        final transaction = transactions[index];
+        final startTime = DateTime.tryParse(transaction['start_time'] ?? '');
+        final price = (transaction['price'] as num?)?.toDouble() ?? 0.0;
+        final status = transaction['status'] ?? 'N/A';
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isDark ? Colors.grey[800] : Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: isDark ? Colors.grey[700]! : Colors.grey[200]!),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      startTime != null 
+                        ? '${startTime.day}/${startTime.month}/${startTime.year}'
+                        : 'Fecha N/A',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w500,
+                        color: isDark ? textColor : Colors.black87,
+                      ),
+                    ),
+                    Text(
+                      'Estado: $status',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark ? hintColor : Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                _formatPrice(price),
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: status == 'completa' ? Colors.green : primaryColor,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildClientsList(List clients) {
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: clients.length,
+      itemBuilder: (context, index) {
+        final client = clients[index];
+        final name = client['name'] ?? 'N/A';
+        final totalAppointments = client['total_appointments'] ?? 0;
+        final status = client['status'] ?? false;
+        final registrationDate = DateTime.tryParse(client['registration_date'] ?? '');
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isDark ? Colors.grey[800] : Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: isDark ? Colors.grey[700]! : Colors.grey[200]!),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 12,
+                height: 12,
+                decoration: BoxDecoration(
+                  color: status ? Colors.green : Colors.red,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w500,
+                        color: isDark ? textColor : Colors.black87,
+                      ),
+                    ),
+                    Text(
+                      'Citas: $totalAppointments | Registro: ${registrationDate != null ? '${registrationDate.day}/${registrationDate.month}/${registrationDate.year}' : 'N/A'}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark ? hintColor : Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildStatusBreakdown(Map<String, int> statusBreakdown) {
+    return Column(
+      children: statusBreakdown.entries.map((entry) {
+        final status = entry.key;
+        final count = entry.value;
+        final statusName = _getStatusName(status);
+        final color = _getStatusColor(status);
+        
+        return Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isDark ? Colors.grey[800] : Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: color.withValues(alpha: 0.3)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: color,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    statusName,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w500,
+                      color: isDark ? textColor : Colors.black87,
+                    ),
+                  ),
+                ],
+              ),
+              Text(
+                count.toString(),
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildAppointmentsList(List appointments) {
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: appointments.length,
+      itemBuilder: (context, index) {
+        final appointment = appointments[index];
+        final startTime = DateTime.tryParse(appointment['start_time'] ?? '');
+        final description = appointment['description'] ?? 'Sin descripción';
+        final status = appointment['status'] ?? 'N/A';
+        final price = (appointment['price'] as num?)?.toDouble() ?? 0.0;
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isDark ? Colors.grey[800] : Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: isDark ? Colors.grey[700]! : Colors.grey[200]!),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    startTime != null 
+                      ? '${startTime.day}/${startTime.month}/${startTime.year} ${startTime.hour}:${startTime.minute.toString().padLeft(2, '0')}'
+                      : 'Fecha N/A',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w500,
+                      color: isDark ? textColor : Colors.black87,
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: _getStatusColor(status).withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      _getStatusName(status),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: _getStatusColor(status),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                description,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: isDark ? hintColor : Colors.grey[600],
+                ),
+              ),
+              if (price > 0) ...[
+                const SizedBox(height: 4),
+                Text(
+                  _formatPrice(price),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: primaryColor,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildServicesBreakdown(Map<String, dynamic> servicesBreakdown) {
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: servicesBreakdown.length,
+      itemBuilder: (context, index) {
+        final entry = servicesBreakdown.entries.elementAt(index);
+        final serviceName = entry.key;
+        final serviceData = entry.value as Map<String, dynamic>;
+        final count = serviceData['count'] ?? 0;
+        final totalRevenue = serviceData['total_revenue']?.toDouble() ?? 0.0;
+        final averagePrice = serviceData['average_price']?.toDouble() ?? 0.0;
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isDark ? Colors.grey[800] : Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: isDark ? Colors.grey[700]! : Colors.grey[200]!),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      serviceName,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w500,
+                        color: isDark ? textColor : Colors.black87,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Text(
+                    '$count servicios',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: primaryColor,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Ingresos: ${_formatPrice(totalRevenue)}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark ? hintColor : Colors.grey[600],
+                    ),
+                  ),
+                  Text(
+                    'Promedio: ${_formatPrice(averagePrice)}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark ? hintColor : Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+  String _getStatusName(String status) {
+    switch (status) {
+      case 'pendiente': return 'Pendiente';
+      case 'confirmada': return 'Confirmada';
+      case 'completa': return 'Completada';
+      case 'cancelada': return 'Cancelada';
+      case 'aplazada': return 'Aplazada';
+      default: return status;
+    }
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'pendiente': return Colors.orange;
+      case 'confirmada': return Colors.blue;
+      case 'completa': return Colors.green;
+      case 'cancelada': return Colors.red;
+      case 'aplazada': return Colors.purple;
+      default: return Colors.grey;
+    }
   }
 }
 
-// [------------- WIDGET DE TARJETA DE REPORTE --------------]
-// Muestra los detalles de un reporte en formato de tarjeta.
-class ReportCard extends StatelessWidget {
-  final Map<String, dynamic> report;
-  final bool isDark;
-  final VoidCallback onView;
-  final VoidCallback onExport; // Nuevo callback para exportar
+// [------------- CLASE DE DATOS PARA TARJETAS RESUMEN --------------]
+class SummaryCardData {
+  final String title;
+  final String value;
+  final IconData icon;
+  final Color color;
 
-  const ReportCard({
-    super.key,
-    required this.report,
-    required this.isDark,
-    required this.onView,
-    required this.onExport,
+  SummaryCardData({
+    required this.title,
+    required this.value,
+    required this.icon,
+    required this.color,
   });
-
-  @override
-  Widget build(BuildContext context) {
-    final bool isWide = MediaQuery.of(context).size.width >= 800;
-    final date = report['date'] ?? 'Sin fecha';
-    final title = report['title'] ?? 'Reporte sin título';
-    final summary = report['summary'] ?? 'Sin resumen disponible.';
-
-    return AnimatedContainer(
-      duration: themeAnimationDuration,
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: isDark ? Colors.grey[800] : Colors.white,
-        borderRadius: BorderRadius.circular(borderRadius),
-        border: Border.all(
-          color: isDark ? Colors.grey[700]! : Colors.grey[200]!,
-          width: 0.5,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: isDark ? Colors.black26 : Colors.black.withValues(alpha: 0.08),
-            blurRadius: isDark ? 6 : 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.all(14),
-        leading: Container(
-          width: isWide ? 48 : 44,
-          height: isWide ? 48 : 44,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [primaryColor, primaryColor.withValues(alpha: 0.7)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(isWide ? 24 : 22),
-          ),
-          child: Icon(Icons.description, color: Colors.white, size: isWide ? 32 : 28),
-        ),
-        title: AnimatedDefaultTextStyle(
-          duration: themeAnimationDuration,
-          style: TextStyle(
-            color: isDark ? textColor : Colors.black87,
-            fontWeight: FontWeight.w600,
-            fontSize: 15,
-          ),
-          child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            AnimatedDefaultTextStyle(
-              duration: themeAnimationDuration,
-              style: TextStyle(
-                color: isDark ? hintColor : Colors.grey[600],
-                fontSize: 12,
-              ),
-              child: Text('Fecha: $date', maxLines: 1, overflow: TextOverflow.ellipsis),
-            ),
-            const SizedBox(height: 4),
-            AnimatedDefaultTextStyle(
-              duration: themeAnimationDuration,
-              style: TextStyle(
-                color: isDark ? hintColor : Colors.grey[500],
-                fontSize: 13,
-              ),
-              child: Text(summary, maxLines: 2, overflow: TextOverflow.ellipsis),
-            ),
-          ],
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Botón de Ver
-            ElevatedButton.icon( // Cambiado a ElevatedButton.icon
-              onPressed: onView,
-              icon: const Icon(Icons.visibility, size: 18, color: Colors.black), // Icono de ojo
-              label: const Text('Ver', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryColor,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            // Botón de Exportar
-            ElevatedButton.icon( // Cambiado a ElevatedButton.icon
-              onPressed: onExport,
-              icon: const Icon(Icons.download, size: 18, color: Colors.white), // Icono de descarga
-              label: const Text('Exportar', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: isDark ? Colors.grey[700] : Colors.blueGrey,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 // [------------- WIDGET DE NOTIFICACIONES --------------]
-// Bottom sheet para mostrar notificaciones.
 class NotificationsBottomSheet extends StatelessWidget {
   const NotificationsBottomSheet({super.key});
 
@@ -971,76 +1574,7 @@ class NotificationsBottomSheet extends StatelessWidget {
   }
 }
 
-// [------------- WIDGET DE APARICIÓN ANIMADA --------------]
-// Aplica una animación de deslizamiento y desvanecimiento a su hijo.
-class AnimatedAppearance extends StatefulWidget {
-  final Widget child;
-  final int delay;
-
-  const AnimatedAppearance({
-    super.key,
-    required this.child,
-    this.delay = 0,
-  });
-
-  @override
-  State<AnimatedAppearance> createState() => _AnimatedAppearanceState();
-}
-
-class _AnimatedAppearanceState extends State<AnimatedAppearance>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _opacity;
-  late Animation<Offset> _slideAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 600),
-      vsync: this,
-    );
-    _opacity = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
-    ));
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: const Interval(0.0, 1.0, curve: Curves.easeOut),
-    ));
-    Future.delayed(Duration(milliseconds: widget.delay), () {
-      if (mounted) {
-        _controller.forward();
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SlideTransition(
-      position: _slideAnimation,
-      child: FadeTransition(
-        opacity: _opacity,
-        child: widget.child,
-      ),
-    );
-  }
-}
-
 // [------------- WIDGET DE FONDO BLURRED --------------]
-// Widget reutilizable para el fondo con efecto de desenfoque.
 class BlurredBackground extends StatelessWidget {
   final bool isDark;
   const BlurredBackground({super.key, required this.isDark});
@@ -1055,8 +1589,6 @@ class BlurredBackground extends StatelessWidget {
             image: AssetImage('assets/images/logo.png'),
             fit: BoxFit.cover,
           ),
-          // Puedes añadir un color de fondo si la imagen no cubre todo o para un efecto adicional
-          // color: isDark ? Colors.black.withValues(alpha: 0.5) : Colors.white.withValues(alpha: 0.5),
         ),
         child: BackdropFilter(
           filter: ui.ImageFilter.blur(sigmaX: 8, sigmaY: 8),
@@ -1068,279 +1600,6 @@ class BlurredBackground extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-// [------------- WIDGET DE DIÁLOGO DE GENERACIÓN DE REPORTE --------------]
-// Diálogo para configurar y "generar" un nuevo reporte.
-class ReportGenerationDialog extends StatefulWidget {
-  final bool isDark;
-  final bool isWide; // Nuevo parámetro para el centrado
-  final Function(String reportType, bool includeDisabled, int minClients, String serviceType, String month) onGenerate;
-
-  const ReportGenerationDialog({
-    super.key,
-    required this.isDark,
-    required this.isWide, // Hacerlo requerido
-    required this.onGenerate,
-  });
-
-  @override
-  State<ReportGenerationDialog> createState() => _ReportGenerationDialogState();
-}
-
-class _ReportGenerationDialogState extends State<ReportGenerationDialog> {
-  String _selectedReportType = 'clients'; // Tipo de reporte por defecto
-  bool _includeDisabledClients = false;
-  int _minClientCount = 0;
-  String _selectedServiceType = 'all';
-  String _selectedMonth = 'all';
-
-  @override
-  Widget build(BuildContext context) {
-    final double navPanelWidth = 280; // Ancho del NavPanel
-    final double horizontalMargin = widget.isWide ? navPanelWidth / 2 : 0; // Margen para centrar
-
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      child: Container(
-        margin: EdgeInsets.only(left: horizontalMargin, right: horizontalMargin), // Aplicar margen
-        constraints: const BoxConstraints(maxWidth: 500),
-        decoration: BoxDecoration(
-          color: widget.isDark ? const Color(0xFF1E1E1E) : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.3),
-              blurRadius: 20,
-              offset: const Offset(0, 10),
-            ),
-          ],
-        ),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // [------------- ENCABEZADO DEL DIÁLOGO --------------]
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Generar Nuevo Reporte',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: widget.isDark ? textColor : Colors.black87,
-                    ),
-                  ),
-                  IconButton(
-                    icon: Icon(Icons.close, color: widget.isDark ? textColor : Colors.black87),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              // [------------- SELECCIÓN DE TIPO DE REPORTE --------------]
-              _buildDropdown(
-                label: 'Tipo de Reporte',
-                icon: Icons.category,
-                value: _selectedReportType,
-                items: const [
-                  DropdownMenuItem(value: 'clients', child: Text('Reporte de Clientes')),
-                  DropdownMenuItem(value: 'financial', child: Text('Reporte Financiero')),
-                  DropdownMenuItem(value: 'services', child: Text('Reporte de Servicios')),
-                  DropdownMenuItem(value: 'appointments', child: Text('Reporte de Citas')),
-                ],
-                onChanged: (value) {
-                  setState(() {
-                    _selectedReportType = value!;
-                    // Resetear filtros específicos al cambiar el tipo de reporte
-                    _includeDisabledClients = false;
-                    _minClientCount = 0;
-                    _selectedServiceType = 'all';
-                    _selectedMonth = 'all';
-                  });
-                },
-              ),
-              const SizedBox(height: 16),
-              // [------------- FILTROS ESPECÍFICOS POR TIPO DE REPORTE --------------]
-              if (_selectedReportType == 'clients')
-                Column(
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Incluir clientes inhabilitados:',
-                            style: TextStyle(color: widget.isDark ? textColor : Colors.black87),
-                          ),
-                        ),
-                        Switch(
-                          value: _includeDisabledClients,
-                          onChanged: (value) {
-                            setState(() {
-                              _includeDisabledClients = value;
-                            });
-                          },
-                          activeColor: primaryColor,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      initialValue: _minClientCount.toString(),
-                      keyboardType: TextInputType.number,
-                      style: TextStyle(color: widget.isDark ? textColor : Colors.black87),
-                      decoration: _buildInputDecoration('Mín. servicios por cliente', Icons.group_add), // Nuevo icono
-                      onChanged: (value) {
-                        setState(() {
-                          _minClientCount = int.tryParse(value) ?? 0;
-                        });
-                      },
-                    ),
-                  ],
-                ),
-              if (_selectedReportType == 'services')
-                _buildDropdown(
-                  label: 'Tipo de Servicio',
-                  icon: Icons.design_services,
-                  value: _selectedServiceType,
-                  items: const [
-                    DropdownMenuItem(value: 'all', child: Text('Todos los Servicios')),
-                    DropdownMenuItem(value: 'Tatuaje', child: Text('Tatuaje')),
-                    DropdownMenuItem(value: 'Piercing', child: Text('Piercing')),
-                    DropdownMenuItem(value: 'Retoque', child: Text('Retoque')),
-                    DropdownMenuItem(value: 'Consulta', child: Text('Consulta')),
-                  ],
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedServiceType = value!;
-                    });
-                  },
-                ),
-              if (_selectedReportType == 'financial' || _selectedReportType == 'appointments')
-                _buildDropdown(
-                  label: 'Mes',
-                  icon: Icons.calendar_month,
-                  value: _selectedMonth,
-                  items: const [
-                    DropdownMenuItem(value: 'all', child: Text('Todos los Meses')),
-                    DropdownMenuItem(value: 'January', child: Text('Enero')),
-                    DropdownMenuItem(value: 'February', child: Text('Febrero')),
-                    DropdownMenuItem(value: 'March', child: Text('Marzo')),
-                    DropdownMenuItem(value: 'April', child: Text('Abril')),
-                    DropdownMenuItem(value: 'May', child: Text('Mayo')),
-                    DropdownMenuItem(value: 'June', child: Text('Junio')),
-                    DropdownMenuItem(value: 'July', child: Text('Julio')),
-                    DropdownMenuItem(value: 'August', child: Text('Agosto')),
-                    DropdownMenuItem(value: 'September', child: Text('Septiembre')),
-                    DropdownMenuItem(value: 'October', child: Text('Octubre')),
-                    DropdownMenuItem(value: 'November', child: Text('Noviembre')),
-                    DropdownMenuItem(value: 'December', child: Text('Diciembre')),
-                  ],
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedMonth = value!;
-                    });
-                  },
-                ),
-              const SizedBox(height: 24),
-              // [------------- BOTÓN DE GENERAR REPORTE --------------]
-              Center(
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    widget.onGenerate(
-                      _selectedReportType,
-                      _includeDisabledClients,
-                      _minClientCount,
-                      _selectedServiceType,
-                      _selectedMonth,
-                    );
-                    Navigator.of(context).pop();
-                  },
-                  icon: const Icon(Icons.analytics, color: Colors.black),
-                  label: const Text(
-                    'Generar Reporte',
-                    style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryColor,
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(borderRadius),
-                    ),
-                    elevation: 4,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // Helper para construir DropdownButtonFormField
-  Widget _buildDropdown<T>({
-    required String label,
-    required IconData icon,
-    required T value,
-    required List<DropdownMenuItem<T>> items,
-    required ValueChanged<T?> onChanged,
-  }) {
-    return DropdownButtonFormField<T>(
-      value: value,
-      decoration: _buildInputDecoration(label, icon, isDropdown: true),
-      dropdownColor: widget.isDark ? Colors.grey[800] : Colors.white,
-      style: TextStyle(color: widget.isDark ? textColor : Colors.black87),
-      items: items,
-      onChanged: onChanged,
-    );
-  }
-
-  // Helper para construir InputDecoration
-  InputDecoration _buildInputDecoration(String label, IconData icon, {bool isDropdown = false}) {
-    return InputDecoration(
-      labelText: label,
-      labelStyle: TextStyle(
-        color: widget.isDark ? hintColor : Colors.grey[600],
-        fontSize: 14,
-      ),
-      prefixIcon: isDropdown ? null : Container(
-        margin: const EdgeInsets.all(12),
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: primaryColor.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Icon(
-          icon,
-          color: primaryColor,
-          size: 20,
-        ),
-      ),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(
-          color: widget.isDark ? Colors.grey[600]! : Colors.grey[300]!,
-        ),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(
-          color: widget.isDark ? Colors.grey[600]! : Colors.grey[300]!,
-        ),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: primaryColor, width: 2),
-      ),
-      filled: true,
-      fillColor: widget.isDark ? Colors.grey[800]?.withValues(alpha: 0.5) : Colors.grey[50],
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
     );
   }
 }

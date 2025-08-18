@@ -22,6 +22,7 @@ const Color completeColor = Color(0xFF2196F3);
 const Color inProgressColor = Color(0xFFFF9800);
 const Color pendingColor = Color(0xFFFF5722);
 const Color cancelledColor = Color(0xFF9E9E9E);
+const Color postponedColor = Color(0xFF9C27B0); // Color morado para aplazadas
 const double borderRadius = 12.0;
 const Duration themeAnimationDuration = Duration(milliseconds: 300);
 
@@ -52,6 +53,9 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
   // Datos para el modo de edición o precarga de nueva cita
   Map<String, dynamic>? _appointmentToEdit;
   Map<String, dynamic>? _initialClientForNewAppointment;
+  bool _isPostponedAppointment = false; // Flag para identificar citas aplazadas
+  // Nuevo: información para el proceso de aplazamiento
+  Map<String, dynamic>? _originalAppointmentToPostpone;
 
   // Flag para asegurar que el popup se abra solo una vez al navegar
   bool _hasProcessedInitialPopup = false;
@@ -292,10 +296,11 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
   }
 
   //[------------- MÉTODOS DE GESTIÓN DE POPUPS Y CITAS --------------]
-  void _openCreateAppointmentPopup({Map<String, dynamic>? clientData}) {
+  void _openCreateAppointmentPopup({Map<String, dynamic>? clientData, bool isPostponed = false}) {
     setState(() {
       _appointmentToEdit = null;
       _initialClientForNewAppointment = clientData;
+      _isPostponedAppointment = isPostponed;
       _isPopupOpen = true;
     });
   }
@@ -304,19 +309,23 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
     setState(() {
       _appointmentToEdit = appointment;
       _initialClientForNewAppointment = null;
+      _isPostponedAppointment = false;
+      _originalAppointmentToPostpone = null; // Limpiar cualquier referencia de aplazamiento
       _isPopupOpen = true;
     });
   }
 
- void _closePopup() {
-  if (mounted) {
-    setState(() {
-      _isPopupOpen = false;
-      _appointmentToEdit = null;
-      _initialClientForNewAppointment = null;
-    });
+  void _closePopup() {
+    if (mounted) {
+      setState(() {
+        _isPopupOpen = false;
+        _appointmentToEdit = null;
+        _initialClientForNewAppointment = null;
+        _isPostponedAppointment = false;
+        _originalAppointmentToPostpone = null; // Limpiar referencia de aplazamiento
+      });
+    }
   }
-}
 
   void _viewAppointmentDetails(Map<String, dynamic> appointment) {
     showDialog(
@@ -388,14 +397,138 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
       _showError('Error al eliminar la cita: ${e.toString()}');
     }
   }
-Future<void> _onAppointmentSaved() async {
-  _closePopup(); // Cerrar el popup primero
-  await Future.delayed(const Duration(milliseconds: 100)); // Pequeña pausa
-  if (mounted) {
-    _showSuccess('Cita guardada exitosamente');
-    await _fetchAppointments(); // Actualizar la lista
+
+  // Método mejorado para aplazar citas - ahora no marca inmediatamente como aplazada
+  Future<void> _postponeAppointment(Map<String, dynamic> appointment) async {
+    try {
+      // Mostrar diálogo de confirmación
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: Provider.of<ThemeProvider>(context).isDark 
+              ? const Color(0xFF1E1E1E) 
+              : Colors.white,
+          title: Text(
+            'Aplazar Cita',
+            style: TextStyle(
+              color: Provider.of<ThemeProvider>(context).isDark ? textColor : Colors.black87,
+            ),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '¿Deseas aplazar esta cita?',
+                style: TextStyle(
+                  color: Provider.of<ThemeProvider>(context).isDark ? textColor : Colors.black87,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Podrás programar una nueva fecha con el mismo cliente. La cita actual se marcará como aplazada solo si confirmas la nueva cita.',
+                style: TextStyle(
+                  color: Provider.of<ThemeProvider>(context).isDark ? hintColor : Colors.grey[600],
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text(
+                'Cancelar',
+                style: TextStyle(
+                  color: Provider.of<ThemeProvider>(context).isDark ? textColor : Colors.black87,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: postponedColor,
+              ),
+              child: const Text(
+                'Continuar',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed == true) {
+        // Preparar datos del cliente para la nueva cita
+        final clientsData = appointment['clients'];
+        Map<String, dynamic>? clientData;
+        
+        if (clientsData is List && clientsData.isNotEmpty) {
+          clientData = {
+            'id': clientsData[0]['id'],
+            'name': clientsData[0]['name'],
+            'phone': clientsData[0]['phone'],
+            'email': clientsData[0]['email'],
+          };
+        } else if (clientsData is Map) {
+          clientData = {
+            'id': clientsData['id'],
+            'name': clientsData['name'],
+            'phone': clientsData['phone'],
+            'email': clientsData['email'],
+          };
+        }
+
+        // Guardar referencia de la cita original para aplazarla después
+        setState(() {
+          _originalAppointmentToPostpone = appointment;
+        });
+
+        // Abrir popup para nueva cita con datos del cliente bloqueados
+        if (clientData != null) {
+          _openCreateAppointmentPopup(clientData: clientData, isPostponed: true);
+        }
+      }
+    } catch (e) {
+      _showError('Error al iniciar el proceso de aplazamiento: ${e.toString()}');
+    }
   }
-}
+
+  Future<void> _onAppointmentSaved() async {
+    try {
+      // Si es una cita de reemplazo (aplazamiento), marcar la original como aplazada
+      if (_originalAppointmentToPostpone != null) {
+        final user = Supabase.instance.client.auth.currentUser!;
+        
+        await AppointmentsService.postponeAppointment(
+          appointmentId: _originalAppointmentToPostpone!['id'],
+          employeeId: user.id,
+        );
+        
+        _showSuccess('Cita original aplazada y nueva cita creada exitosamente');
+      } else {
+        _showSuccess('Cita guardada exitosamente');
+      }
+    } catch (e) {
+      _showError('Error al finalizar el proceso: ${e.toString()}');
+    } finally {
+      _closePopup(); // Cerrar el popup
+      await Future.delayed(const Duration(milliseconds: 100)); // Pequeña pausa
+      if (mounted) {
+        await _fetchAppointments(); // Actualizar la lista
+      }
+    }
+  }
+
+  // Método para cancelar el aplazamiento
+  void _onAppointmentCancelled() {
+    setState(() {
+      _originalAppointmentToPostpone = null; // Limpiar la referencia
+    });
+    _closePopup();
+  }
 
   //[------------- CONSTRUCCIÓN DE LA INTERFAZ DE USUARIO --------------]
   @override
@@ -456,11 +589,12 @@ Future<void> _onAppointmentSaved() async {
                     Positioned.fill(
                       left: isWide ? 280 : 0,
                       child: AppointmentPopup(
-                        onClose: _closePopup,
+                        onClose: _onAppointmentCancelled, // Usar el método de cancelación
                         isDark: isDark,
                         employeeId: user.id,
                         initialAppointment: _appointmentToEdit,
                         initialClientData: _initialClientForNewAppointment,
+                        isPostponedAppointment: _isPostponedAppointment,
                         onSaved: _onAppointmentSaved,
                       ),
                     ),
@@ -771,6 +905,13 @@ Future<void> _onAppointmentSaved() async {
             });
             _fetchAppointments();
           }),
+          const SizedBox(width: 8),
+          _buildStatusFilterChip('Aplazadas', 'aplazada', _selectedStatus, isDark, (value) {
+            setState(() {
+              _selectedStatus = value;
+            });
+            _fetchAppointments();
+          }),
         ],
       ),
     );
@@ -825,6 +966,9 @@ Future<void> _onAppointmentSaved() async {
         break;
       case 'cancelada':
         chipColor = cancelledColor;
+        break;
+      case 'aplazada':
+        chipColor = postponedColor;
         break;
     }
 
@@ -1024,6 +1168,7 @@ Future<void> _onAppointmentSaved() async {
                                     onView: () => _viewAppointmentDetails(appointment),
                                     onEdit: () => _openEditAppointmentPopup(appointment),
                                     onDelete: () => _deleteAppointment(appointment['id']),
+                                    onPostpone: () => _postponeAppointment(appointment),
                                     isLoading: _loading,
                                     getClientName: _getClientName,
                                     calculateDuration: _calculateDuration,
@@ -1047,6 +1192,7 @@ Future<void> _onAppointmentSaved() async {
                                       onView: () => _viewAppointmentDetails(appointment),
                                       onEdit: () => _openEditAppointmentPopup(appointment),
                                       onDelete: () => _deleteAppointment(appointment['id']),
+                                      onPostpone: () => _postponeAppointment(appointment),
                                       isLoading: _loading,
                                       getClientName: _getClientName,
                                       calculateDuration: _calculateDuration,
@@ -1075,6 +1221,7 @@ class AppointmentCard extends StatelessWidget {
   final VoidCallback onView;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final VoidCallback onPostpone;
   final bool isLoading;
   final String Function(Map<String, dynamic>) getClientName;
   final int Function(Map<String, dynamic>) calculateDuration;
@@ -1086,6 +1233,7 @@ class AppointmentCard extends StatelessWidget {
     required this.onView,
     required this.onEdit,
     required this.onDelete,
+    required this.onPostpone,
     required this.isLoading,
     required this.getClientName,
     required this.calculateDuration,
@@ -1118,11 +1266,18 @@ class AppointmentCard extends StatelessWidget {
         statusColor = cancelledColor;
         statusText = 'Cancelada';
         break;
+      case 'aplazada':
+        statusColor = postponedColor;
+        statusText = 'Aplazada';
+        break;
     }
 
     final Color cardBgColor = isDark ? Colors.grey[800]! : Colors.white;
     final Color cardBorderColor = isDark ? Colors.grey[700]! : Colors.grey[200]!;
     final Color shadowColor = isDark ? Colors.black26 : Colors.black.withValues(alpha: 0.08);
+
+    // No mostrar el botón de aplazar si la cita ya está aplazada o cancelada
+    final bool canPostpone = status != 'aplazada' && status != 'cancelada' && status != 'completa';
 
     return AnimatedContainer(
       duration: themeAnimationDuration,
@@ -1336,6 +1491,29 @@ class AppointmentCard extends StatelessWidget {
                         tooltip: 'Editar',
                       ),
                     ),
+                    // Botón de aplazar (solo si se puede aplazar)
+                    if (canPostpone) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        width: isWide ? 36 : 32,
+                        height: isWide ? 36 : 32,
+                        decoration: BoxDecoration(
+                          color: postponedColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: postponedColor.withValues(alpha: 0.3),
+                            width: 1,
+                          ),
+                        ),
+                        child: IconButton(
+                          padding: EdgeInsets.zero,
+                          icon: Icon(Icons.schedule, size: isWide ? 20 : 18),
+                          color: postponedColor,
+                          onPressed: isLoading ? null : onPostpone,
+                          tooltip: 'Aplazar cita',
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ],
@@ -1354,6 +1532,7 @@ class AppointmentPopup extends StatefulWidget {
   final String employeeId;
   final Map<String, dynamic>? initialAppointment;
   final Map<String, dynamic>? initialClientData;
+  final bool isPostponedAppointment;
   final VoidCallback onSaved;
 
   const AppointmentPopup({
@@ -1363,6 +1542,7 @@ class AppointmentPopup extends StatefulWidget {
     required this.employeeId,
     this.initialAppointment,
     this.initialClientData,
+    this.isPostponedAppointment = false,
     required this.onSaved,
   });
 
@@ -1395,10 +1575,14 @@ class _AppointmentPopupState extends State<AppointmentPopup>
   Map<String, dynamic>? _selectedClient;
   bool _isClientSelectionPopupOpen = false;
   bool _isSaving = false;
+  List<String> _availableStatuses = [];
 
   @override
   void initState() {
     super.initState();
+
+    // Obtener los estados disponibles del servicio (excluye 'aplazada')
+    _availableStatuses = AppointmentsService.getAvailableStatusesForForm();
 
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 400),
@@ -1474,7 +1658,14 @@ class _AppointmentPopupState extends State<AppointmentPopup>
       final endTime = DateTime.parse(appointment['end_time']);
       _selectedDuration = endTime.difference(startTime).inMinutes;
       
-      _selectedStatus = appointment['status'] ?? 'pendiente';
+      // Asegurar que el estado de la cita esté en los estados disponibles
+      String currentStatus = appointment['status'] ?? 'pendiente';
+      if (_availableStatuses.contains(currentStatus)) {
+        _selectedStatus = currentStatus;
+      } else {
+        // Si es una cita aplazada siendo editada, usar pendiente como estado por defecto
+        _selectedStatus = 'pendiente';
+      }
     } else if (widget.initialClientData != null) {
       _clientNameCtrl.text = widget.initialClientData!['name']?.toString() ?? '';
       _clientPhoneCtrl.text = widget.initialClientData!['phone']?.toString() ?? '';
@@ -1502,9 +1693,12 @@ class _AppointmentPopupState extends State<AppointmentPopup>
   }
 
   void _selectClient() {
-    setState(() {
-      _isClientSelectionPopupOpen = true;
-    });
+    // Solo permitir selección si no es una cita aplazada
+    if (!widget.isPostponedAppointment) {
+      setState(() {
+        _isClientSelectionPopupOpen = true;
+      });
+    }
   }
 
   void _onClientSelected(Map<String, dynamic>? client) {
@@ -1520,12 +1714,15 @@ class _AppointmentPopupState extends State<AppointmentPopup>
   }
 
   void _clearSelectedClient() {
-    setState(() {
-      _selectedClient = null;
-      _clientNameCtrl.clear();
-      _clientPhoneCtrl.clear();
-      _clientEmailCtrl.clear();
-    });
+    // Solo permitir limpiar si no es una cita aplazada
+    if (!widget.isPostponedAppointment) {
+      setState(() {
+        _selectedClient = null;
+        _clientNameCtrl.clear();
+        _clientPhoneCtrl.clear();
+        _clientEmailCtrl.clear();
+      });
+    }
   }
 
   Future<void> _saveAppointment() async {
@@ -1714,7 +1911,7 @@ class _AppointmentPopupState extends State<AppointmentPopup>
                           ),
                         ),
                       ),
-                      if (_isClientSelectionPopupOpen)
+                      if (_isClientSelectionPopupOpen && !widget.isPostponedAppointment)
                         Positioned.fill(
                           child: ClientSelectionDialog(
                             isDark: widget.isDark,
@@ -1734,8 +1931,11 @@ class _AppointmentPopupState extends State<AppointmentPopup>
   }
 
   Widget _buildHeader() {
-    final String title = widget.initialAppointment != null ? 'Editar Cita' : 'Nueva Cita';
-    final String subtitle = widget.initialAppointment != null ? 'Modifica los detalles de la cita' : 'Programa una nueva cita con el cliente';
+    final String title = widget.initialAppointment != null ? 'Editar Cita' : 
+                        widget.isPostponedAppointment ? 'Nueva Cita - Cliente Fijo' : 'Nueva Cita';
+    final String subtitle = widget.initialAppointment != null ? 'Modifica los detalles de la cita' : 
+                           widget.isPostponedAppointment ? 'Programa una nueva fecha para el cliente seleccionado' : 
+                           'Programa una nueva cita con el cliente';
 
     return Row(
       children: [
@@ -1743,16 +1943,19 @@ class _AppointmentPopupState extends State<AppointmentPopup>
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [
+              colors: widget.isPostponedAppointment ? [
+                postponedColor,
+                postponedColor.withValues(alpha: 0.8),
+              ] : [
                 primaryColor,
                 primaryColor.withValues(alpha: 0.8),
               ],
             ),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: const Icon(
-            Icons.event_available,
-            color: Colors.black,
+          child: Icon(
+            widget.isPostponedAppointment ? Icons.schedule : Icons.event_available,
+            color: Colors.white,
             size: 24,
           ),
         ),
@@ -1806,7 +2009,7 @@ class _AppointmentPopupState extends State<AppointmentPopup>
                 children: [
                   Icon(
                     Icons.person,
-                    color: primaryColor,
+                    color: widget.isPostponedAppointment ? postponedColor : primaryColor,
                     size: 20,
                   ),
                   const SizedBox(width: 8),
@@ -1818,26 +2021,49 @@ class _AppointmentPopupState extends State<AppointmentPopup>
                       color: widget.isDark ? textColor : Colors.black87,
                     ),
                   ),
+                  if (widget.isPostponedAppointment) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: postponedColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: postponedColor.withValues(alpha: 0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Text(
+                        'BLOQUEADO',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: postponedColor,
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
             Row(
               children: [
-                if (_selectedClient != null)
+                if (_selectedClient != null && !widget.isPostponedAppointment)
                   IconButton(
                     icon: Icon(Icons.clear, color: widget.isDark ? hintColor : Colors.grey[600]),
                     onPressed: _clearSelectedClient,
                     tooltip: 'Deseleccionar cliente',
                   ),
                 ElevatedButton.icon(
-                  onPressed: _isSaving ? null : _selectClient,
+                  onPressed: _isSaving || widget.isPostponedAppointment ? null : _selectClient,
                   icon: Icon(Icons.search, color: Colors.black, size: 18),
                   label: Text(
+                    widget.isPostponedAppointment ? 'Cliente Fijo' :
                     _selectedClient != null ? 'Cambiar Cliente' : 'Buscar Cliente',
                     style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryColor,
+                    backgroundColor: widget.isPostponedAppointment ? postponedColor : primaryColor,
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
@@ -1854,7 +2080,7 @@ class _AppointmentPopupState extends State<AppointmentPopup>
           controller: _clientNameCtrl,
           style: TextStyle(color: widget.isDark ? textColor : Colors.black87),
           decoration: _buildInputDecoration('Nombre completo *', Icons.person_outline),
-          readOnly: _selectedClient != null,
+          readOnly: true, // Siempre solo lectura porque viene de la selección
           validator: (value) {
             if (value == null || value.isEmpty) {
               return 'El nombre es requerido';
@@ -1871,7 +2097,7 @@ class _AppointmentPopupState extends State<AppointmentPopup>
                 style: TextStyle(color: widget.isDark ? textColor : Colors.black87),
                 decoration: _buildInputDecoration('Teléfono', Icons.phone_outlined),
                 keyboardType: TextInputType.phone,
-                readOnly: _selectedClient != null,
+                readOnly: true,
                 validator: (value) {
                   if (value != null && value.isNotEmpty && !RegExp(r'^\+?[0-9]{7,15}$').hasMatch(value)) {
                     return 'Ingresa un número de teléfono válido';
@@ -1887,7 +2113,7 @@ class _AppointmentPopupState extends State<AppointmentPopup>
                 style: TextStyle(color: widget.isDark ? textColor : Colors.black87),
                 decoration: _buildInputDecoration('Email', Icons.email_outlined),
                 keyboardType: TextInputType.emailAddress,
-                readOnly: _selectedClient != null,
+                readOnly: true,
                 validator: (value) {
                   if (value != null && value.isNotEmpty && !RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) {
                     return 'Ingresa un email válido';
@@ -1910,7 +2136,7 @@ class _AppointmentPopupState extends State<AppointmentPopup>
           children: [
             Icon(
               Icons.event_available,
-              color: primaryColor,
+              color: widget.isPostponedAppointment ? postponedColor : primaryColor,
               size: 20,
             ),
             const SizedBox(width: 8),
@@ -1965,7 +2191,7 @@ class _AppointmentPopupState extends State<AppointmentPopup>
                     children: [
                       Icon(
                         Icons.calendar_today,
-                        color: primaryColor,
+                        color: widget.isPostponedAppointment ? postponedColor : primaryColor,
                         size: 20,
                       ),
                       const SizedBox(width: 12),
@@ -2006,7 +2232,7 @@ class _AppointmentPopupState extends State<AppointmentPopup>
                     children: [
                       Icon(
                         Icons.access_time,
-                        color: primaryColor,
+                        color: widget.isPostponedAppointment ? postponedColor : primaryColor,
                         size: 20,
                       ),
                       const SizedBox(width: 12),
@@ -2051,12 +2277,27 @@ class _AppointmentPopupState extends State<AppointmentPopup>
                 decoration: _buildInputDecoration('Estado', Icons.flag_outlined, isDropdown: true),
                 dropdownColor: widget.isDark ? Colors.grey[800] : Colors.white,
                 style: TextStyle(color: widget.isDark ? textColor : Colors.black87),
-                items: const [
-                  DropdownMenuItem(value: 'pendiente', child: Text('Pendiente')),
-                  DropdownMenuItem(value: 'confirmada', child: Text('Confirmada')),
-                  DropdownMenuItem(value: 'completa', child: Text('Completada')),
-                  DropdownMenuItem(value: 'cancelada', child: Text('Cancelada')),
-                ],
+                items: _availableStatuses.map((status) {
+                  String displayText = '';
+                  switch (status) {
+                    case 'pendiente':
+                      displayText = 'Pendiente';
+                      break;
+                    case 'confirmada':
+                      displayText = 'Confirmada';
+                      break;
+                    case 'completa':
+                      displayText = 'Completada';
+                      break;
+                    case 'cancelada':
+                      displayText = 'Cancelada';
+                      break;
+                  }
+                  return DropdownMenuItem(
+                    value: status,
+                    child: Text(displayText),
+                  );
+                }).toList(),
                 onChanged: _isSaving ? null : (value) => setState(() => _selectedStatus = value!),
               ),
             ),
@@ -2120,6 +2361,8 @@ class _AppointmentPopupState extends State<AppointmentPopup>
   }
 
   InputDecoration _buildInputDecoration(String label, IconData icon, {bool isDropdown = false}) {
+    final Color accentColor = widget.isPostponedAppointment ? postponedColor : primaryColor;
+    
     return InputDecoration(
       labelText: label,
       labelStyle: TextStyle(
@@ -2130,12 +2373,12 @@ class _AppointmentPopupState extends State<AppointmentPopup>
         margin: const EdgeInsets.all(12),
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: primaryColor.withValues(alpha: 0.1),
+          color: accentColor.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Icon(
           icon,
-          color: primaryColor,
+          color: accentColor,
           size: 20,
         ),
       ),
@@ -2153,7 +2396,7 @@ class _AppointmentPopupState extends State<AppointmentPopup>
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: primaryColor, width: 2),
+        borderSide: BorderSide(color: accentColor, width: 2),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -2171,6 +2414,8 @@ class _AppointmentPopupState extends State<AppointmentPopup>
 
   Widget _buildActionButtons() {
     final String buttonText = widget.initialAppointment != null ? 'Actualizar Cita' : 'Guardar Cita';
+    final Color buttonColor = widget.isPostponedAppointment ? postponedColor : primaryColor;
+    
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
@@ -2217,14 +2462,14 @@ class _AppointmentPopupState extends State<AppointmentPopup>
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  primaryColor,
-                  primaryColor.withValues(alpha: 0.8),
+                  buttonColor,
+                  buttonColor.withValues(alpha: 0.8),
                 ],
               ),
               borderRadius: BorderRadius.circular(10),
               boxShadow: [
                 BoxShadow(
-                  color: primaryColor.withValues(alpha: 0.3),
+                  color: buttonColor.withValues(alpha: 0.3),
                   blurRadius: 8,
                   offset: const Offset(0, 4),
                 ),
@@ -2245,7 +2490,7 @@ class _AppointmentPopupState extends State<AppointmentPopup>
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(
-                        color: Colors.black,
+                        color: Colors.white,
                         strokeWidth: 2,
                       ),
                     )
@@ -2254,14 +2499,14 @@ class _AppointmentPopupState extends State<AppointmentPopup>
                       children: [
                         Icon(
                           Icons.save,
-                          color: Colors.black,
+                          color: Colors.white,
                           size: 18,
                         ),
                         const SizedBox(width: 8),
                         Text(
                           buttonText,
                           style: const TextStyle(
-                            color: Colors.black,
+                            color: Colors.white,
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
                           ),
@@ -2354,6 +2599,10 @@ class AppointmentDetailsDialog extends StatelessWidget {
       case 'cancelada':
         statusColor = cancelledColor;
         statusText = 'Cancelada';
+        break;
+      case 'aplazada':
+        statusColor = postponedColor;
+        statusText = 'Aplazada';
         break;
     }
 
@@ -2923,6 +3172,19 @@ class _ClientSelectionDialogState extends State<ClientSelectionDialog> {
           ),
         ),
       ),
+    );
+  }
+}
+
+// Clase placeholder para NotificationsBottomSheet
+class NotificationsBottomSheet extends StatelessWidget {
+  const NotificationsBottomSheet({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      child: const Text('Notificaciones'),
     );
   }
 }

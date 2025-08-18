@@ -18,9 +18,11 @@ const Color hintColor = Colors.white70;
 const Color errorColor = Color(0xFFCF6679);
 const Color successColor = Color(0xFF4CAF50);
 const Color confirmedColor = Color(0xFF4CAF50);
+const Color completeColor = Color(0xFF2196F3);
 const Color inProgressColor = Color(0xFFFF9800);
 const Color pendingColor = Color(0xFFFF5722);
 const Color cancelledColor = Color(0xFF9E9E9E);
+const Color postponedColor = Color(0xFF9C27B0); // Color morado para aplazadas
 const double borderRadius = 12.0;
 const Duration themeAnimationDuration = Duration(milliseconds: 300);
 
@@ -144,6 +146,45 @@ class _CalendarPageState extends State<CalendarPage> with TickerProviderStateMix
     });
   }
 
+  // [------------- MÉTODO PARA OBTENER COLOR POR ESTADO --------------]
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'confirmada':
+        return confirmedColor;
+      case 'completa':
+        return completeColor;
+      case 'en_progreso':
+        return inProgressColor;
+      case 'pendiente':
+        return pendingColor;
+      case 'cancelada':
+        return cancelledColor;
+      case 'aplazada':
+        return postponedColor;
+      default:
+        return primaryColor;
+    }
+  }
+
+  String _getStatusText(String status) {
+    switch (status) {
+      case 'confirmada':
+        return 'Confirmada';
+      case 'completa':
+        return 'Completada';
+      case 'en_progreso':
+        return 'En Progreso';
+      case 'pendiente':
+        return 'Pendiente';
+      case 'cancelada':
+        return 'Cancelada';
+      case 'aplazada':
+        return 'Aplazada';
+      default:
+        return 'Desconocido';
+    }
+  }
+
   // [------------- UTILIDADES PARA MENSAJES Y NAVEGACIÓN --------------]
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -156,7 +197,7 @@ class _CalendarPageState extends State<CalendarPage> with TickerProviderStateMix
   }
 
   // Método para manejar actualizaciones de citas - CORREGIDO
-Future<void> _handleAppointmentUpdate() async {
+  Future<void> _handleAppointmentUpdate() async {
     // Refrescar los datos del calendario INMEDIATAMENTE
     await _fetchAppointments();
     
@@ -284,9 +325,11 @@ Future<void> _handleAppointmentUpdate() async {
                       key: ValueKey('appointment_${appointment['id']}_${appointment['status']}'),
                       appointment: appointment,
                       isDark: isDark,
+                      getStatusColor: _getStatusColor,
+                      getStatusText: _getStatusText,
                       onStatusChanged: () async {
                         // IMPORTANTE: Actualizar INMEDIATAMENTE la página principal
-                       await _handleAppointmentUpdate().then((_) {
+                        await _handleAppointmentUpdate().then((_) {
                           // Cerrar el modal después de que se actualice la página
                           if (mounted) {
                             // ignore: use_build_context_synchronously
@@ -488,7 +531,7 @@ Future<void> _handleAppointmentUpdate() async {
     return months[month - 1];
   }
 
-  // [------------- CUADRÍCULA DEL CALENDARIO --------------]
+  // [------------- CUADRÍCULA DEL CALENDARIO CON INDICADORES DE ESTADO --------------]
   Widget _buildCalendarGrid(bool isDark) {
     final daysInMonth = DateTime(_focusedDay.year, _focusedDay.month + 1, 0).day;
     final firstDayOfMonth = DateTime(_focusedDay.year, _focusedDay.month, 1);
@@ -545,9 +588,26 @@ Future<void> _handleAppointmentUpdate() async {
                                   date.month == _selectedDay.month &&
                                   date.day == _selectedDay.day;
 
-                // Contar citas del día
+                // Obtener color dominante del día basado en las citas
+                Color? dominantColor;
                 final dateKey = DateFormat('dd/MM/yyyy').format(date);
-                final appointmentCount = _groupedAppointments[dateKey]?.length ?? 0;
+                final appointmentsForDate = _groupedAppointments[dateKey] ?? [];
+                final appointmentCount = appointmentsForDate.length;
+
+                if (appointmentsForDate.isNotEmpty) {
+                  // Priorizar citas aplazadas (morado)
+                  if (appointmentsForDate.any((apt) => apt['status'] == 'aplazada')) {
+                    dominantColor = postponedColor;
+                  } else if (appointmentsForDate.any((apt) => apt['status'] == 'confirmada')) {
+                    dominantColor = confirmedColor;
+                  } else if (appointmentsForDate.any((apt) => apt['status'] == 'completa')) {
+                    dominantColor = completeColor;
+                  } else if (appointmentsForDate.any((apt) => apt['status'] == 'pendiente')) {
+                    dominantColor = pendingColor;
+                  } else {
+                    dominantColor = primaryColor;
+                  }
+                }
 
                 return GestureDetector(
                   onTap: () {
@@ -561,16 +621,18 @@ Future<void> _handleAppointmentUpdate() async {
                   child: AnimatedContainer(
                     duration: themeAnimationDuration,
                     decoration: BoxDecoration(
-                      color: hasAppointment
-                          ? primaryColor.withValues(alpha: 0.2)
+                      color: hasAppointment && dominantColor != null
+                          ? dominantColor.withValues(alpha: 0.15)
                           : (isToday
                               ? (isDark ? Colors.grey[700] : Colors.grey[200])
                               : (isDark ? Colors.grey[800] : Colors.white)),
                       borderRadius: BorderRadius.circular(borderRadius / 2),
                       border: Border.all(
                         color: isSelected
-                            ? primaryColor
-                            : (isDark ? Colors.grey[700]! : Colors.grey[300]!),
+                            ? (dominantColor ?? primaryColor)
+                            : (hasAppointment && dominantColor != null
+                                ? dominantColor.withValues(alpha: 0.4)
+                                : (isDark ? Colors.grey[700]! : Colors.grey[300]!)),
                         width: isSelected ? 2 : 1,
                       ),
                     ),
@@ -582,8 +644,8 @@ Future<void> _handleAppointmentUpdate() async {
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
-                            color: hasAppointment
-                                ? primaryColor
+                            color: hasAppointment && dominantColor != null
+                                ? dominantColor
                                 : (isDark ? textColor : Colors.black87),
                           ),
                         ),
@@ -596,7 +658,7 @@ Future<void> _handleAppointmentUpdate() async {
                               height: 16,
                               constraints: const BoxConstraints(minWidth: 16),
                               decoration: BoxDecoration(
-                                color: primaryColor,
+                                color: dominantColor ?? primaryColor,
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Center(
@@ -605,7 +667,7 @@ Future<void> _handleAppointmentUpdate() async {
                                   style: const TextStyle(
                                     fontSize: 10,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.black,
+                                    color: Colors.white,
                                   ),
                                 ),
                               ),
@@ -623,36 +685,104 @@ Future<void> _handleAppointmentUpdate() async {
     );
   }
 
-  // [------------- LISTA DE CITAS DEL MES --------------]
+  // [------------- LISTA DE CITAS DEL MES CON ESTADOS MEJORADOS --------------]
   Widget _buildAppointmentsListHeader(bool isDark) {
-    return Row(
+    // Contar citas por estado para mostrar estadísticas
+    final statusCounts = <String, int>{};
+    for (final appointment in _appointments) {
+      final status = appointment['status'] as String;
+      statusCounts[status] = (statusCounts[status] ?? 0) + 1;
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        AnimatedDefaultTextStyle(
-          duration: themeAnimationDuration,
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            color: isDark ? textColor : Colors.black87,
-          ),
-          child: const Text('Citas del Mes'),
-        ),
-        const SizedBox(width: 12),
-        if (_appointments.isNotEmpty)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: primaryColor.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              '${_appointments.length}',
-              style: const TextStyle(
-                fontSize: 12,
+        Row(
+          children: [
+            AnimatedDefaultTextStyle(
+              duration: themeAnimationDuration,
+              style: TextStyle(
+                fontSize: 22,
                 fontWeight: FontWeight.bold,
-                color: primaryColor,
+                color: isDark ? textColor : Colors.black87,
               ),
+              child: const Text('Citas del Mes'),
             ),
+            const SizedBox(width: 12),
+            if (_appointments.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: primaryColor.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${_appointments.length}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: primaryColor,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        // Mostrar indicadores de estado si hay citas
+        if (statusCounts.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            children: statusCounts.entries.map((entry) {
+              final status = entry.key;
+              final count = entry.value;
+              final color = _getStatusColor(status);
+              final text = _getStatusText(status);
+              
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: color.withValues(alpha: 0.3),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      text,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: color,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '($count)',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isDark ? hintColor : Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
           ),
+        ],
       ],
     );
   }
@@ -730,6 +860,8 @@ Future<void> _handleAppointmentUpdate() async {
                   child: AppointmentListItem(
                     appointment: appointment,
                     isDark: isDark,
+                    getStatusColor: _getStatusColor,
+                    getStatusText: _getStatusText,
                     onTap: () {
                       final appointmentDate = DateTime.parse(appointment['start_time']);
                       _showAppointmentDetails(appointmentDate);
@@ -751,16 +883,20 @@ Future<void> _handleAppointmentUpdate() async {
   }
 }
 
-// [------------- COMPONENTE PARA ELEMENTOS DE LA LISTA DE CITAS --------------]
+// [------------- COMPONENTE PARA ELEMENTOS DE LA LISTA DE CITAS MEJORADO --------------]
 class AppointmentListItem extends StatelessWidget {
   final Map<String, dynamic> appointment;
   final bool isDark;
   final VoidCallback? onTap;
+  final Color Function(String) getStatusColor;
+  final String Function(String) getStatusText;
 
   const AppointmentListItem({
     super.key,
     required this.appointment,
     required this.isDark,
+    required this.getStatusColor,
+    required this.getStatusText,
     this.onTap,
   });
 
@@ -772,27 +908,8 @@ class AppointmentListItem extends StatelessWidget {
     final clientData = appointment['clients'] as Map<String, dynamic>?;
     final clientName = clientData?['name'] ?? 'Cliente sin nombre';
 
-    Color statusColor = primaryColor;
-    String statusText = '';
-    
-    switch (status) {
-      case 'confirmada':
-        statusColor = confirmedColor;
-        statusText = 'Confirmada';
-        break;
-      case 'pendiente':
-        statusColor = pendingColor;
-        statusText = 'Pendiente';
-        break;
-      case 'cancelada':
-        statusColor = cancelledColor;
-        statusText = 'Cancelada';
-        break;
-      case 'completa':
-        statusColor = confirmedColor;
-        statusText = 'Completada';
-        break;
-    }
+    final statusColor = getStatusColor(status);
+    final statusText = getStatusText(status);
 
     return GestureDetector(
       onTap: onTap,
@@ -802,6 +919,10 @@ class AppointmentListItem extends StatelessWidget {
         decoration: BoxDecoration(
           color: isDark ? Colors.grey[800] : Colors.white,
           borderRadius: BorderRadius.circular(borderRadius),
+          border: Border.all(
+            color: statusColor.withValues(alpha: 0.2),
+            width: 1,
+          ),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.05),
@@ -867,13 +988,27 @@ class AppointmentListItem extends StatelessWidget {
                   width: 1,
                 ),
               ),
-              child: Text(
-                statusText,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: statusColor,
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Ícono especial para citas aplazadas
+                  if (status == 'aplazada') ...[
+                    Icon(
+                      Icons.schedule,
+                      size: 12,
+                      color: statusColor,
+                    ),
+                    const SizedBox(width: 4),
+                  ],
+                  Text(
+                    statusText,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: statusColor,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -883,16 +1018,20 @@ class AppointmentListItem extends StatelessWidget {
   }
 }
 
-// [------------- COMPONENTE PARA TARJETAS DE DETALLE DE CITAS - CORREGIDO --------------]
+// [------------- COMPONENTE PARA TARJETAS DE DETALLE DE CITAS - MEJORADO CON APLAZADAS --------------]
 class AppointmentDetailCard extends StatefulWidget {
   final Map<String, dynamic> appointment;
   final bool isDark;
   final VoidCallback? onStatusChanged;
+  final Color Function(String) getStatusColor;
+  final String Function(String) getStatusText;
 
   const AppointmentDetailCard({
     super.key,
     required this.appointment,
     required this.isDark,
+    required this.getStatusColor,
+    required this.getStatusText,
     this.onStatusChanged,
   });
 
@@ -902,8 +1041,6 @@ class AppointmentDetailCard extends StatefulWidget {
 
 class _AppointmentDetailCardState extends State<AppointmentDetailCard> {
   bool _isUpdating = false;
-
-  // Función auxiliar para formatear precios de forma segura - CORREGIDA PARA DECIMAL
 
   Future<void> _updateAppointmentStatus(String newStatus) async {
     if (_isUpdating) return;
@@ -957,33 +1094,35 @@ class _AppointmentDetailCardState extends State<AppointmentDetailCard> {
   }
 
   void _showStatusChangeDialog() {
-  final currentStatus = widget.appointment['status'] as String;
-  
-  showDialog(
-    context: context,
-    builder: (context) => AlertDialog(
-      backgroundColor: widget.isDark ? const Color.fromRGBO(15, 19, 21, 0.95) : Colors.white,
-      title: Text(
-        'Cambiar Estado',
-        style: TextStyle(
-          color: widget.isDark ? textColor : Colors.black87,
+    final currentStatus = widget.appointment['status'] as String;
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: widget.isDark ? const Color.fromRGBO(15, 19, 21, 0.95) : Colors.white,
+        title: Text(
+          'Cambiar Estado',
+          style: TextStyle(
+            color: widget.isDark ? textColor : Colors.black87,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildStatusOption('pendiente', 'Pendiente', currentStatus),
+            _buildStatusOption('confirmada', 'Confirmada', currentStatus),
+            _buildStatusOption('completa', 'Completada', currentStatus),
+            _buildStatusOption('cancelada', 'Cancelada', currentStatus),
+            _buildStatusOption('aplazada', 'Aplazada', currentStatus),
+          ],
         ),
       ),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _buildStatusOption('pendiente', 'Pendiente', pendingColor, currentStatus),
-          _buildStatusOption('confirmada', 'Confirmada', confirmedColor, currentStatus),
-          _buildStatusOption('completa', 'Completada', confirmedColor, currentStatus),
-          _buildStatusOption('cancelada', 'Cancelada', cancelledColor, currentStatus),
-        ],
-      ),
-    ),
-  );
-}
+    );
+  }
 
-  Widget _buildStatusOption(String value, String label, Color color, String currentStatus) {
+  Widget _buildStatusOption(String value, String label, String currentStatus) {
     final isSelected = value == currentStatus;
+    final color = widget.getStatusColor(value);
     
     return ListTile(
       leading: Container(
@@ -996,7 +1135,7 @@ class _AppointmentDetailCardState extends State<AppointmentDetailCard> {
         ),
         child: isSelected 
           ? const Icon(Icons.check, size: 14, color: Colors.white)
-          : null,
+          : (value == 'aplazada' ? Icon(Icons.schedule, size: 12, color: color) : null),
       ),
       title: Text(
         label,
@@ -1028,31 +1167,8 @@ class _AppointmentDetailCardState extends State<AppointmentDetailCard> {
     final price = widget.appointment['price'];
     final depositPaid = widget.appointment['deposit_paid'];
 
-    Color statusColor = primaryColor;
-    String statusText = '';
-    
-    switch (status) {
-      case 'confirmada':
-        statusColor = confirmedColor;
-        statusText = 'Confirmada';
-        break;
-      case 'en_progreso':
-        statusColor = inProgressColor;
-        statusText = 'En Progreso';
-        break;
-      case 'pendiente':
-        statusColor = pendingColor;
-        statusText = 'Pendiente';
-        break;
-      case 'cancelada':
-        statusColor = cancelledColor;
-        statusText = 'Cancelada';
-        break;
-      case 'completa':
-        statusColor = confirmedColor;
-        statusText = 'Completada';
-        break;
-    }
+    final statusColor = widget.getStatusColor(status);
+    final statusText = widget.getStatusText(status);
 
     final duration = endTime.difference(startTime);
     final durationText = '${duration.inHours}h ${duration.inMinutes % 60}min';
@@ -1063,6 +1179,10 @@ class _AppointmentDetailCardState extends State<AppointmentDetailCard> {
       decoration: BoxDecoration(
         color: widget.isDark ? Colors.grey[800] : Colors.white,
         borderRadius: BorderRadius.circular(borderRadius),
+        border: Border.all(
+          color: statusColor.withValues(alpha: 0.2),
+          width: 1,
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.1),
@@ -1080,12 +1200,12 @@ class _AppointmentDetailCardState extends State<AppointmentDetailCard> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: primaryColor.withValues(alpha: 0.1),
+                  color: statusColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
-                  Icons.person,
-                  color: primaryColor,
+                  status == 'aplazada' ? Icons.schedule : Icons.person,
+                  color: statusColor,
                   size: 24,
                 ),
               ),
@@ -1136,7 +1256,15 @@ class _AppointmentDetailCardState extends State<AppointmentDetailCard> {
                             valueColor: AlwaysStoppedAnimation<Color>(statusColor),
                           ),
                         )
-                      else
+                      else ...[
+                        if (status == 'aplazada') ...[
+                          Icon(
+                            Icons.schedule,
+                            size: 12,
+                            color: statusColor,
+                          ),
+                          const SizedBox(width: 4),
+                        ],
                         Text(
                           statusText,
                           style: TextStyle(
@@ -1145,6 +1273,7 @@ class _AppointmentDetailCardState extends State<AppointmentDetailCard> {
                             color: statusColor,
                           ),
                         ),
+                      ],
                       if (!_isUpdating) ...[
                         const SizedBox(width: 4),
                         Icon(
@@ -1246,155 +1375,155 @@ class _AppointmentDetailCardState extends State<AppointmentDetailCard> {
           
           // Información financiera - CORREGIDA PARA DECIMAL
           if (price != null) ...[
-  Row(
-    children: [
-      Icon(
-        Icons.attach_money,
-        size: 18,
-        color: widget.isDark ? hintColor : Colors.grey[600],
-      ),
-      const SizedBox(width: 8),
-      Text(
-        'Información Financiera',
-        style: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-          color: widget.isDark ? textColor : Colors.black87,
-        ),
-      ),
-    ],
-  ),
-  const SizedBox(height: 8),
-  Padding(
-    padding: const EdgeInsets.only(left: 26),
-    child: Builder(
-      builder: (context) {
-        // Convertir price y depositPaid a double de forma segura
-        double totalPrice = 0.0;
-        double deposit = 0.0;
-        
-        // Procesar precio total
-        if (price is String) {
-          totalPrice = double.tryParse(price) ?? 0.0;
-        } else if (price is num) {
-          totalPrice = price.toDouble();
-        }
-        
-        // Procesar adelanto
-        if (depositPaid != null) {
-          if (depositPaid is String) {
-            deposit = double.tryParse(depositPaid) ?? 0.0;
-          } else if (depositPaid is num) {
-            deposit = depositPaid.toDouble();
-          }
-        }
-        
-        final pending = totalPrice - deposit;
-        
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Precio total
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: widget.isDark ? Colors.grey[700] : Colors.grey[100],
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Total:',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                  ),
-                  Text(
-                    '\$${totalPrice.toStringAsFixed(2)}',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: widget.isDark ? textColor : Colors.black87,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            
-            const SizedBox(height: 8),
-            
-            // Adelanto
-            if (deposit > 0) ...[
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Adelanto pagado:',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: widget.isDark ? hintColor : Colors.grey[600],
-                    ),
-                  ),
-                  Text(
-                    '\$${deposit.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: confirmedColor,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-            ],
-            
-            // Pendiente o estado de pago
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
+                Icon(
+                  Icons.attach_money,
+                  size: 18,
+                  color: widget.isDark ? hintColor : Colors.grey[600],
+                ),
+                const SizedBox(width: 8),
                 Text(
-                  pending > 0 ? 'Pendiente:' : 'Estado:',
+                  'Información Financiera',
                   style: TextStyle(
                     fontSize: 14,
-                    color: widget.isDark ? hintColor : Colors.grey[600],
+                    fontWeight: FontWeight.w600,
+                    color: widget.isDark ? textColor : Colors.black87,
                   ),
                 ),
-                if (pending > 0)
-                  Text(
-                    '\$${pending.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: pendingColor,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  )
-                else
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.check_circle,
-                        size: 16,
-                        color: confirmedColor,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        deposit > 0 ? 'Pagado completo' : 'Sin adelanto',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: deposit > 0 ? confirmedColor : pendingColor,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
               ],
             ),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.only(left: 26),
+              child: Builder(
+                builder: (context) {
+                  // Convertir price y depositPaid a double de forma segura
+                  double totalPrice = 0.0;
+                  double deposit = 0.0;
+                  
+                  // Procesar precio total
+                  if (price is String) {
+                    totalPrice = double.tryParse(price) ?? 0.0;
+                  } else if (price is num) {
+                    totalPrice = price.toDouble();
+                  }
+                  
+                  // Procesar adelanto
+                  if (depositPaid != null) {
+                    if (depositPaid is String) {
+                      deposit = double.tryParse(depositPaid) ?? 0.0;
+                    } else if (depositPaid is num) {
+                      deposit = depositPaid.toDouble();
+                    }
+                  }
+                  
+                  final pending = totalPrice - deposit;
+                  
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Precio total
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: widget.isDark ? Colors.grey[700] : Colors.grey[100],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Total:',
+                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                            ),
+                            Text(
+                              '\$${totalPrice.toStringAsFixed(2)}',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: widget.isDark ? textColor : Colors.black87,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      
+                      const SizedBox(height: 8),
+                      
+                      // Adelanto
+                      if (deposit > 0) ...[
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Adelanto pagado:',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: widget.isDark ? hintColor : Colors.grey[600],
+                              ),
+                            ),
+                            Text(
+                              '\$${deposit.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: confirmedColor,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                      ],
+                      
+                      // Pendiente o estado de pago
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            pending > 0 ? 'Pendiente:' : 'Estado:',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: widget.isDark ? hintColor : Colors.grey[600],
+                            ),
+                          ),
+                          if (pending > 0)
+                            Text(
+                              '\$${pending.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: pendingColor,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            )
+                          else
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.check_circle,
+                                  size: 16,
+                                  color: confirmedColor,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  deposit > 0 ? 'Pagado completo' : 'Sin adelanto',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: deposit > 0 ? confirmedColor : pendingColor,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                        ],
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
           ],
-        );
-      },
-    ),
-  ),
-  const SizedBox(height: 16),
-],
           
           // Notas adicionales
           if (notes != null && notes.toString().isNotEmpty) ...[

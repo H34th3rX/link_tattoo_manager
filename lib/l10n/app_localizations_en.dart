@@ -146,6 +146,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get newAppointment => 'New Appointment';
 
   @override
+  String get appointmentsConfirmed => 'Appointments';
+
+  @override
   String get viewAppointments => 'View Appointments';
 
   @override

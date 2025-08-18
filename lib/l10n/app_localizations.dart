@@ -362,6 +362,12 @@ abstract class AppLocalizations {
   /// **'New Appointment'**
   String get newAppointment;
 
+  /// No description provided for @appointmentsConfirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'Appointments'**
+  String get appointmentsConfirmed;
+
   /// No description provided for @viewAppointments.
   ///
   /// In en, this message translates to:

@@ -147,6 +147,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get newAppointment => 'Nueva Cita';
 
   @override
+  String get appointmentsConfirmed => 'Citas Confirmadas';
+
+  @override
   String get viewAppointments => 'Ver Citas';
 
   @override

@@ -55,6 +55,7 @@
     "income": "Ingresos",
     "newAppointment": "Nueva Cita",
     "viewAppointments": "Ver Citas",
+     "appointmentsConfirmed": "Citas Confirmadas",
     "calendarAction": "Calendario",
     "weeklyRevenue": "Ingresos de la Semana",
     "recentActivity": "Actividad Reciente",
