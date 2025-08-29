@@ -56,6 +56,7 @@ class AppointmentsService {
       'price': price,
       'deposit_paid': depositPaid,
       'notes': notes,
+      'created_at': DateTime.now().toIso8601String(),
     }).select('''
       *,
       clients(
@@ -83,7 +84,16 @@ class AppointmentsService {
         ''')
         .eq('employee_id', employeeId)
         .order('start_time', ascending: true);
-    return List<Map<String, dynamic>>.from(response);
+    
+    return List<Map<String, dynamic>>.from(response.map((appointment) {
+      if (appointment['created_at'] != null) {
+        appointment['created_at'] = DateTime.parse(appointment['created_at']).toLocal().toIso8601String();
+      }
+      if (appointment['updated_at'] != null) {
+        appointment['updated_at'] = DateTime.parse(appointment['updated_at']).toLocal().toIso8601String();
+      }
+      return appointment;
+    }));
   }
 
   // Obtener citas filtradas por fecha y estado
@@ -119,7 +129,16 @@ class AppointmentsService {
     }
 
     final response = await query.order('start_time', ascending: true);
-    return List<Map<String, dynamic>>.from(response);
+    
+    return List<Map<String, dynamic>>.from(response.map((appointment) {
+      if (appointment['created_at'] != null) {
+        appointment['created_at'] = DateTime.parse(appointment['created_at']).toLocal().toIso8601String();
+      }
+      if (appointment['updated_at'] != null) {
+        appointment['updated_at'] = DateTime.parse(appointment['updated_at']).toLocal().toIso8601String();
+      }
+      return appointment;
+    }));
   }
 
   // Actualizar los datos de una cita existente
@@ -135,7 +154,7 @@ class AppointmentsService {
     double? depositPaid,
     String? notes,
   }) async {
-    final updateData = <String, dynamic>{};
+    final updateData = <String, dynamic>{};  
     
     if (clientId != null) updateData['client_id'] = clientId;
     if (startTime != null) updateData['start_time'] = startTime.toIso8601String();
@@ -263,7 +282,16 @@ class AppointmentsService {
         .gte('start_time', startOfDay.toIso8601String())
         .lte('start_time', endOfDay.toIso8601String())
         .order('start_time', ascending: true);
-    return response;
+    
+    return response.map((appointment) {
+      if (appointment['created_at'] != null) {
+        appointment['created_at'] = DateTime.parse(appointment['created_at']).toLocal().toIso8601String();
+      }
+      if (appointment['updated_at'] != null) {
+        appointment['updated_at'] = DateTime.parse(appointment['updated_at']).toLocal().toIso8601String();
+      }
+      return appointment;
+    }).toList();
   }
 
   // Obtener citas de esta semana
@@ -287,7 +315,16 @@ class AppointmentsService {
         .gte('start_time', startOfWeek.toIso8601String())
         .lte('start_time', endOfWeek.toIso8601String())
         .order('start_time', ascending: true);
-    return response;
+    
+    return response.map((appointment) {
+      if (appointment['created_at'] != null) {
+        appointment['created_at'] = DateTime.parse(appointment['created_at']).toLocal().toIso8601String();
+      }
+      if (appointment['updated_at'] != null) {
+        appointment['updated_at'] = DateTime.parse(appointment['updated_at']).toLocal().toIso8601String();
+      }
+      return appointment;
+    }).toList();
   }
 
   // Obtener citas de este mes
@@ -311,7 +348,16 @@ class AppointmentsService {
         .gte('start_time', startOfMonth.toIso8601String())
         .lte('start_time', endOfMonth.toIso8601String())
         .order('start_time', ascending: true);
-    return response;
+    
+    return response.map((appointment) {
+      if (appointment['created_at'] != null) {
+        appointment['created_at'] = DateTime.parse(appointment['created_at']).toLocal().toIso8601String();
+      }
+      if (appointment['updated_at'] != null) {
+        appointment['updated_at'] = DateTime.parse(appointment['updated_at']).toLocal().toIso8601String();
+      }
+      return appointment;
+    }).toList();
   }
 
   // Contar el total de citas por estado

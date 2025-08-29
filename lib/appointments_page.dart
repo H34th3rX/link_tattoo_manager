@@ -27,7 +27,7 @@ const double borderRadius = 12.0;
 const Duration themeAnimationDuration = Duration(milliseconds: 300);
 
 class AppointmentsPage extends StatefulWidget {
-  const AppointmentsPage({super.key});
+  const AppointmentsPage({super.key, Map<String, dynamic>? arguments});
 
   @override
   State<AppointmentsPage> createState() => _AppointmentsPageState();

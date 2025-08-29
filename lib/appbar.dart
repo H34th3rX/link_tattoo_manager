@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import './l10n/app_localizations.dart';
 import 'theme_provider.dart';
+import '../integrations/notifications_service.dart';
 
 //[-------------CONSTANTES GLOBALES--------------]
 const Color primaryColor = Color(0xFFBDA206);
@@ -49,15 +50,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
               child: Text(title),
             ),
             actions: [
-              AnimatedContainer(
-                duration: themeAnimationDuration,
-                child: IconButton(
-                  icon: const Icon(Icons.notifications),
-                  onPressed: onNotificationPressed,
-                  tooltip: localizations.notifications,
-                  color: isDark ? textColor : Colors.black87,
-                ),
-              ),
+              _buildNotificationButton(context, isDark, localizations),
               AnimatedContainer(
                 duration: themeAnimationDuration,
                 child: IconButton(
@@ -98,13 +91,70 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     );
   }
 
+  Widget _buildNotificationButton(BuildContext context, bool isDark, AppLocalizations localizations) {
+    return FutureBuilder<List<NotificationItem>>(
+      future: NotificationsService.getNotifications(),
+      builder: (context, snapshot) {
+        final notificationCount = snapshot.hasData ? snapshot.data!.length : 0;
+        
+        return AnimatedContainer(
+          duration: themeAnimationDuration,
+          child: Stack(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.notifications),
+                onPressed: () => _showNotificationsBottomSheet(context),
+                tooltip: localizations.notifications,
+                color: isDark ? textColor : Colors.black87,
+              ),
+              if (notificationCount > 0)
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: Colors.amber,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 16,
+                      minHeight: 16,
+                    ),
+                    child: Text(
+                      notificationCount > 9 ? '9+' : notificationCount.toString(),
+                      style: const TextStyle(
+                        color: Colors.black,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showNotificationsBottomSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => const DynamicNotificationsBottomSheet(),
+    );
+  }
+
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
 }
 
-//[-------------HOJA INFERIOR DE NOTIFICACIONES--------------]
-class NotificationsBottomSheet extends StatelessWidget {
-  const NotificationsBottomSheet({super.key});
+//[-------------HOJA INFERIOR DE NOTIFICACIONES DINÁMICAS--------------]
+class DynamicNotificationsBottomSheet extends StatelessWidget {
+  const DynamicNotificationsBottomSheet({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -137,16 +187,15 @@ class NotificationsBottomSheet extends StatelessWidget {
               ),
               AnimatedDefaultTextStyle(
                 duration: themeAnimationDuration,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
-                  color: isDark ? textColor : Colors.black87,
+                  color: Colors.amber, // Color amarillo para el título
                 ),
                 child: Text(localizations.notifications),
               ),
               const SizedBox(height: 16),
-              // Verificar si hay notificaciones
-              _buildNotificationsList(context, localizations, isDark),
+              _buildDynamicNotificationsList(context, localizations, isDark),
               const SizedBox(height: 16),
             ],
           ),
@@ -155,58 +204,128 @@ class NotificationsBottomSheet extends StatelessWidget {
     );
   }
 
-  Widget _buildNotificationsList(BuildContext context, AppLocalizations localizations, bool isDark) {
-    // Puedes cambiar esto dinámicamente según tu lógica de negocio
-  
-    // Si hay notificaciones, mostrar la lista
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: 3,
-      itemBuilder: (context, index) {
-        return NotificationTile(
-          icon: index == 0
-              ? Icons.event_available
-              : index == 1
-                  ? Icons.person_add
-                  : Icons.schedule,
-          title: index == 0
-              ? localizations.upcomingAppointmentNotification
-              : index == 1
-                  ? localizations.newClientRegisteredNotification
-                  : localizations.reminderNotification,
-          subtitle: index == 0
-              ? 'Ana López - 2:30 PM'
-              : index == 1
-                  ? 'Carlos Mendoza'
-                  : localizations.checkTomorrowAppointments,
-          time: index == 0
-              ? '2:00 PM'
-              : index == 1
-                  ? '1:45 PM'
-                  : '12:00 PM',
-          isDark: isDark,
+  Widget _buildDynamicNotificationsList(BuildContext context, AppLocalizations localizations, bool isDark) {
+    return FutureBuilder<List<NotificationItem>>(
+      future: NotificationsService.getNotifications(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(20),
+              child: CircularProgressIndicator(),
+            ),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  Text(
+                    'Error al cargar notificaciones',
+                    style: TextStyle(
+                      color: isDark ? Colors.white70 : Colors.grey[600],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${snapshot.error}',
+                    style: TextStyle(
+                      color: isDark ? Colors.white38 : Colors.grey[400],
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        final notifications = snapshot.data ?? [];
+
+        if (notifications.isEmpty) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.notifications_none,
+                    size: 48,
+                    color: isDark ? Colors.white38 : Colors.grey[400],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'No hay notificaciones',
+                    style: TextStyle(
+                      color: isDark ? Colors.white70 : Colors.grey[600],
+                      fontSize: 16,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        return ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 400),
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: notifications.length,
+            itemBuilder: (context, index) {
+              final notification = notifications[index];
+              return DynamicNotificationTile(
+                notification: notification,
+                isDark: isDark,
+                onTap: () {
+                  NotificationsService.markAsRead(notification.id);
+                  Navigator.pop(context); // Cerrar el bottom sheet
+                  
+                  // Navegar según el tipo de notificación
+                  _navigateBasedOnNotificationType(context, notification.type);
+                },
+              );
+            },
+          ),
         );
       },
     );
   }
+
+  void _navigateBasedOnNotificationType(BuildContext context, String notificationType) {
+    switch (notificationType) {
+      case 'next_appointment':
+      case 'pending_confirmation':
+      case 'daily_summary':
+        // Todas las notificaciones relacionadas con citas van a appointments
+        Navigator.of(context).pushNamed('/appointments');
+        break;
+      case 'new_client':
+        // Notificaciones de nuevos clientes van a la página de clientes
+        Navigator.of(context).pushNamed('/clients');
+        break;
+      default:
+        // Por defecto, ir al dashboard
+        Navigator.of(context).pushNamed('/dashboard');
+        break;
+    }
+  }
 }
 
-//[-------------ELEMENTO DE NOTIFICACIÓN--------------]
-class NotificationTile extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final String time;
+//[-------------ELEMENTO DE NOTIFICACIÓN DINÁMICO--------------]
+class DynamicNotificationTile extends StatelessWidget {
+  final NotificationItem notification;
   final bool isDark;
+  final VoidCallback? onTap;
 
-  const NotificationTile({
+  const DynamicNotificationTile({
     super.key,
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.time,
+    required this.notification,
     required this.isDark,
+    this.onTap,
   });
 
   @override
@@ -216,11 +335,12 @@ class NotificationTile extends StatelessWidget {
     return AnimatedContainer(
       duration: themeAnimationDuration,
       child: ListTile(
+        onTap: onTap,
         leading: AnimatedContainer(
           duration: themeAnimationDuration,
           child: CircleAvatar(
             backgroundColor: primaryColor.withValues(alpha: 0.1),
-            child: Icon(icon, color: primaryColor),
+            child: Icon(_getIconData(notification.icon), color: primaryColor),
           ),
         ),
         title: AnimatedDefaultTextStyle(
@@ -229,24 +349,40 @@ class NotificationTile extends StatelessWidget {
             fontWeight: FontWeight.w600,
             color: isDark ? textColor : Colors.black87,
           ),
-          child: Text(title),
+          child: Text(notification.title),
         ),
         subtitle: AnimatedDefaultTextStyle(
           duration: themeAnimationDuration,
           style: TextStyle(
             color: isDark ? hintColor : Colors.grey[600],
           ),
-          child: Text(subtitle),
+          child: Text(notification.subtitle),
         ),
         trailing: AnimatedDefaultTextStyle(
           duration: themeAnimationDuration,
-          style: TextStyle(
-            color: isDark ? hintColor : Colors.grey[600],
+          style: const TextStyle(
+            color: Colors.amber, // Color amarillo para el tiempo
             fontSize: 12,
+            fontWeight: FontWeight.w600,
           ),
-          child: Text(time),
+          child: Text(notification.time),
         ),
       ),
     );
+  }
+
+  IconData _getIconData(String iconName) {
+    switch (iconName) {
+      case 'event_available':
+        return Icons.event_available;
+      case 'person_add':
+        return Icons.person_add;
+      case 'schedule':
+        return Icons.schedule;
+      case 'today':
+        return Icons.today;
+      default:
+        return Icons.notifications;
+    }
   }
 }

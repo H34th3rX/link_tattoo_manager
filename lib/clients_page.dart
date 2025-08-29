@@ -20,7 +20,7 @@ const double borderRadius = 12.0;
 const Duration themeAnimationDuration = Duration(milliseconds: 300);
 
 class ClientsPage extends StatefulWidget {
-  const ClientsPage({super.key});
+  const ClientsPage({super.key, Map<String, dynamic>? arguments});
 
   @override
   State<ClientsPage> createState() => _ClientsPageState();

@@ -14,6 +14,8 @@ class ClientsService {
     String? notes,
     String? preferredContactMethod,
   }) async {
+    final now = DateTime.now();
+    
     final response = await client.from('clients').insert({
       'employee_id': employeeId,
       'name': name,
@@ -21,6 +23,7 @@ class ClientsService {
       'email': email,
       'notes': notes,
       'preferred_contact_method': preferredContactMethod,
+      'registration_date': now.toIso8601String(), // Usar hora local
     }).select().single();
     return response;
   }
@@ -32,7 +35,16 @@ class ClientsService {
         .select()
         .eq('employee_id', employeeId)
         .order('registration_date', ascending: false);
-    return List<Map<String, dynamic>>.from(response);
+    
+    final clients = List<Map<String, dynamic>>.from(response);
+    for (var client in clients) {
+      if (client['registration_date'] != null) {
+        final utcDate = DateTime.parse(client['registration_date']);
+        client['registration_date'] = utcDate.toLocal().toIso8601String();
+      }
+    }
+    
+    return clients;
   }
 
   // Actualizar los datos de un cliente existente
@@ -96,6 +108,12 @@ class ClientsService {
         .order('registration_date', ascending: false)
         .limit(1)
         .maybeSingle();
+    
+    if (response != null && response['registration_date'] != null) {
+      final utcDate = DateTime.parse(response['registration_date']);
+      response['registration_date'] = utcDate.toLocal().toIso8601String();
+    }
+    
     return response;
   }
 
@@ -108,6 +126,12 @@ class ClientsService {
         .order('created_at', ascending: false)
         .limit(1)
         .maybeSingle();
+    
+    if (response != null && response['start_time'] != null) {
+      final utcDate = DateTime.parse(response['start_time']);
+      response['start_time'] = utcDate.toLocal().toIso8601String();
+    }
+    
     return response;
   }
 
@@ -119,6 +143,14 @@ class ClientsService {
         .eq('employee_id', employeeId)
         .order('start_time', ascending: false)
         .limit(3);
+    
+    for (var appointment in response) {
+      if (appointment['start_time'] != null) {
+        final utcDate = DateTime.parse(appointment['start_time']);
+        appointment['start_time'] = utcDate.toLocal().toIso8601String();
+      }
+    }
+    
     return response;
   }
 
