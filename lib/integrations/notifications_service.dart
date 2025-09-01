@@ -42,7 +42,7 @@ class NotificationsService {
         }
       }
     } catch (e) {
-      print('[NotificationsService] Error getting employee ID: $e');
+      // Error silencioso
     }
     return null;
   }
@@ -79,7 +79,6 @@ class NotificationsService {
 
       return notifications;
     } catch (e) {
-      print('[NotificationsService] Error getting notifications: $e');
       return [];
     }
   }
@@ -137,7 +136,7 @@ class NotificationsService {
         );
       }
     } catch (e) {
-      print('[NotificationsService] Error getting next appointment: $e');
+      // Error silencioso
     }
     return null;
   }
@@ -191,7 +190,7 @@ class NotificationsService {
         }
       }
     } catch (e) {
-      print('[NotificationsService] Error getting pending appointments: $e');
+      // Error silencioso
     }
     return notifications;
   }
@@ -238,7 +237,7 @@ class NotificationsService {
         ));
       }
     } catch (e) {
-      print('[NotificationsService] Error getting new clients: $e');
+      // Error silencioso
     }
     return notifications;
   }
@@ -275,7 +274,7 @@ class NotificationsService {
         }
       }
     } catch (e) {
-      print('[NotificationsService] Error getting today summary: $e');
+      // Error silencioso
     }
     return null;
   }
@@ -315,6 +314,5 @@ class NotificationsService {
   // Marcar notificación como leída
   static Future<void> markAsRead(String notificationId) async {
     // Implementar lógica para marcar como leída si es necesario
-    print('[NotificationsService] Notificación marcada como leída: $notificationId');
   }
 }
