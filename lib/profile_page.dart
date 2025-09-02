@@ -8,10 +8,11 @@ import 'appbar.dart';
 import './integrations/clients_service.dart';
 import './integrations/employee_service.dart';
 import 'package:intl/intl.dart'; 
-import './l10n/app_localizations.dart'; // Importar el archivo generado
-import 'localization_provider.dart'; // Importar el proveedor de localización
-import 'services/auth_service.dart'; // Importar AuthService
-import 'reset_password_page.dart'; // Importar ResetPasswordPage
+import './l10n/app_localizations.dart';
+import 'localization_provider.dart';
+import 'services/auth_service.dart';
+import 'reset_password_page.dart';
+import '../services/notification_scheduler.dart';
 
 // Constantes globales para estilos y animaciones
 const Color primaryColor = Color(0xFFBDA206);
@@ -32,7 +33,7 @@ class ProfilePage extends StatefulWidget {
   State<ProfilePage> createState() => _ProfilePageState();
 }
 
-class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin {
+class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStateMixin {
   // Variables para datos del perfil y estado
   String? _userName;
   Map<String, dynamic>? _employeeProfile;
@@ -48,9 +49,8 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
   bool _isPopupOpen = false;
   String? _error;
   String? _successMessage;
-  late AnimationController _errorAnimationController;
-  late AnimationController _successAnimationController;
-  bool _isGoogleUser = false; // Nuevo: para saber si es usuario de Google
+  late AnimationController _animationController;
+  bool _isGoogleUser = false;
 
   // Estadísticas del empleado
   int _yearsOfExperience = 0;
@@ -64,12 +64,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
     super.initState();
     _nextAppointmentFuture = Future.value(null);
     _loadProfileDataFuture = _fetchProfileData();
-    // Controladores para animaciones de mensajes de error y éxito
-    _errorAnimationController = AnimationController(
-      duration: themeAnimationDuration,
-      vsync: this,
-    );
-    _successAnimationController = AnimationController(
+    _animationController = AnimationController(
       duration: themeAnimationDuration,
       vsync: this,
     );
@@ -77,19 +72,16 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
 
   @override
   void dispose() {
-    // Liberar recursos
     _usernameCtrl.dispose();
     _phoneCtrl.dispose();
     _emailCtrl.dispose();
     _specialtyCtrl.dispose();
     _notesCtrl.dispose();
-    _errorAnimationController.dispose();
-    _successAnimationController.dispose();
+    _animationController.dispose();
     super.dispose();
   }
 
   //[-------------CARGA DE DATOS DEL PERFIL--------------]
-  // Obtiene los datos del perfil del empleado desde Supabase
   Future<void> _fetchProfileData() async {
     setState(() {
       _loading = true;
@@ -100,7 +92,6 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
       final user = Supabase.instance.client.auth.currentUser!;
       final profile = await EmployeeService.getEmployeeProfile(user.id);
       
-      // Nuevo: Verificar si el usuario es de Google
       if (user.email != null) {
         final userStatus = await AuthService.checkUserCanResetPassword(user.email!);
         if (!mounted) return;
@@ -109,7 +100,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
         });
       }
 
-      if (!mounted) return; // Guardar el contexto
+      if (!mounted) return;
 
       setState(() {
         _employeeProfile = profile;
@@ -119,66 +110,59 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
             : 0;
       });
 
-      // Carga estadísticas dinámicas
       _totalClients = await ClientsService.getClientCountByEmployee(user.id);
       _appointmentsThisMonth = await EmployeeService.getAppointmentsThisMonth(user.id);
       _nextAppointmentFuture = EmployeeService.getNextAppointment(user.id);
 
-      if (!mounted) return; // Guardar el contexto
+      if (!mounted) return;
       setState(() => _loading = false);
     } catch (e) {
-      if (!mounted) return; // Guardar el contexto
+      if (!mounted) return;
       _showError(AppLocalizations.of(context)!.errorLoadingProfile(e.toString()));
     } finally {
-      if (mounted) { // Guardar el contexto
+      if (mounted) {
         setState(() => _loading = false);
       }
     }
   }
 
-  // Muestra mensaje de error con animación
   void _showError(String message) {
     setState(() {
       _error = message;
       _loading = false;
     });
-    _errorAnimationController.forward().then((_) {
+    _animationController.forward().then((_) {
       Future.delayed(const Duration(seconds: 3), () {
         if (mounted) {
-          _errorAnimationController.reverse();
+          _animationController.reverse();
           setState(() => _error = null);
         }
       });
     });
   }
 
-  // Muestra mensaje de éxito con animación
   void _showSuccess(String message) {
     setState(() => _successMessage = message);
-    _successAnimationController.forward().then((_) {
+    _animationController.forward().then((_) {
       Future.delayed(const Duration(seconds: 2), () {
         if (mounted) {
-          _successAnimationController.reverse();
+          _animationController.reverse();
           setState(() => _successMessage = null);
         }
       });
     });
   }
 
-  // Cierra sesión y redirige a la pantalla de login
   Future<void> _logout() async {
     try {
-      await AuthService.signOut(); // Usar el método completo de AuthService
-      if (!mounted) return; // Guardar el contexto
-      // La navegación se maneja dentro de AuthService.signOut() para web,
-      // pero para mobile o fallback, aseguramos la navegación aquí.
+      await AuthService.signOut();
+      if (!mounted) return;
       Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
     } catch (e) {
-      _showError(AppLocalizations.of(context)!.errorLoggingOut); // Usar texto localizado
+      _showError(AppLocalizations.of(context)!.errorLoggingOut);
     }
   }
 
-  // Muestra hoja inferior de notificaciones
   void _showNotifications() {
     showModalBottomSheet(
       context: context,
@@ -188,7 +172,6 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
     );
   }
 
-  // Abre el popup para editar el perfil
   void _openEditProfilePopup() {
     if (_employeeProfile != null) {
       _usernameCtrl.text = _employeeProfile!['username'] ?? '';
@@ -200,7 +183,6 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
     setState(() => _isPopupOpen = true);
   }
 
-  // Navega a la página de cambio de contraseña
   void _navigateToChangePassword() {
     final user = Supabase.instance.client.auth.currentUser;
     if (user != null && user.email != null) {
@@ -211,17 +193,15 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
         ),
       );
     } else {
-      _showError(AppLocalizations.of(context)!.errorLoadingUserData); // Usar texto localizado
+      _showError(AppLocalizations.of(context)!.errorLoadingUserData);
     }
   }
 
-  // Cierra el popup y reinicia el formulario
   void _closePopup() {
     setState(() => _isPopupOpen = false);
     _resetForm();
   }
 
-  // Reinicia los campos del formulario
   void _resetForm() {
     _formKey.currentState?.reset();
     _usernameCtrl.clear();
@@ -231,7 +211,6 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
     _notesCtrl.clear();
   }
 
-  // Guarda los cambios del perfil en Supabase
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -247,15 +226,15 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
         notes: _notesCtrl.text.trim().isNotEmpty ? _notesCtrl.text.trim() : null,
       );
 
-      if (!mounted) return; // Guardar el contexto
+      if (!mounted) return;
       _showSuccess(AppLocalizations.of(context)!.profileUpdatedSuccessfully);
       _closePopup();
       await _fetchProfileData();
     } catch (e) {
-      if (!mounted) return; // Guardar el contexto
+      if (!mounted) return;
       _showError(AppLocalizations.of(context)!.errorSavingProfile(e.toString()));
     } finally {
-      if (mounted) { // Guardar el contexto
+      if (mounted) {
         setState(() => _loading = false);
       }
     }
@@ -265,7 +244,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
-    final AppLocalizations localizations = AppLocalizations.of(context)!; // Obtener localizaciones
+    final AppLocalizations localizations = AppLocalizations.of(context)!;
     final bool isWide = MediaQuery.of(context).size.width >= 800;
     final user = Supabase.instance.client.auth.currentUser!;
     final bool isDark = themeProvider.isDark;
@@ -278,7 +257,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
             return Scaffold(
               backgroundColor: isDark ? backgroundColor : Colors.grey[100],
               appBar: CustomAppBar(
-                title: localizations.profilePageTitle, // Usar texto localizado
+                title: localizations.profilePageTitle,
                 onNotificationPressed: _showNotifications,
                 isWide: isWide,
               ),
@@ -343,7 +322,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                         position: Tween<Offset>(
                           begin: const Offset(0, 1),
                           end: Offset.zero,
-                        ).animate(_errorAnimationController),
+                        ).animate(_animationController),
                         child: Material(
                           color: Colors.transparent,
                           child: Container(
@@ -353,7 +332,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                               borderRadius: BorderRadius.circular(borderRadius),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withValues(alpha:   0.26),
+                                  color: Colors.black.withValues(alpha: 0.26),
                                   blurRadius: 6,
                                   offset: const Offset(0, 3),
                                 ),
@@ -384,7 +363,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                         position: Tween<Offset>(
                           begin: const Offset(0, 1),
                           end: Offset.zero,
-                        ).animate(_successAnimationController),
+                        ).animate(_animationController),
                         child: Material(
                           color: Colors.transparent,
                           child: Container(
@@ -394,7 +373,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                               borderRadius: BorderRadius.circular(borderRadius),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withValues(alpha:   0.26),
+                                  color: Colors.black.withValues(alpha: 0.26),
                                   blurRadius: 6,
                                   offset: const Offset(0, 3),
                                 ),
@@ -425,7 +404,6 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
     );
   }
 
-  // Construye el contenido principal de la página
   Widget _buildMainContent(bool isDark, bool isWide, AppLocalizations localizations) {
     if (_loading && _employeeProfile == null) {
       return const Center(child: CircularProgressIndicator(color: primaryColor));
@@ -438,12 +416,12 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
             Icon(Icons.person_off_outlined, size: 64, color: isDark ? hintColor : Colors.grey[400]),
             const SizedBox(height: 16),
             Text(
-              localizations.noEmployeeProfileLoaded, // Usar texto localizado
+              localizations.noEmployeeProfileLoaded,
               style: TextStyle(fontSize: 18, color: isDark ? hintColor : Colors.grey[600]),
             ),
             const SizedBox(height: 8),
             Text(
-              localizations.ensureAccountLinked, // Usar texto localizado
+              localizations.ensureAccountLinked,
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 14, color: isDark ? hintColor : Colors.grey[500]),
             ),
@@ -451,7 +429,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
             ElevatedButton(
               onPressed: _fetchProfileData,
               style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
-              child: Text(localizations.retry, style: const TextStyle(color: Colors.black)), // Usar texto localizado
+              child: Text(localizations.retry, style: const TextStyle(color: Colors.black)),
             ),
           ],
         ),
@@ -473,7 +451,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
               children: [
                 const SizedBox(height: 8),
                 AnimatedAppearance(
-                  delay: 0, // Animación inmediata
+                  delay: 0,
                   child: _buildProfileHeader(isDark, localizations),
                 ),
                 const SizedBox(height: 24),
@@ -483,11 +461,11 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                 ),
                 const SizedBox(height: 32),
                 AnimatedAppearance(
-                  delay: 300, // Retraso para que aparezca después de la información
+                  delay: 300,
                   child: Center(
-                    child: Wrap( // Usar Wrap para que los botones se ajusten
-                      spacing: 16, // Espacio horizontal entre botones
-                      runSpacing: 16, // Espacio vertical entre filas de botones
+                    child: Wrap(
+                      spacing: 16,
+                      runSpacing: 16,
                       alignment: WrapAlignment.center,
                       children: [
                         SizedBox(
@@ -497,7 +475,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                             onPressed: _openEditProfilePopup,
                             icon: const Icon(Icons.edit, color: Colors.black),
                             label: Text(
-                              localizations.editProfile, // Usar texto localizado
+                              localizations.editProfile,
                               style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
                             ),
                             style: ElevatedButton.styleFrom(
@@ -510,7 +488,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                             ),
                           ),
                         ),
-                        if (!_isGoogleUser) // Condición para mostrar el botón
+                        if (!_isGoogleUser)
                           SizedBox(
                             width: isWide ? 300 : double.infinity,
                             height: 50,
@@ -518,7 +496,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                               onPressed: _navigateToChangePassword,
                               icon: const Icon(Icons.lock_reset, color: Colors.black),
                               label: Text(
-                                localizations.changePassword, // Usar texto localizado
+                                localizations.changePassword,
                                 style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
                               ),
                               style: ElevatedButton.styleFrom(
@@ -538,7 +516,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                 const SizedBox(height: 40),
                 AnimatedAppearance(
                   delay: 450,
-                  child: _buildLanguageSettings(isDark, localizations), // Añadir sección de idioma
+                  child: _buildGeneralSettings(isDark, localizations),
                 ),
                 const SizedBox(height: 40),
               ],
@@ -549,7 +527,6 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
     );
   }
 
-  // Construye el encabezado del perfil con información del empleado
   Widget _buildProfileHeader(bool isDark, AppLocalizations localizations) {
     final String initials = (_employeeProfile?['username'] as String? ?? 'UN')
         .split(' ')
@@ -564,7 +541,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
         borderRadius: BorderRadius.circular(borderRadius),
         boxShadow: [
           BoxShadow(
-            color: isDark ? Colors.black26 : Colors.grey.withValues(alpha:  0.1),
+            color: isDark ? Colors.black26 : Colors.grey.withValues(alpha: 0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -582,13 +559,13 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: LinearGradient(
-                    colors: [primaryColor, primaryColor.withValues(alpha:   0.7)],
+                    colors: [primaryColor, primaryColor.withValues(alpha: 0.7)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: primaryColor.withValues(alpha:   0.3),
+                      color: primaryColor.withValues(alpha: 0.3),
                       blurRadius: 12,
                       offset: const Offset(0, 4),
                     ),
@@ -620,7 +597,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      _employeeProfile?['specialty'] ?? localizations.selectSpecialty, // Usar texto localizado
+                      _employeeProfile?['specialty'] ?? localizations.selectSpecialty,
                       style: TextStyle(
                         fontSize: 18,
                         color: primaryColor,
@@ -639,7 +616,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
           ),
           const SizedBox(height: 20),
           Text(
-            _employeeProfile?['notes'] ?? localizations.notesBiography, // Usar texto localizado
+            _employeeProfile?['notes'] ?? localizations.notesBiography,
             style: TextStyle(
               fontSize: 16,
               color: isDark ? hintColor : Colors.grey[700],
@@ -651,7 +628,6 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
     );
   }
 
-  // Construye filas de información (teléfono, email)
   Widget _buildInfoRow(IconData icon, String text, bool isDark) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2.0),
@@ -678,7 +654,6 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
     );
   }
 
-  // Construye las tarjetas de estadísticas
   Widget _buildStatCards(bool isDark, AppLocalizations localizations) {
     return GridView.count(
       shrinkWrap: true,
@@ -691,7 +666,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
         ProfileStatCard(
           icon: Icons.emoji_events_outlined,
           value: _yearsOfExperience.toString(),
-          label: localizations.years, // Usar texto localizado
+          label: localizations.years,
           isDark: isDark,
           iconColor: Colors.blue.shade600,
           valueColor: Colors.blue.shade600,
@@ -699,7 +674,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
         ProfileStatCard(
           icon: Icons.people_alt_outlined,
           value: '$_totalClients+',
-          label: localizations.clients, // Usar texto localizado
+          label: localizations.clients,
           isDark: isDark,
           iconColor: Colors.green.shade600,
           valueColor: Colors.green.shade600,
@@ -707,7 +682,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
         ProfileStatCard(
           icon: Icons.calendar_today_outlined,
           value: _appointmentsThisMonth.toString(),
-          label: localizations.thisMonth, // Usar texto localizado
+          label: localizations.thisMonth,
           isDark: isDark,
           iconColor: Colors.orange.shade600,
           valueColor: Colors.orange.shade600,
@@ -715,23 +690,34 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
         FutureBuilder<Map<String, dynamic>?>(
           future: _nextAppointmentFuture,
           builder: (context, snapshot) {
-            String nextAppointmentText = localizations.noAppointments; // Usar texto localizado
+            String nextAppointmentText = localizations.noAppointments;
             Color nextAppointmentColor = isDark ? hintColor : Colors.grey[700]!;
             if (snapshot.connectionState == ConnectionState.waiting) {
-              nextAppointmentText = localizations.loading; // Usar texto localizado
+              nextAppointmentText = localizations.loading;
             } else if (snapshot.hasError) {
-              nextAppointmentText = localizations.error; // Usar texto localizado
+              nextAppointmentText = localizations.error;
               nextAppointmentColor = errorColor;
             } else if (snapshot.hasData && snapshot.data != null) {
               final appointment = snapshot.data!;
-              final startTime = DateTime.parse(appointment['start_time']).toLocal();
+              final startTimeStr = appointment['start_time'] as String;
+              DateTime startTime;
+              
+              if (startTimeStr.endsWith('+00:00')) {
+                final timeWithoutOffset = startTimeStr.replaceAll('+00:00', '');
+                startTime = DateTime.parse(timeWithoutOffset);
+              } else if (startTimeStr.endsWith('Z')) {
+                startTime = DateTime.parse(startTimeStr).toLocal();
+              } else {
+                startTime = DateTime.parse(startTimeStr);
+              }
+              
               nextAppointmentText = DateFormat('HH:mm').format(startTime);
               nextAppointmentColor = Colors.purple.shade600;
             }
             return ProfileStatCard(
               icon: Icons.schedule_outlined,
               value: nextAppointmentText,
-              label: localizations.nextAppointment, // Usar texto localizado
+              label: localizations.nextAppointment,
               isDark: isDark,
               iconColor: Colors.purple.shade600,
               valueColor: nextAppointmentColor,
@@ -742,8 +728,8 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
     );
   }
 
-  // Nuevo widget para la configuración de idioma
-  Widget _buildLanguageSettings(bool isDark, AppLocalizations localizations) {
+  // Widget para configuraciones generales
+  Widget _buildGeneralSettings(bool isDark, AppLocalizations localizations) {
     final localizationProvider = Provider.of<LocalizationProvider>(context);
     String currentPreference = localizationProvider.languagePreference;
 
@@ -754,7 +740,7 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
         borderRadius: BorderRadius.circular(borderRadius),
         boxShadow: [
           BoxShadow(
-            color: isDark ? Colors.black26 : Colors.grey.withValues(alpha:  0.1),
+            color: isDark ? Colors.black26 : Colors.grey.withValues(alpha: 0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -764,79 +750,588 @@ class _ProfilePageState extends State<ProfilePage> with TickerProviderStateMixin
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            localizations.languageSettings, // Usar texto localizado
+            'Configuraciones Generales',
             style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.bold,
               color: isDark ? textColor : Colors.black87,
             ),
           ),
-          const SizedBox(height: 16),
-          DropdownButtonFormField<String>(
-            value: currentPreference,
-            hint: Text(localizations.selectLanguage, style: TextStyle(color: isDark ? hintColor : Colors.grey[600])),
-            items: [
-              DropdownMenuItem(
-                value: 'system',
-                child: Text(localizations.systemDefault, style: TextStyle(color: isDark ? primaryColor : Colors.black87)),
+          const SizedBox(height: 24),
+          
+          // Configuración de idioma
+          _buildSettingSection(
+            title: 'Idioma',
+            icon: Icons.language,
+            isDark: isDark,
+            child: DropdownButtonFormField<String>(
+              value: currentPreference,
+              hint: Text(localizations.selectLanguage, style: TextStyle(color: isDark ? hintColor : Colors.grey[600])),
+              items: [
+                DropdownMenuItem(
+                  value: 'system',
+                  child: Text(localizations.systemDefault, style: TextStyle(color: isDark ? primaryColor : Colors.black87)),
+                ),
+                DropdownMenuItem(
+                  value: 'en',
+                  child: Text(localizations.english, style: TextStyle(color: isDark ? primaryColor : Colors.black87)),
+                ),
+                DropdownMenuItem(
+                  value: 'es',
+                  child: Text(localizations.spanish, style: TextStyle(color: isDark ? primaryColor : Colors.black87)),
+                ),
+              ],
+              onChanged: (value) async {
+                if (value != null) {
+                  await localizationProvider.setLanguagePreference(value);
+                  if (!mounted) return;
+                  _showSuccess(localizations.languagePreferenceSaved);
+                }
+              },
+              decoration: _buildInputDecoration(
+                label: localizations.selectLanguage,
+                icon: Icons.language,
+                isDark: isDark,
               ),
-              DropdownMenuItem(
-                value: 'en',
-                child: Text(localizations.english, style: TextStyle(color: isDark ? primaryColor : Colors.black87)),
+              dropdownColor: isDark ? Colors.grey[800] : Colors.white,
+              style: TextStyle(color: isDark ? primaryColor : Colors.black87),
+            ),
+          ),
+          
+          const SizedBox(height: 24),
+          
+          // Configuración de notificaciones
+          _buildNotificationSettings(isDark),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildSettingSection({
+    required String title,
+    required IconData icon,
+    required bool isDark,
+    required Widget child,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: primaryColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
               ),
-              DropdownMenuItem(
-                value: 'es',
-                child: Text(localizations.spanish, style: TextStyle(color: isDark ? primaryColor : Colors.black87)),
+              child: Icon(icon, color: primaryColor, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: isDark ? textColor : Colors.black87,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        child,
+      ],
+    );
+  }
+  
+  Widget _buildNotificationSettings(bool isDark) {
+    return _buildSettingSection(
+      title: 'Notificaciones de Citas',
+      icon: Icons.notifications_outlined,
+      isDark: isDark,
+      child: FutureBuilder<Map<String, dynamic>>(
+        future: NotificationScheduler.getDiagnosticInfo(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: CircularProgressIndicator(color: primaryColor),
+              ),
+            );
+          }
+          
+          final diagnosticInfo = snapshot.data ?? {};
+          final hasPermissions = diagnosticInfo['hasPermissions'] ?? false;
+          final canScheduleExact = diagnosticInfo['canScheduleExact'] ?? false;
+          final pendingCount = diagnosticInfo['pendingCount'] ?? 0;
+          final currentMinutes = diagnosticInfo['notificationTime'] ?? 60;
+          final isEnabled = diagnosticInfo['isEnabled'] ?? false;
+          final systemReady = diagnosticInfo['systemReady'] ?? false;
+          
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Estado del sistema
+              _buildSystemStatusCard(isDark, hasPermissions, canScheduleExact, pendingCount, systemReady),
+              
+              const SizedBox(height: 16),
+              
+              // Switch principal para habilitar/deshabilitar notificaciones
+              _buildNotificationToggle(isDark, isEnabled),
+              
+              const SizedBox(height: 16),
+              
+              // Configuración de tiempo (solo si están habilitadas)
+              if (isEnabled) ...[
+                _buildTimeConfiguration(isDark, currentMinutes),
+                const SizedBox(height: 16),
+              ],
+              
+              // Solo botón de permisos si es necesario
+              if (!hasPermissions)
+                _buildPermissionsButton(isDark),
+              
+              // Información de ayuda
+              const SizedBox(height: 16),
+              _buildHelpInfo(isDark, hasPermissions, canScheduleExact),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  // Estado del sistema
+  Widget _buildSystemStatusCard(bool isDark, bool hasPermissions, bool canScheduleExact, int pendingCount, bool systemReady) {
+    Color statusColor;
+    String statusText;
+    IconData statusIcon;
+    
+    if (systemReady) {
+      statusColor = successColor;
+      statusText = 'Sistema funcionando correctamente';
+      statusIcon = Icons.check_circle;
+    } else if (hasPermissions) {
+      statusColor = Colors.orange;
+      statusText = 'Configuración parcial - revisa permisos';
+      statusIcon = Icons.warning;
+    } else {
+      statusColor = errorColor;
+      statusText = 'Requiere configuración';
+      statusIcon = Icons.error;
+    }
+    
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: statusColor.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: statusColor.withOpacity(0.3)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Icon(statusIcon, color: statusColor, size: 24),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  statusText,
+                  style: TextStyle(
+                    color: isDark ? textColor : Colors.black87,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                  ),
+                ),
               ),
             ],
-            onChanged: (value) async {
-              if (value != null) {
-                await localizationProvider.setLanguagePreference(value);
-                if (!mounted) return; // Guardar el contexto
-                _showSuccess(localizations.languagePreferenceSaved); // Mostrar mensaje de éxito
-              }
-            },
-            decoration: InputDecoration(
-              labelText: localizations.selectLanguage, // Usar texto localizado
-              labelStyle: TextStyle(color: isDark ? hintColor : Colors.grey[600], fontSize: 14),
-              prefixIcon: Container(
-                margin: const EdgeInsets.all(12),
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: primaryColor.withValues(alpha:   0.1),
-                  borderRadius: BorderRadius.circular(8),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _buildStatusItem(
+                  'Permisos', 
+                  hasPermissions ? 'Concedidos' : 'Pendientes',
+                  hasPermissions ? Icons.check : Icons.close,
+                  hasPermissions ? successColor : errorColor,
+                  isDark,
                 ),
-                child: Icon(Icons.language, color: primaryColor, size: 20),
               ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: isDark ? Colors.grey[600]! : Colors.grey[300]!),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _buildStatusItem(
+                  'Alarmas exactas', 
+                  canScheduleExact ? 'Habilitadas' : 'Limitadas',
+                  canScheduleExact ? Icons.schedule : Icons.schedule_rounded,
+                  canScheduleExact ? successColor : Colors.orange,
+                  isDark,
+                ),
               ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: isDark ? Colors.grey[600]! : Colors.grey[300]!),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _buildStatusItem(
+                  'Programadas', 
+                  '$pendingCount',
+                  Icons.event_available,
+                  primaryColor,
+                  isDark,
+                ),
               ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: primaryColor, width: 2),
-              ),
-              errorBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: errorColor),
-              ),
-              focusedErrorBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: errorColor, width: 2),
-              ),
-              filled: true,
-              fillColor: isDark ? Colors.grey[800]?.withValues(alpha:   0.5) : Colors.grey[50],
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            ),
-            dropdownColor: isDark ? Colors.grey[800] : Colors.white,
-            style: TextStyle(color: isDark ? primaryColor : Colors.black87),
+            ],
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildStatusItem(String label, String value, IconData icon, Color color, bool isDark) {
+    return Column(
+      children: [
+        Icon(icon, color: color, size: 20),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: TextStyle(
+            color: color,
+            fontWeight: FontWeight.bold,
+            fontSize: 14,
+          ),
+        ),
+        Text(
+          label,
+          style: TextStyle(
+            color: isDark ? hintColor : Colors.grey[600],
+            fontSize: 12,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+
+  // Toggle principal para notificaciones
+  Widget _buildNotificationToggle(bool isDark, bool isEnabled) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.grey[800]?.withOpacity(0.5) : Colors.grey[50],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark ? Colors.grey[600]! : Colors.grey[300]!,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: primaryColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              isEnabled ? Icons.notifications_active : Icons.notifications_off,
+              color: primaryColor,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Notificaciones de citas',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? textColor : Colors.black87,
+                  ),
+                ),
+                Text(
+                  isEnabled ? 'Recibirás avisos antes de tus citas' : 'No recibirás notificaciones',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: isDark ? hintColor : Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: isEnabled,
+            onChanged: (value) async {
+              try {
+                await NotificationScheduler.setNotificationsEnabled(value);
+                setState(() {});
+                _showSuccess(value 
+                    ? 'Notificaciones habilitadas' 
+                    : 'Notificaciones deshabilitadas');
+              } catch (e) {
+                _showError('Error actualizando configuración: $e');
+              }
+            },
+            activeColor: primaryColor,
+            activeTrackColor: primaryColor.withOpacity(0.3),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Configuración de tiempo con reprogramación automática
+  Widget _buildTimeConfiguration(bool isDark, int currentMinutes) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Tiempo de notificación',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: isDark ? textColor : Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Recibir notificación antes de la cita:',
+          style: TextStyle(
+            fontSize: 14,
+            color: isDark ? hintColor : Colors.grey[600],
+          ),
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<int>(
+          value: currentMinutes,
+          items: [
+            DropdownMenuItem(
+              value: 5,
+              child: Text('5 minutos antes', style: TextStyle(color: isDark ? primaryColor : Colors.black87)),
+            ),
+            DropdownMenuItem(
+              value: 15,
+              child: Text('15 minutos antes', style: TextStyle(color: isDark ? primaryColor : Colors.black87)),
+            ),
+            DropdownMenuItem(
+              value: 30,
+              child: Text('30 minutos antes', style: TextStyle(color: isDark ? primaryColor : Colors.black87)),
+            ),
+            DropdownMenuItem(
+              value: 60,
+              child: Text('1 hora antes', style: TextStyle(color: isDark ? primaryColor : Colors.black87)),
+            ),
+            DropdownMenuItem(
+              value: 120,
+              child: Text('2 horas antes', style: TextStyle(color: isDark ? primaryColor : Colors.black87)),
+            ),
+            DropdownMenuItem(
+              value: 360,
+              child: Text('6 horas antes', style: TextStyle(color: isDark ? primaryColor : Colors.black87)),
+            ),
+            DropdownMenuItem(
+              value: 1440,
+              child: Text('1 día antes', style: TextStyle(color: isDark ? primaryColor : Colors.black87)),
+            ),
+          ],
+          onChanged: (value) async {
+            if (value != null) {
+              try {
+                await NotificationScheduler.setNotificationTime(value);
+                setState(() {});
+                _showSuccess('Tiempo actualizado y notificaciones reprogramadas automáticamente');
+              } catch (e) {
+                _showError('Error actualizando tiempo: $e');
+              }
+            }
+          },
+          decoration: _buildInputDecoration(
+            label: 'Seleccionar tiempo',
+            icon: Icons.schedule,
+            isDark: isDark,
+          ),
+          dropdownColor: isDark ? Colors.grey[800] : Colors.white,
+          style: TextStyle(color: isDark ? primaryColor : Colors.black87),
+        ),
+      ],
+    );
+  }
+
+  // Solo botón de permisos cuando sea necesario
+  Widget _buildPermissionsButton(bool isDark) {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: () async {
+          try {
+            final granted = await NotificationScheduler.requestNotificationPermissions();
+            setState(() {});
+            if (granted) {
+              _showSuccess('Permisos concedidos');
+            } else {
+              _showError('Permisos denegados');
+            }
+          } catch (e) {
+            _showError('Error solicitando permisos: $e');
+          }
+        },
+        icon: Icon(Icons.security, size: 18),
+        label: Text('Solicitar Permisos'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: primaryColor,
+          foregroundColor: Colors.black,
+          padding: EdgeInsets.symmetric(vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Información de ayuda
+  Widget _buildHelpInfo(bool isDark, bool hasPermissions, bool canScheduleExact) {
+    List<Widget> helpItems = [];
+    
+    if (!hasPermissions) {
+      helpItems.add(_buildHelpItem(
+        isDark,
+        Icons.error,
+        errorColor,
+        'Sin permisos de notificación',
+        'Ve a Configuración > Aplicaciones > Tu App > Notificaciones y habilita los permisos.',
+      ));
+    }
+    
+    if (!canScheduleExact) {
+      helpItems.add(_buildHelpItem(
+        isDark,
+        Icons.warning,
+        Colors.orange,
+        'Alarmas inexactas',
+        'Para notificaciones precisas, habilita "Alarmas y recordatorios" en configuración del sistema.',
+      ));
+    }
+    
+    helpItems.add(_buildHelpItem(
+      isDark,
+      Icons.info,
+      primaryColor,
+      'Optimización de batería',
+      'Para mejor funcionamiento, desactiva la optimización de batería para esta app.',
+    ));
+    
+    if (helpItems.isEmpty) {
+      helpItems.add(_buildHelpItem(
+        isDark,
+        Icons.check_circle,
+        successColor,
+        'Todo configurado',
+        'El sistema de notificaciones está funcionando correctamente.',
+      ));
+    }
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Información y ayuda',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: isDark ? textColor : Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 8),
+        ...helpItems,
+      ],
+    );
+  }
+
+  Widget _buildHelpItem(bool isDark, IconData icon, Color color, String title, String description) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: color.withOpacity(0.3)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: color, size: 20),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? textColor : Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    description,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark ? hintColor : Colors.grey[600],
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  InputDecoration _buildInputDecoration({
+    required String label,
+    required IconData icon,
+    required bool isDark,
+  }) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: TextStyle(color: isDark ? hintColor : Colors.grey[600], fontSize: 14),
+      prefixIcon: Container(
+        margin: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: primaryColor.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(icon, color: primaryColor, size: 20),
+      ),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: isDark ? Colors.grey[600]! : Colors.grey[300]!),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: isDark ? Colors.grey[600]! : Colors.grey[300]!),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: primaryColor, width: 2),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: errorColor),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: errorColor, width: 2),
+      ),
+      filled: true,
+      fillColor: isDark ? Colors.grey[800]?.withValues(alpha: 0.5) : Colors.grey[50],
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
     );
   }
 }
@@ -870,7 +1365,7 @@ class ProfileStatCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(borderRadius),
         boxShadow: [
           BoxShadow(
-            color: isDark ? Colors.black26 : Colors.grey.withValues(alpha:  0.1),
+            color: isDark ? Colors.black26 : Colors.grey.withValues(alpha: 0.1),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -955,7 +1450,6 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
   @override
   void initState() {
     super.initState();
-    // Configura animaciones para el popup
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 400),
       vsync: this,
@@ -982,7 +1476,6 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
       curve: Curves.easeOutBack,
     ));
 
-    // Inicializa la especialidad según el valor inicial
     if (widget.initialSpecialty != null && widget.initialSpecialty!.isNotEmpty) {
       if (_specialties.contains(widget.initialSpecialty)) {
         _selectedSpecialty = widget.initialSpecialty;
@@ -1006,18 +1499,16 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
     super.dispose();
   }
 
-  // Cierra el popup con animación
   void _closeWithAnimation() async {
     await _animationController.reverse();
     widget.onClose();
   }
 
-  // Validaciones para los campos del formulario
   String? _validateUsername(String? value) {
     final localizations = AppLocalizations.of(context)!;
     if (value == null || value.isEmpty) return localizations.username;
     if (value.length < 3 || value.length > 50) {
-      return localizations.nameLengthError; // Localizado
+      return localizations.nameLengthError;
     }
     return null;
   }
@@ -1026,7 +1517,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
     final localizations = AppLocalizations.of(context)!;
     if (value == null || value.isEmpty) return null;
     if (!RegExp(r'^\+?[\d\s\-()]{7,15}$').hasMatch(value)) {
-      return localizations.phoneFormatError; // Localizado
+      return localizations.phoneFormatError;
     }
     return null;
   }
@@ -1035,15 +1526,13 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
     final localizations = AppLocalizations.of(context)!;
     if (value == null || value.isEmpty) return null;
     if (!RegExp(r'^[\w\.-]+@[\w\.-]+\.\w+$').hasMatch(value)) {
-      return localizations.emailFormatError; // Localizado
+      return localizations.emailFormatError;
     }
     return null;
   }
 
-  // Maneja el guardado del formulario
   Future<void> _handleSave() async {
     if (!widget.formKey.currentState!.validate()) {
-      debugPrint('Validation failed. Not saving.');
       return;
     }
 
@@ -1063,7 +1552,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
       animation: _animationController,
       builder: (context, child) {
         return Container(
-          color: Colors.black.withValues(alpha:   0.5 * _opacityAnimation.value),
+          color: Colors.black.withValues(alpha: 0.5 * _opacityAnimation.value),
           child: Center(
             child: SlideTransition(
               position: _slideAnimation,
@@ -1080,7 +1569,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha:   0.3),
+                          color: Colors.black.withValues(alpha: 0.3),
                           blurRadius: 20,
                           offset: const Offset(0, 10),
                         ),
@@ -1116,7 +1605,6 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
     );
   }
 
-  // Construye el encabezado del popup
   Widget _buildHeader(bool isDark, AppLocalizations localizations) {
     return Row(
       children: [
@@ -1126,7 +1614,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
             gradient: LinearGradient(
               colors: [
                 primaryColor,
-                primaryColor.withValues(alpha:  0.8),
+                primaryColor.withValues(alpha: 0.8),
               ],
             ),
             borderRadius: BorderRadius.circular(12),
@@ -1143,7 +1631,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                localizations.editProfile, // Usar texto localizado
+                localizations.editProfile,
                 style: TextStyle(
                   fontSize: 26,
                   fontWeight: FontWeight.bold,
@@ -1151,7 +1639,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
                 ),
               ),
               Text(
-                localizations.modifyClientInfo, // Usar texto localizado
+                localizations.modifyClientInfo,
                 style: TextStyle(
                   fontSize: 14,
                   color: isDark ? hintColor : Colors.grey[600],
@@ -1175,13 +1663,12 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
     );
   }
 
-  // Construye los campos del formulario
   Widget _buildFormFields(bool isDark, AppLocalizations localizations) {
     return Column(
       children: [
         _buildAnimatedTextField(
           controller: widget.usernameCtrl,
-          label: localizations.username, // Usar texto localizado
+          label: localizations.username,
           icon: Icons.person_outline,
           validator: _validateUsername,
           isDark: isDark,
@@ -1194,7 +1681,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
         const SizedBox(height: 20),
         _buildAnimatedTextField(
           controller: widget.phoneCtrl,
-          label: localizations.phone, // Usar texto localizado
+          label: localizations.phone,
           icon: Icons.phone_outlined,
           keyboardType: TextInputType.phone,
           validator: _validatePhone,
@@ -1205,7 +1692,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
         const SizedBox(height: 20),
         _buildAnimatedTextField(
           controller: widget.emailCtrl,
-          label: localizations.email, // Usar texto localizado
+          label: localizations.email,
           icon: Icons.email_outlined,
           keyboardType: TextInputType.emailAddress,
           validator: _validateEmail,
@@ -1216,7 +1703,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
         const SizedBox(height: 20),
         _buildAnimatedTextField(
           controller: widget.notesCtrl,
-          label: localizations.notesBiography, // Usar texto localizado
+          label: localizations.notesBiography,
           icon: Icons.note_outlined,
           maxLines: 3,
           isDark: isDark,
@@ -1227,7 +1714,6 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
     );
   }
 
-  // Construye el campo de especialidad con dropdown
   Widget _buildSpecialtyField(bool isDark, AppLocalizations localizations) {
     return TweenAnimationBuilder<double>(
       duration: const Duration(milliseconds: 450),
@@ -1242,7 +1728,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
               children: [
                 DropdownButtonFormField<String>(
                   value: _selectedSpecialty,
-                  hint: Text(localizations.selectSpecialty, style: TextStyle(color: isDark ? hintColor : Colors.grey[600])), // Usar texto localizado
+                  hint: Text(localizations.selectSpecialty, style: TextStyle(color: isDark ? hintColor : Colors.grey[600])),
                   items: _specialties.map((String specialty) {
                     return DropdownMenuItem<String>(
                       value: specialty,
@@ -1256,15 +1742,15 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
                       if (!_isCustomSpecialty) widget.specialtyCtrl.clear();
                     });
                   },
-                  validator: (value) => value == null ? localizations.selectSpecialty : null, // Usar texto localizado
+                  validator: (value) => value == null ? localizations.selectSpecialty : null,
                   decoration: InputDecoration(
-                    labelText: '${localizations.specialty} *', // Usar texto localizado
+                    labelText: '${localizations.specialty} *',
                     labelStyle: TextStyle(color: isDark ? hintColor : Colors.grey[600], fontSize: 14),
                     prefixIcon: Container(
                       margin: const EdgeInsets.all(12),
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: primaryColor.withValues(alpha:   0.1),
+                        color: primaryColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Icon(Icons.work_outline, color: primaryColor, size: 20),
@@ -1290,7 +1776,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
                       borderSide: const BorderSide(color: errorColor, width: 2),
                     ),
                     filled: true,
-                    fillColor: isDark ? Colors.grey[800]?.withValues(alpha:   0.5) : Colors.grey[50],
+                    fillColor: isDark ? Colors.grey[800]?.withValues(alpha: 0.5) : Colors.grey[50],
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                   ),
                   dropdownColor: isDark ? Colors.grey[800] : Colors.white,
@@ -1300,10 +1786,10 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
                   const SizedBox(height: 20),
                   _buildAnimatedTextField(
                     controller: widget.specialtyCtrl,
-                    label: localizations.customSpecialty, // Usar texto localizado
+                    label: localizations.customSpecialty,
                     icon: Icons.edit,
                     isDark: isDark,
-                    validator: (value) => value == null || value.isEmpty ? localizations.customSpecialty : null, // Localizado
+                    validator: (value) => value == null || value.isEmpty ? localizations.customSpecialty : null,
                     delay: 250,
                     autovalidateMode: AutovalidateMode.onUserInteraction,
                   ),
@@ -1316,7 +1802,6 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
     );
   }
 
-  // Construye campos de texto animados
   Widget _buildAnimatedTextField({
     required TextEditingController controller,
     required String label,
@@ -1357,7 +1842,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
                   margin: const EdgeInsets.all(12),
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: primaryColor.withValues(alpha:   0.1),
+                    color: primaryColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(
@@ -1391,7 +1876,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
                   borderSide: const BorderSide(color: errorColor, width: 2),
                 ),
                 filled: true,
-                fillColor: isDark ? Colors.grey[800]?.withValues(alpha:   0.5) : Colors.grey[50],
+                fillColor: isDark ? Colors.grey[800]?.withValues(alpha: 0.5) : Colors.grey[50],
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
               ),
             ),
@@ -1401,7 +1886,6 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
     );
   }
 
-  // Construye el mensaje de error
   Widget _buildErrorMessage() {
     return Container(
       width: double.infinity,
@@ -1410,8 +1894,8 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            errorColor.withValues(alpha:  0.1),
-            errorColor.withValues(alpha:  0.05),
+            errorColor.withValues(alpha: 0.1),
+            errorColor.withValues(alpha: 0.05),
           ],
         ),
         border: Border.all(color: errorColor, width: 1),
@@ -1422,7 +1906,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
           Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: errorColor.withValues(alpha:   0.2),
+              color: errorColor.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Icon(Icons.error_outline, color: errorColor, size: 20),
@@ -1443,7 +1927,6 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
     );
   }
 
-  // Construye los botones de acción del popup
   Widget _buildActionButtons(bool isDark, AppLocalizations localizations) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
@@ -1474,7 +1957,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    localizations.cancel, // Usar texto localizado
+                    localizations.cancel,
                     style: TextStyle(
                       color: isDark ? primaryColor : Colors.black87,
                       fontWeight: FontWeight.w500,
@@ -1492,13 +1975,13 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
               gradient: LinearGradient(
                 colors: [
                   primaryColor,
-                  primaryColor.withValues(alpha:  0.8),
+                  primaryColor.withValues(alpha: 0.8),
                 ],
               ),
               borderRadius: BorderRadius.circular(10),
               boxShadow: [
                 BoxShadow(
-                  color: primaryColor.withValues(alpha:   0.3),
+                  color: primaryColor.withValues(alpha: 0.3),
                   blurRadius: 8,
                   offset: const Offset(0, 4),
                 ),
@@ -1533,7 +2016,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          localizations.saveChanges, // Usar texto localizado
+                          localizations.saveChanges,
                           style: const TextStyle(
                             color: Colors.black,
                             fontWeight: FontWeight.bold,
@@ -1573,9 +2056,8 @@ class _AnimatedAppearanceState extends State<AnimatedAppearance> with SingleTick
   @override
   void initState() {
     super.initState();
-    // Configura animaciones de opacidad y deslizamiento
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 400), // Animación más rápida
+      duration: const Duration(milliseconds: 400),
       vsync: this,
     );
     _opacity = Tween<double>(
@@ -1641,7 +2123,7 @@ class BlurredBackground extends StatelessWidget {
             duration: themeAnimationDuration,
             color: isDark
                 ? const Color.fromRGBO(0, 0, 0, 0.7)
-                : Colors.white.withValues(alpha:  0.85),
+                : Colors.white.withValues(alpha: 0.85),
           ),
         ),
       ),
@@ -1659,7 +2141,7 @@ class NotificationsBottomSheet extends StatelessWidget {
     return Container(
       height: 200,
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor, // Usar color del tema
+        color: Theme.of(context).cardColor,
         borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(20),
           topRight: Radius.circular(20),
@@ -1667,8 +2149,8 @@ class NotificationsBottomSheet extends StatelessWidget {
       ),
       child: Center(
         child: Text(
-          localizations.notifications, // Usar texto localizado
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Theme.of(context).textTheme.bodyLarge?.color), // Usar color del tema
+          localizations.notifications,
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Theme.of(context).textTheme.bodyLarge?.color),
         ),
       ),
     );

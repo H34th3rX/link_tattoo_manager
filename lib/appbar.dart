@@ -91,14 +91,16 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     );
   }
 
-  Widget _buildNotificationButton(BuildContext context, bool isDark, AppLocalizations localizations) {
-    return FutureBuilder<List<NotificationItem>>(
-      future: NotificationsService.getNotifications(),
-      builder: (context, snapshot) {
-        final notificationCount = snapshot.hasData ? snapshot.data!.length : 0;
-        
-        return AnimatedContainer(
-          duration: themeAnimationDuration,
+Widget _buildNotificationButton(BuildContext context, bool isDark, AppLocalizations localizations) {
+  return FutureBuilder<List<NotificationItem>>(
+    future: NotificationsService.getNotifications(),
+    builder: (context, snapshot) {
+      final notificationCount = snapshot.hasData ? snapshot.data!.length : 0;
+      
+      return AnimatedContainer(
+        duration: themeAnimationDuration,
+        child: GestureDetector(
+          onTap: () => _showNotificationsBottomSheet(context),
           child: Stack(
             children: [
               IconButton(
@@ -111,33 +113,37 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                 Positioned(
                   right: 8,
                   top: 8,
-                  child: Container(
-                    padding: const EdgeInsets.all(2),
-                    decoration: BoxDecoration(
-                      color: Colors.amber,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    constraints: const BoxConstraints(
-                      minWidth: 16,
-                      minHeight: 16,
-                    ),
-                    child: Text(
-                      notificationCount > 9 ? '9+' : notificationCount.toString(),
-                      style: const TextStyle(
-                        color: Colors.black,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
+                  child: GestureDetector(
+                    onTap: () => _showNotificationsBottomSheet(context),
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: Colors.amber,
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      textAlign: TextAlign.center,
+                      constraints: const BoxConstraints(
+                        minWidth: 16,
+                        minHeight: 16,
+                      ),
+                      child: Text(
+                        notificationCount > 9 ? '9+' : notificationCount.toString(),
+                        style: const TextStyle(
+                          color: Colors.black,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
                     ),
                   ),
                 ),
             ],
           ),
-        );
-      },
-    );
-  }
+        ),
+      );
+    },
+  );
+}
 
   void _showNotificationsBottomSheet(BuildContext context) {
     showModalBottomSheet(

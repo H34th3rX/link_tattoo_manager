@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+// Added debug mode import
 import 'profile_page.dart';
 import 'supabase_service.dart';
 import 'theme_provider.dart';
 import 'login_page.dart' show LoginPage;
 import 'register_page.dart' show RegisterPage;
 import 'dashboard_page.dart' show DashboardPage;
-import 'complete_profile_page.dart'; // Importación simplificada
+import 'complete_profile_page.dart';
 import 'loading_screen.dart' show LoadingScreen;
 import 'appointments_page.dart' show AppointmentsPage;
 import 'clients_page.dart' show ClientsPage;
@@ -20,6 +21,7 @@ import 'reset_password_page.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import './l10n/app_localizations.dart';
 import 'localization_provider.dart';
+import '../services/notification_scheduler.dart';
 
 // Definir una GlobalKey para el Navigator
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -27,7 +29,7 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SupabaseService.initialize();
-  
+  await NotificationScheduler.initialize();  
   // Configurar el listener de deep links para manejar confirmaciones de email
   _setupDeepLinkListener();
   

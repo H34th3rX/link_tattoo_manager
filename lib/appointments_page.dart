@@ -1,4 +1,5 @@
 import 'dart:ui' as ui;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -9,6 +10,7 @@ import 'package:intl/intl.dart';
 import 'dart:collection';
 import './integrations/clients_service.dart';
 import './integrations/appointments_service.dart';
+import './services/notification_scheduler.dart';
 
 //[------------- CONSTANTES GLOBALES DE ESTILO --------------]
 const Color primaryColor = Color(0xFFBDA206);
@@ -1130,22 +1132,10 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
-                        child: Row(
-                          children: [
-                            Icon(Icons.calendar_today, size: 18, color: isDark ? hintColor : Colors.grey[600]),
-                            const SizedBox(width: 8),
-                            Text(
-                              dateKey,
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: isDark ? textColor : Colors.black87,
-                              ),
-                            ),
-                          ],
-                        ),
+                      AnimatedDateSection(
+                        dateText: dateKey,
+                        isDark: isDark,
+                        index: index, // Pass the section index for staggered animation
                       ),
                       isWide
                           ? GridView.builder(
@@ -1209,6 +1199,116 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class AnimatedDateSection extends StatefulWidget {
+  final String dateText;
+  final bool isDark;
+  final int index;
+
+  const AnimatedDateSection({
+    super.key,
+    required this.dateText,
+    required this.isDark,
+    required this.index,
+  });
+
+  @override
+  State<AnimatedDateSection> createState() => _AnimatedDateSectionState();
+}
+
+class _AnimatedDateSectionState extends State<AnimatedDateSection>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: Duration(milliseconds: 600 + (widget.index * 100)),
+      vsync: this,
+    );
+
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOut,
+    ));
+
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(-0.3, 0),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutCubic,
+    ));
+
+    Future.delayed(Duration(milliseconds: widget.index * 150), () {
+      if (mounted) {
+        _controller.forward();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SlideTransition(
+      position: _slideAnimation,
+      child: FadeTransition(
+        opacity: _fadeAnimation,
+        child: Container(
+          margin: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: widget.isDark
+                  ? [Colors.grey[800]!.withValues(alpha: 0.3), Colors.grey[700]!.withValues(alpha: 0.1)]
+                  : [primaryColor.withValues(alpha: 0.1), primaryColor.withValues(alpha: 0.05)],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: widget.isDark ? Colors.grey[600]!.withValues(alpha: 0.3) : primaryColor.withValues(alpha: 0.2),
+              width: 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 4,
+                height: 20,
+                decoration: BoxDecoration(
+                  color: primaryColor,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                widget.dateText,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: widget.isDark ? textColor : Colors.grey[800],
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1571,10 +1671,14 @@ class _AppointmentPopupState extends State<AppointmentPopup>
   TimeOfDay _selectedTime = TimeOfDay.now();
   int _selectedDuration = 60;
   String _selectedStatus = 'pendiente';
+  bool _notifyMe = true;
 
   Map<String, dynamic>? _selectedClient;
   bool _isClientSelectionPopupOpen = false;
   bool _isSaving = false;
+  
+  Key _datePickerKey = UniqueKey();
+
   List<String> _availableStatuses = [];
 
   @override
@@ -1585,36 +1689,28 @@ class _AppointmentPopupState extends State<AppointmentPopup>
     _availableStatuses = AppointmentsService.getAvailableStatusesForForm();
 
     _animationController = AnimationController(
-      duration: const Duration(milliseconds: 400),
+      duration: const Duration(milliseconds: 300),
       vsync: this,
     );
 
-    _scaleAnimation = Tween<double>(
-      begin: 0.8,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.elasticOut,
-    ));
+    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeOutBack),
+    );
 
-    _opacityAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
-    ));
+    _opacityAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
+    );
 
     _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, -0.3),
+      begin: const Offset(0, 0.3),
       end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOutBack,
-    ));
+    ).animate(CurvedAnimation(parent: _animationController, curve: Curves.easeOut));
 
     _animationController.forward();
+    _initializeFields();
+  }
 
+  void _initializeFields() {
     // Rellenar campos si está en modo edición o con datos iniciales de cliente
     if (widget.initialAppointment != null) {
       final appointment = widget.initialAppointment!;
@@ -1812,6 +1908,23 @@ class _AppointmentPopupState extends State<AppointmentPopup>
           depositPaid: depositPaid ?? 0.00,
           notes: _notesCtrl.text.isEmpty ? null : _notesCtrl.text,
         );
+      }
+
+      if (_notifyMe && (_selectedStatus == 'confirmada' || _selectedStatus == 'pendiente')) {
+        try {
+          // Schedule notification using the scheduler
+          await NotificationScheduler.scheduleAppointmentNotification(
+            appointmentId: widget.initialAppointment?['id'] ?? 'new_appointment',
+            clientName: _selectedClient!['name'] ?? 'Cliente',
+            appointmentTime: selectedDateTime,
+            employeeId: widget.employeeId,
+          );
+        } catch (e) {
+          // Don't fail the appointment creation if notification fails
+          if (kDebugMode) {
+            print('Error programando notificación automática: $e');
+          }
+        }
       }
 
       // Verify mounted before any operation with context or setState
@@ -2167,14 +2280,29 @@ class _AppointmentPopupState extends State<AppointmentPopup>
           children: [
             Expanded(
               child: GestureDetector(
-                onTap: _isSaving ? null : () async {
+                key: _datePickerKey,
+                onTap: () async {
+                  setState(() {
+                    _datePickerKey = UniqueKey();
+                  });
+                  
                   final date = await showDatePicker(
                     context: context,
                     initialDate: _selectedDate,
                     firstDate: DateTime.now(),
                     lastDate: DateTime.now().add(const Duration(days: 365)),
+                    builder: (context, child) {
+                      return Theme(
+                        data: Theme.of(context).copyWith(
+                          colorScheme: Theme.of(context).colorScheme.copyWith(
+                            primary: widget.isPostponedAppointment ? postponedColor : primaryColor,
+                          ),
+                        ),
+                        child: child!,
+                      );
+                    },
                   );
-                  if (date != null) {
+                  if (date != null && mounted) {
                     setState(() => _selectedDate = date);
                   }
                 },
@@ -2210,12 +2338,22 @@ class _AppointmentPopupState extends State<AppointmentPopup>
             const SizedBox(width: 16),
             Expanded(
               child: GestureDetector(
-                onTap: _isSaving ? null : () async {
+                onTap: () async {
                   final time = await showTimePicker(
                     context: context,
                     initialTime: _selectedTime,
+                    builder: (context, child) {
+                      return Theme(
+                        data: Theme.of(context).copyWith(
+                          colorScheme: Theme.of(context).colorScheme.copyWith(
+                            primary: widget.isPostponedAppointment ? postponedColor : primaryColor,
+                          ),
+                        ),
+                        child: child!,
+                      );
+                    },
                   );
-                  if (time != null) {
+                  if (time != null && mounted) {
                     setState(() => _selectedTime = time);
                   }
                 },
@@ -2302,6 +2440,46 @@ class _AppointmentPopupState extends State<AppointmentPopup>
               ),
             ),
           ],
+        ),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: widget.isDark ? Colors.grey[800]?.withValues(alpha: 0.3) : Colors.grey[50],
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: widget.isDark ? Colors.grey[600]! : Colors.grey[300]!,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.notifications_active,
+                color: _notifyMe 
+                    ? (widget.isPostponedAppointment ? postponedColor : primaryColor)
+                    : (widget.isDark ? Colors.grey[500] : Colors.grey[400]),
+                size: 20,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Notificarme de esta cita',
+                  style: TextStyle(
+                    color: widget.isDark ? textColor : Colors.black87,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              Switch(
+                value: _notifyMe,
+                onChanged: _isSaving ? null : (value) => setState(() => _notifyMe = value),
+                activeColor: widget.isPostponedAppointment ? postponedColor : primaryColor,
+                inactiveThumbColor: widget.isDark ? Colors.grey[600] : Colors.grey[400],
+                inactiveTrackColor: widget.isDark ? Colors.grey[700] : Colors.grey[300],
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 16),
         Row(

@@ -19,6 +19,8 @@ dependencies:
   google_sign_in: ^6.2.1
 
   shared_preferences: ^2.2.2
+  timezone: ^0.10.1
+  collection: ^1.17.2
 
   # Graficos
   syncfusion_flutter_charts: 29.2.11
