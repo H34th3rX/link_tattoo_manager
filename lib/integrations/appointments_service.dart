@@ -83,7 +83,7 @@ class AppointmentsService {
           )
         ''')
         .eq('employee_id', employeeId)
-        .order('start_time', ascending: true);
+        .order('created_at', ascending: false);
     
     return List<Map<String, dynamic>>.from(response.map((appointment) {
       if (appointment['created_at'] != null) {
@@ -128,7 +128,7 @@ class AppointmentsService {
       query = query.eq('status', status);
     }
 
-    final response = await query.order('start_time', ascending: true);
+    final response = await query.order('created_at', ascending: false);
     
     return List<Map<String, dynamic>>.from(response.map((appointment) {
       if (appointment['created_at'] != null) {

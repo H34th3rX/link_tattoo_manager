@@ -196,21 +196,21 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
       final notes = (appointment['notes']?.toString() ?? '').toLowerCase();
 
       final matchesSearch = clientName.contains(query) ||
-                           description.contains(query) ||
-                           notes.contains(query);
+                          description.contains(query) ||
+                          notes.contains(query);
 
       return matchesSearch;
     }).toList();
 
-    // Ordenar por fecha y hora
+    // CAMBIO: Ordenar por fecha de creación descendente (más reciente primero)
     tempFilteredList.sort((a, b) {
-      final dateA = DateTime.parse(a['start_time']);
-      final dateB = DateTime.parse(b['start_time']);
-      return dateA.compareTo(dateB);
+      final dateA = DateTime.parse(a['created_at'] ?? a['start_time']);
+      final dateB = DateTime.parse(b['created_at'] ?? b['start_time']);
+      return dateB.compareTo(dateA); // Orden descendente
     });
 
     // Agrupar por fecha
-    LinkedHashMap<String, List<Map<String, dynamic>>> newGroupedAppointments = LinkedHashMap();
+   LinkedHashMap<String, List<Map<String, dynamic>>> newGroupedAppointments = LinkedHashMap();
     for (var appointment in tempFilteredList) {
       final dateKey = DateFormat('dd/MM/yyyy').format(DateTime.parse(appointment['start_time']));
       if (!newGroupedAppointments.containsKey(dateKey)) {
@@ -218,6 +218,14 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
       }
       newGroupedAppointments[dateKey]!.add(appointment);
     }
+
+    newGroupedAppointments.forEach((key, appointments) {
+      appointments.sort((a, b) {
+        final dateA = DateTime.parse(a['created_at'] ?? a['start_time']);
+        final dateB = DateTime.parse(b['created_at'] ?? b['start_time']);
+        return dateB.compareTo(dateA);
+      });
+    });
 
     setState(() {
       _filteredAppointments = tempFilteredList;
