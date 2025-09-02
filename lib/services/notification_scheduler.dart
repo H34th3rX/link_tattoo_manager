@@ -110,35 +110,36 @@ class NotificationScheduler {
   
   // Crear canal de notificación con configuración completa
   static Future<void> _createNotificationChannel() async {
-    if (Platform.isAndroid) {
-      final androidImplementation = _notifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
-      if (androidImplementation != null) {
-        const appointmentChannel = AndroidNotificationChannel(
-          'appointment_channel',
-          'Notificaciones de Citas',
-          description: 'Notificaciones para citas próximas y recordatorios importantes',
-          importance: Importance.high,
-          playSound: true,
-          enableVibration: true,
-          showBadge: true,
-          sound: RawResourceAndroidNotificationSound('notification_sound'),
-        );
-        
-        const testChannel = AndroidNotificationChannel(
-          'test_channel',
-          'Notificaciones de Prueba',
-          description: 'Canal para probar el funcionamiento de notificaciones',
-          importance: Importance.high,
-          playSound: true,
-          enableVibration: true,
-          showBadge: false,
-        );
-        
-        await androidImplementation.createNotificationChannel(appointmentChannel);
-        await androidImplementation.createNotificationChannel(testChannel);
-      }
+  if (Platform.isAndroid) {
+    final androidImplementation = _notifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    if (androidImplementation != null) {
+      const appointmentChannel = AndroidNotificationChannel(
+        'appointment_channel',
+        'Notificaciones de Citas',
+        description: 'Notificaciones para citas próximas y recordatorios importantes',
+        importance: Importance.max, // Cambiado a max para asegurar sonido
+        playSound: true,
+        enableVibration: true,
+        showBadge: true,
+        // Removido el sonido personalizado para usar el sonido por defecto
+        // sound: RawResourceAndroidNotificationSound('notification_sound'),
+      );
+      
+      const testChannel = AndroidNotificationChannel(
+        'test_channel',
+        'Notificaciones de Prueba',
+        description: 'Canal para probar el funcionamiento de notificaciones',
+        importance: Importance.max, // Cambiado a max
+        playSound: true,
+        enableVibration: true,
+        showBadge: false,
+      );
+      
+      await androidImplementation.createNotificationChannel(appointmentChannel);
+      await androidImplementation.createNotificationChannel(testChannel);
     }
   }
+}
   
   // Solicitar todos los permisos necesarios
   static Future<void> _requestAllPermissions() async {
@@ -231,117 +232,120 @@ class NotificationScheduler {
   
   // Programar notificación para una cita
   static Future<void> scheduleAppointmentNotification({
-    required String appointmentId,
-    required String clientName,
-    required DateTime appointmentTime,
-    String? employeeId,
-  }) async {
-    try {
-      final isEnabled = await getNotificationsEnabled();
-      if (!isEnabled) {
+  required String appointmentId,
+  required String clientName,
+  required DateTime appointmentTime,
+  String? employeeId,
+}) async {
+  try {
+    final isEnabled = await getNotificationsEnabled();
+    if (!isEnabled) {
+      return;
+    }
+    
+    final hasPermissions = await checkNotificationPermissions();
+    if (!hasPermissions) {
+      final granted = await requestNotificationPermissions();
+      if (!granted) {
         return;
       }
-      
-      final hasPermissions = await checkNotificationPermissions();
-      if (!hasPermissions) {
-        final granted = await requestNotificationPermissions();
-        if (!granted) {
-          return;
-        }
-      }
-      
-      final notificationMinutes = await getNotificationTime();
-      final notificationTime = appointmentTime.subtract(Duration(minutes: notificationMinutes));
-      
-      if (notificationTime.isAfter(DateTime.now())) {
-        final payload = jsonEncode({
-          'type': 'appointment',
-          'appointmentId': appointmentId,
-          'clientName': clientName,
-          'appointmentTime': appointmentTime.toIso8601String(),
-        });
-        
-        final notificationId = _generateNotificationId(appointmentId);
-        final scheduledDate = tz.TZDateTime.from(notificationTime, tz.local);
-        
-        final androidDetails = AndroidNotificationDetails(
-          'appointment_channel',
-          'Notificaciones de Citas',
-          channelDescription: 'Notificaciones para citas próximas y recordatorios importantes',
-          importance: Importance.max,
-          priority: Priority.max,
-          icon: '@mipmap/ic_launcher',
-          largeIcon: const DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
-          color: Color(0xFFBDA206),
-          playSound: true,
-          enableVibration: true,
-          autoCancel: true,
-          ongoing: false,
-          showWhen: true,
-          when: scheduledDate.millisecondsSinceEpoch,
-          usesChronometer: false,
-          fullScreenIntent: true,
-          category: AndroidNotificationCategory.reminder,
-          visibility: NotificationVisibility.public,
-          ticker: 'Cita con $clientName en $notificationMinutes minutos',
-          actions: <AndroidNotificationAction>[
-            AndroidNotificationAction(
-              'view_appointment',
-              'Ver Cita',
-              icon: DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
-            ),
-            AndroidNotificationAction(
-              'dismiss',
-              'Descartar',
-              cancelNotification: true,
-            ),
-          ],
-        );
-        
-        final iosDetails = DarwinNotificationDetails(
-          presentAlert: true,
-          presentBadge: true,
-          presentSound: true,
-          interruptionLevel: InterruptionLevel.timeSensitive,
-          categoryIdentifier: 'appointment_category',
-          threadIdentifier: appointmentId,
-        );
-        
-        final notificationDetails = NotificationDetails(
-          android: androidDetails,
-          iOS: iosDetails,
-        );
-        
-        AndroidScheduleMode scheduleMode = AndroidScheduleMode.exactAllowWhileIdle;
-        
-        try {
-          final androidImplementation = _notifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
-          if (androidImplementation != null) {
-            final canScheduleExact = await androidImplementation.canScheduleExactNotifications();
-            if (canScheduleExact != true) {
-              scheduleMode = AndroidScheduleMode.inexactAllowWhileIdle;
-            }
-          }
-        } catch (e) {
-          scheduleMode = AndroidScheduleMode.inexactAllowWhileIdle;
-        }
-        
-        await _notifications.zonedSchedule(
-          notificationId,
-          '🔔 Cita Próxima',
-          'Tienes una cita con $clientName en $notificationMinutes minutos',
-          scheduledDate,
-          notificationDetails,
-          androidScheduleMode: scheduleMode,
-          payload: payload,
-          matchDateTimeComponents: null,
-        );
-      }
-      
-    } catch (e) {
-      // Error handling silencioso
     }
+    
+    final notificationMinutes = await getNotificationTime();
+    final notificationTime = appointmentTime.subtract(Duration(minutes: notificationMinutes));
+    
+    if (notificationTime.isAfter(DateTime.now())) {
+      final payload = jsonEncode({
+        'type': 'appointment',
+        'appointmentId': appointmentId,
+        'clientName': clientName,
+        'appointmentTime': appointmentTime.toIso8601String(),
+      });
+      
+      final notificationId = _generateNotificationId(appointmentId);
+      final scheduledDate = tz.TZDateTime.from(notificationTime, tz.local);
+      
+      final androidDetails = AndroidNotificationDetails(
+        'appointment_channel',
+        'Notificaciones de Citas',
+        channelDescription: 'Notificaciones para citas próximas y recordatorios importantes',
+        importance: Importance.max, // Asegurar máxima importancia
+        priority: Priority.max,
+        icon: '@mipmap/ic_launcher',
+        largeIcon: const DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
+        color: Color(0xFFBDA206),
+        playSound: true, // Asegurar que el sonido esté habilitado
+        enableVibration: true,
+        autoCancel: true,
+        ongoing: false,
+        showWhen: true,
+        when: scheduledDate.millisecondsSinceEpoch,
+        usesChronometer: false,
+        fullScreenIntent: true,
+        category: AndroidNotificationCategory.reminder,
+        visibility: NotificationVisibility.public,
+        ticker: 'Cita con $clientName en $notificationMinutes minutos',
+        // Removido el sonido personalizado para usar el por defecto
+        // sound: RawResourceAndroidNotificationSound('notification_sound'),
+        actions: <AndroidNotificationAction>[
+          AndroidNotificationAction(
+            'view_appointment',
+            'Ver Cita',
+            icon: DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
+          ),
+          AndroidNotificationAction(
+            'dismiss',
+            'Descartar',
+            cancelNotification: true,
+          ),
+        ],
+      );
+      
+      final iosDetails = DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true, // Asegurar sonido en iOS
+        sound: 'default', // Usar sonido por defecto
+        interruptionLevel: InterruptionLevel.timeSensitive,
+        categoryIdentifier: 'appointment_category',
+        threadIdentifier: appointmentId,
+      );
+      
+      final notificationDetails = NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      );
+      
+      AndroidScheduleMode scheduleMode = AndroidScheduleMode.exactAllowWhileIdle;
+      
+      try {
+        final androidImplementation = _notifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+        if (androidImplementation != null) {
+          final canScheduleExact = await androidImplementation.canScheduleExactNotifications();
+          if (canScheduleExact != true) {
+            scheduleMode = AndroidScheduleMode.inexactAllowWhileIdle;
+          }
+        }
+      } catch (e) {
+        scheduleMode = AndroidScheduleMode.inexactAllowWhileIdle;
+      }
+      
+      await _notifications.zonedSchedule(
+        notificationId,
+        '🔔 Cita Próxima',
+        'Tienes una cita con $clientName en $notificationMinutes minutos',
+        scheduledDate,
+        notificationDetails,
+        androidScheduleMode: scheduleMode,
+        payload: payload,
+        matchDateTimeComponents: null,
+      );
+    }
+    
+  } catch (e) {
+    // Error handling silencioso
   }
+}
   
   // Cancelar notificación de una cita
   static Future<void> cancelAppointmentNotification(String appointmentId) async {
@@ -478,53 +482,56 @@ class NotificationScheduler {
   
   // Mostrar notificación de prueba
   static Future<void> showTestNotification() async {
-    try {
-      final hasPermissions = await checkNotificationPermissions();
-      if (!hasPermissions) {
-        final granted = await requestNotificationPermissions();
-        if (!granted) {
-          return;
-        }
+  try {
+    final hasPermissions = await checkNotificationPermissions();
+    if (!hasPermissions) {
+      final granted = await requestNotificationPermissions();
+      if (!granted) {
+        return;
       }
-      
-      final testId = _generateTestNotificationId();
-      
-      await _notifications.show(
-        testId,
-        '🧪 Prueba de Notificación',
-        'Si ves esto, las notificaciones funcionan correctamente. ${DateTime.now().toString().substring(11, 16)}',
-        NotificationDetails(
-          android: AndroidNotificationDetails(
-            'test_channel',
-            'Notificaciones de Prueba',
-            channelDescription: 'Canal para probar el funcionamiento de notificaciones',
-            importance: Importance.max,
-            priority: Priority.max,
-            icon: '@mipmap/ic_launcher',
-            largeIcon: const DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
-            color: Color(0xFFBDA206),
-            playSound: true,
-            enableVibration: true,
-            autoCancel: true,
-            showWhen: true,
-            fullScreenIntent: true,
-          ),
-          iOS: DarwinNotificationDetails(
-            presentAlert: true,
-            presentBadge: true,
-            presentSound: true,
-            interruptionLevel: InterruptionLevel.active,
-          ),
-        ),
-      );
-      
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt('last_test_notification', DateTime.now().millisecondsSinceEpoch);
-      
-    } catch (e) {
-      // Error handling silencioso
     }
+    
+    final testId = _generateTestNotificationId();
+    
+    await _notifications.show(
+      testId,
+      '🧪 Prueba de Notificación',
+      'Si ves esto, las notificaciones funcionan correctamente. ${DateTime.now().toString().substring(11, 16)}',
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          'test_channel',
+          'Notificaciones de Prueba',
+          channelDescription: 'Canal para probar el funcionamiento de notificaciones',
+          importance: Importance.max, // Máxima importancia
+          priority: Priority.max,
+          icon: '@mipmap/ic_launcher',
+          largeIcon: const DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
+          color: Color(0xFFBDA206),
+          playSound: true, // Asegurar sonido
+          enableVibration: true,
+          autoCancel: true,
+          showWhen: true,
+          fullScreenIntent: true,
+          // Usar sonido por defecto del sistema
+          sound: RawResourceAndroidNotificationSound('notification'), // Sonido por defecto
+        ),
+        iOS: DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true, // Asegurar sonido
+          sound: 'default', // Sonido por defecto
+          interruptionLevel: InterruptionLevel.active,
+        ),
+      ),
+    );
+    
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('last_test_notification', DateTime.now().millisecondsSinceEpoch);
+    
+  } catch (e) {
+    // Error handling silencioso
   }
+}
   
   // Mostrar diálogo de permisos de alarma exacta
   static Future<void> showExactAlarmPermissionDialog(BuildContext context) async {

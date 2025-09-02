@@ -924,9 +924,9 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: statusColor.withOpacity(0.1),
+        color: statusColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: statusColor.withOpacity(0.3)),
+        border: Border.all(color: statusColor.withValues(alpha: 0.3)),
       ),
       child: Column(
         children: [
@@ -1015,7 +1015,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDark ? Colors.grey[800]?.withOpacity(0.5) : Colors.grey[50],
+        color: isDark ? Colors.grey[800]?.withValues(alpha: 0.5) : Colors.grey[50],
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isDark ? Colors.grey[600]! : Colors.grey[300]!,
@@ -1026,7 +1026,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: primaryColor.withOpacity(0.1),
+              color: primaryColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(
@@ -1072,7 +1072,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
               }
             },
             activeColor: primaryColor,
-            activeTrackColor: primaryColor.withOpacity(0.3),
+            activeTrackColor: primaryColor.withValues(alpha: 0.3),
           ),
         ],
       ),
@@ -1253,9 +1253,9 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: color.withOpacity(0.3)),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
