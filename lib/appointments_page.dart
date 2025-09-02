@@ -1304,14 +1304,27 @@ class _AnimatedDateSectionState extends State<AnimatedDateSection>
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              const SizedBox(width: 12),
-              Text(
-                widget.dateText,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: widget.isDark ? textColor : Colors.grey[800],
-                  letterSpacing: 0.5,
+              // Contenido centrado con espaciado
+              Expanded(
+                child: Center(
+                  child: Text(
+                    widget.dateText,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: widget.isDark ? textColor : Colors.grey[800],
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ),
+              // Barra derecha (simétrica a la izquierda)
+              Container(
+                width: 4,
+                height: 20,
+                decoration: BoxDecoration(
+                  color: primaryColor,
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ],
