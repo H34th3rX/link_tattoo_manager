@@ -101,7 +101,6 @@ class EmployeeService {
       }
     } catch (e) {
       // No lanzar error si no se puede eliminar la foto anterior
-      print('Advertencia: No se pudo eliminar la foto anterior: $e');
     }
   }
 

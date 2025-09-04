@@ -205,7 +205,7 @@ Widget _buildNotificationButton(BuildContext context, bool isDark, AppLocalizati
 
   Widget _buildProfileAvatar() {
     return ClipOval(
-      child: Container(
+      child: SizedBox(
         width: 36,
         height: 36,
         child: _isLoadingProfile
