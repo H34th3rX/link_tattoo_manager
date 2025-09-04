@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'theme_provider.dart';
 import './l10n/app_localizations.dart';
 import 'services/auth_service.dart';
+import 'loading_screen.dart';
 import '../integrations/employee_service.dart';
 
 // Duración constante para las animaciones de transición del tema general
@@ -34,6 +35,7 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
   // Variables para manejo de imagen de perfil
   String? _cachedPhotoUrl;
   bool _isLoadingProfile = true;
+  bool _isLoggingOut = false; // Nueva variable para controlar el estado de logout
 
   @override
   void initState() {
@@ -463,7 +465,7 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
           GestureDetector(
             onTap: () => themeProvider.toggle(),
             child: AnimatedContainer(
-              duration: buttonAnimationDuration, // Usar la duración más corta aquí
+              duration: buttonAnimationDuration,
               width: 50,
               height: 26,
               decoration: BoxDecoration(
@@ -475,7 +477,7 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
               child: Stack(
                 children: [
                   AnimatedPositioned(
-                    duration: buttonAnimationDuration, // Usar la duración más corta aquí
+                    duration: buttonAnimationDuration,
                     left: themeProvider.isDark ? 26 : 2,
                     top: 2,
                     child: Container(
@@ -503,7 +505,7 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
     );
   }
 
-  // Botón para cerrar sesión
+  // Botón para cerrar sesión con estado de carga
   Widget _buildLogoutButton(ui.Color accent) {
     final AppLocalizations localizations = AppLocalizations.of(context)!;
     return AnimatedContainer(
@@ -511,15 +513,14 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
       width: double.infinity,
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            Colors.red.shade400,
-            Colors.red.shade600,
-          ],
+          colors: _isLoggingOut 
+              ? [Colors.grey.shade400, Colors.grey.shade600]
+              : [Colors.red.shade400, Colors.red.shade600],
         ),
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.red.withValues(alpha: 0.3),
+            color: (_isLoggingOut ? Colors.grey : Colors.red).withValues(alpha: 0.3),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -529,16 +530,27 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
-          onTap: () => _handleLogout(), // Usar método específico
+          onTap: _isLoggingOut ? null : () => _handleLogout(),
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 12),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.logout_rounded, color: Colors.white, size: 20),
-                SizedBox(width: 8),
+                if (_isLoggingOut) ...[
+                  const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  ),
+                ] else ...[
+                  const Icon(Icons.logout_rounded, color: Colors.white, size: 20),
+                ],
+                const SizedBox(width: 8),
                 Text(
-                  localizations.logout,
+                  _isLoggingOut ? 'Cerrando sesión...' : localizations.logout,
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 14,
@@ -552,59 +564,59 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
       ),
     );
   }
-// Método específico para manejar logout correctamente
-Future<void> _handleLogout() async {
-  // Verificar si el widget sigue montado antes de cualquier operación UI
-  if (!mounted) return;
-  
-  try {
-    if (kDebugMode) {
-      print('Iniciando proceso de logout...');
-    }
+
+  // Método mejorado para manejar logout con pantalla de carga
+  Future<void> _handleLogout() async {
+    if (!mounted || _isLoggingOut) return;
     
-    // Usar el método de logout mejorado del AuthService
-    await AuthService.signOut();
-    
-    if (kDebugMode) {
-      print('Logout completado, redirigiendo...');
-    }
-    
-    // Esperar un momento para asegurar que el logout se complete
-    await Future.delayed(const Duration(milliseconds: 300));
-    
-    // Verificar nuevamente si el widget sigue montado antes de navegar
-    if (mounted) {
-      // Navegar a login con limpieza completa
-      Navigator.of(context).pushNamedAndRemoveUntil(
-        '/login',
-        (route) => false, // Eliminar todas las rutas anteriores
-      );
-    }
-  } catch (e) {
-    if (kDebugMode) {
-      print('Error durante logout: $e');
-    }
-    
-    // En caso de error, forzar logout básico
+    setState(() {
+      _isLoggingOut = true;
+    });
+
     try {
-      await Supabase.instance.client.auth.signOut();
-    } catch (basicLogoutError) {
       if (kDebugMode) {
-        print('Error en logout básico: $basicLogoutError');
+        print('Iniciando proceso de logout con pantalla de carga...');
+      }
+      
+      // Navegar a la pantalla de carga de logout
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (context) => LoadingScreen(
+              userName: widget.userName,
+              type: LoadingScreenType.logout,
+            ),
+          ),
+          (route) => false, // Eliminar todas las rutas anteriores
+        );
+      }
+      
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error durante logout: $e');
+      }
+      
+      // En caso de error, realizar logout básico
+      setState(() {
+        _isLoggingOut = false;
+      });
+      
+      try {
+        await AuthService.signOut();
+      } catch (basicLogoutError) {
+        if (kDebugMode) {
+          print('Error en logout básico: $basicLogoutError');
+        }
+      }
+      
+      // Proceder con navegación de todas formas
+      if (mounted) {
+        Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
       }
     }
-    
-    // Proceder con navegación de todas formas, pero solo si el widget sigue montado
-    if (mounted) {
-      Navigator.of(context).pushNamedAndRemoveUntil(
-        '/login',
-        (route) => false,
-      );
-    }
   }
-}
 
-  // Método público para refrescar el perfil (útil cuando se actualiza la foto)
+  // Método público para refrescar el perfil
   void refreshProfile() {
     _loadEmployeeProfile();
   }

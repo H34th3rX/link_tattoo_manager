@@ -9,7 +9,7 @@ import 'login_page.dart' show LoginPage;
 import 'register_page.dart' show RegisterPage;
 import 'dashboard_page.dart' show DashboardPage;
 import 'complete_profile_page.dart';
-import 'loading_screen.dart' show LoadingScreen;
+import 'loading_screen.dart' show LoadingScreen, LoadingScreenType;
 import 'appointments_page.dart' show AppointmentsPage;
 import 'clients_page.dart' show ClientsPage;
 import 'reports_page.dart';
@@ -97,28 +97,36 @@ class MyApp extends StatelessWidget {
             return localizationProvider.resolveLocale(supportedLocales, deviceLocale);
           },
           routes: {
-            '/loading': (_) => const LoadingScreen(),
-            '/login': (_) => const LoginPage(),
-            '/register': (_) => const RegisterPage(),
-            '/password_recovery': (_) => const PasswordRecoveryPage(),
-            '/complete_profile': (_) => const CompleteProfilePage(), // Usar la página unificada
-            '/dashboard': (_) => const DashboardPage(),
-            '/client_dashboard': (_) => const ClientDashboardPage(),
-            '/profile': (context) => const ProfilePage(),
-            '/appointments': (_) => const AppointmentsPage(),
-            '/clients': (_) => const ClientsPage(),
-            '/reports': (_) => ReportsPage(),
-            '/client_profile': (context) {
-              final client = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
-              return ClientProfilePage(client: client);
+             '/loading': (_) => const LoadingScreen(type: LoadingScreenType.login),
+              '/logout_loading': (context) {
+                final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>?;
+                final userName = args?['userName'] as String?;
+                return LoadingScreen(
+                  userName: userName,
+                  type: LoadingScreenType.logout,
+                );
+              },
+              '/login': (_) => const LoginPage(),
+              '/register': (_) => const RegisterPage(),
+              '/password_recovery': (_) => const PasswordRecoveryPage(),
+              '/complete_profile': (_) => const CompleteProfilePage(),
+              '/dashboard': (_) => const DashboardPage(),
+              '/client_dashboard': (_) => const ClientDashboardPage(),
+              '/profile': (context) => const ProfilePage(),
+              '/appointments': (_) => const AppointmentsPage(),
+              '/clients': (_) => const ClientsPage(),
+              '/reports': (_) => ReportsPage(),
+              '/client_profile': (context) {
+                final client = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+                return ClientProfilePage(client: client);
+              },
+              '/client_history': (context) {
+                final client = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+                return ClientHistoryPage(client: client);
+              },
+              '/calendar': (_) => const CalendarPage(),
             },
-            '/client_history': (context) {
-              final client = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
-              return ClientHistoryPage(client: client);
-            },
-            '/calendar': (_) => const CalendarPage(),
-          },
-          onGenerateRoute: (settings) {
+                      onGenerateRoute: (settings) {
             // Manejar rutas con parámetros, como la página de restablecimiento de contraseña
             if (settings.name == '/reset_password') {
               final args = settings.arguments as Map<String, dynamic>?;
