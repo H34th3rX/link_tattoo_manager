@@ -16,6 +16,7 @@ dependencies:
   shake: ^3.0.0
   # Backend y autenticación
   supabase_flutter: ^2.9.1
+  image_picker: ^1.0.7
   google_sign_in: ^6.2.1
 
   shared_preferences: ^2.2.2
@@ -58,6 +59,7 @@ flutter:
     - assets/images/logo.png
     - assets/images/icon.png
     - assets/images/google_logo.png
+    - assets/images/default_profile.png
     - assets/fonts/Roboto-Regular.ttf
     - assets/fonts/Roboto-Bold.ttf
 

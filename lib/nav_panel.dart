@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'theme_provider.dart';
 import './l10n/app_localizations.dart';
 import 'services/auth_service.dart';
+import '../integrations/employee_service.dart';
 
 // Duración constante para las animaciones de transición del tema general
 const Duration themeAnimationDuration = Duration(milliseconds: 300);
@@ -29,6 +30,10 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
   late AnimationController _hoverController;
   late AnimationController _pulseController;
   int _hoveredIndex = -1; // Índice del elemento con hover
+  
+  // Variables para manejo de imagen de perfil
+  String? _cachedPhotoUrl;
+  bool _isLoadingProfile = true;
 
   @override
   void initState() {
@@ -43,6 +48,9 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
       duration: const Duration(milliseconds: 1500),
       vsync: this,
     )..repeat();
+    
+    // Cargar el perfil del empleado
+    _loadEmployeeProfile();
   }
 
   @override
@@ -51,6 +59,25 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
     _hoverController.dispose();
     _pulseController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadEmployeeProfile() async {
+    try {
+      final profile = await EmployeeService.getCurrentEmployeeProfile();
+      if (mounted) {
+        setState(() {
+          _cachedPhotoUrl = profile?['photo_url'] as String?;
+          _isLoadingProfile = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _cachedPhotoUrl = null;
+          _isLoadingProfile = false;
+        });
+      }
+    }
   }
 
   //[-------------CONSTRUCCIÓN DEL PANEL--------------]
@@ -130,38 +157,7 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
       ),
       child: Column(
         children: [
-          AnimatedBuilder(
-            animation: _pulseController,
-            builder: (context, child) {
-              return Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: const RadialGradient(
-                    colors: [Colors.white, Color(0xFFF0F0F0)],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.white.withValues(alpha: 0.3 + 0.2 * _pulseController.value),
-                      blurRadius: 20,
-                      spreadRadius: 2,
-                    ),
-                  ],
-                ),
-                child: Center(
-                  child: Text(
-                    widget.user.email![0].toUpperCase(),
-                    style: TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      color: accent,
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
+          _buildProfileAvatar(accent),
           const SizedBox(height: 16),
           Text(
             widget.userName,
@@ -179,6 +175,100 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildProfileAvatar(ui.Color accent) {
+    return AnimatedBuilder(
+      animation: _pulseController,
+      builder: (context, child) {
+        return Container(
+          width: 80,
+          height: 80,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.white.withValues(alpha: 0.3 + 0.2 * _pulseController.value),
+                blurRadius: 20,
+                spreadRadius: 2,
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(40),
+            child: Stack(
+              children: [
+                // Fondo por defecto que siempre está presente
+                _buildFallbackAvatar(accent),
+                // Imagen que aparece encima con fade (solo si está cargando o hay imagen)
+                if (_isLoadingProfile)
+                  Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.black.withValues(alpha: 0.3),
+                    ),
+                    child: const Center(
+                      child: SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      ),
+                    ),
+                  )
+                else if (_cachedPhotoUrl != null && _cachedPhotoUrl!.isNotEmpty)
+                  AnimatedOpacity(
+                    duration: const Duration(milliseconds: 500),
+                    opacity: 1.0,
+                    child: Image.network(
+                      _cachedPhotoUrl!,
+                      width: 80,
+                      height: 80,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return const SizedBox.shrink(); // No mostrar nada si hay error, se verá el fondo
+                      },
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) {
+                          return child; // Imagen completamente cargada
+                        }
+                        return const SizedBox.shrink(); // Mientras carga, no mostrar nada
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildFallbackAvatar(ui.Color accent) {
+    return Container(
+      width: 80,
+      height: 80,
+      decoration: const BoxDecoration(
+        gradient: RadialGradient(
+          colors: [Colors.white, Color(0xFFF0F0F0)],
+        ),
+        shape: BoxShape.circle,
+      ),
+      child: Center(
+        child: Text(
+          widget.user.email![0].toUpperCase(),
+          style: TextStyle(
+            fontSize: 32,
+            fontWeight: FontWeight.bold,
+            color: accent,
+          ),
+        ),
       ),
     );
   }
@@ -513,4 +603,9 @@ Future<void> _handleLogout() async {
     }
   }
 }
+
+  // Método público para refrescar el perfil (útil cuando se actualiza la foto)
+  void refreshProfile() {
+    _loadEmployeeProfile();
+  }
 }

@@ -5,6 +5,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../integrations/employee_service.dart'; // Importar el servicio de empleados
 
 //[-------------PANTALLA DE CARGA ANIMADA OPTIMIZADA--------------]
 class LoadingScreen extends StatefulWidget {
@@ -43,6 +44,10 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
   String _statusMessage = 'Iniciando...';
   String _displayName = '';
   String? _redirectRoute;
+  
+  // Variables para el perfil del empleado
+  String? _cachedPhotoUrl;
+  bool _isLoadingProfile = true;
 
   @override
   void initState() {
@@ -124,8 +129,9 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
       curve: Curves.easeOutBack,
     ));
 
-    // Iniciar verificación de usuario y animaciones
+    // Iniciar verificación de usuario y carga del perfil
     _checkUserStatus();
+    _loadEmployeeProfile();
     
     // Iniciar las animaciones principales con delay
     Future.delayed(const Duration(milliseconds: 300), () {
@@ -142,6 +148,39 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
         _checkForRedirect();
       }
     });
+  }
+
+  // Cargar el perfil del empleado para obtener la foto
+  Future<void> _loadEmployeeProfile() async {
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user != null) {
+        final profile = await EmployeeService.getCurrentEmployeeProfile();
+        if (mounted) {
+          setState(() {
+            _cachedPhotoUrl = profile?['photo_url'] as String?;
+            _isLoadingProfile = false;
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _cachedPhotoUrl = null;
+            _isLoadingProfile = false;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _cachedPhotoUrl = null;
+          _isLoadingProfile = false;
+        });
+      }
+      if (kDebugMode) {
+        print('Error al cargar perfil del empleado en loading screen: $e');
+      }
+    }
   }
 
   // Verificar el estado del usuario y determinar redirección
@@ -383,7 +422,7 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Icono animado con anillos rotatorios más elaborados
+                        // Foto de perfil del empleado con anillos rotatorios
                         Stack(
                           alignment: Alignment.center,
                           children: [
@@ -432,33 +471,8 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
                                 ),
                               ),
                             ),
-                            // Icono central con gradiente mejorado
-                            Container(
-                              width: 90,
-                              height: 90,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                gradient: RadialGradient(
-                                  colors: [
-                                    accentColor.withValues(alpha: 0.9),
-                                    accentColor.withValues(alpha: 0.5),
-                                    accentColor.withValues(alpha: 0.2),
-                                  ],
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: accentColor.withValues(alpha: 0.6),
-                                    blurRadius: 20,
-                                    offset: const Offset(0, 0),
-                                  ),
-                                ],
-                              ),
-                              child: const Icon(
-                                Icons.waving_hand, 
-                                size: 45, 
-                                color: Colors.white,
-                              ),
-                            ),
+                            // Foto de perfil del empleado o icono por defecto
+                            _buildProfileImage(accentColor),
                           ],
                         ),
                         
@@ -630,6 +644,101 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // Widget para mostrar la imagen del perfil del empleado
+  Widget _buildProfileImage(Color accentColor) {
+    return Container(
+      width: 90,
+      height: 90,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: RadialGradient(
+          colors: [
+            accentColor.withValues(alpha: 0.9),
+            accentColor.withValues(alpha: 0.5),
+            accentColor.withValues(alpha: 0.2),
+          ],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: accentColor.withValues(alpha: 0.6),
+            blurRadius: 20,
+            offset: const Offset(0, 0),
+          ),
+        ],
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.3),
+          width: 2,
+        ),
+      ),
+      child: ClipOval(
+        child: _isLoadingProfile
+            ? Container(
+                color: Colors.grey[300],
+                child: const Center(
+                  child: SizedBox(
+                    width: 30,
+                    height: 30,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  ),
+                ),
+              )
+            : (_cachedPhotoUrl != null && _cachedPhotoUrl!.isNotEmpty
+                ? Image.network(
+                    _cachedPhotoUrl!,
+                    fit: BoxFit.cover,
+                    width: 90,
+                    height: 90,
+                    errorBuilder: (context, error, stackTrace) {
+                      return _buildDefaultIcon();
+                    },
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return Container(
+                        color: Colors.grey[300],
+                        child: const Center(
+                          child: SizedBox(
+                            width: 30,
+                            height: 30,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  )
+                : _buildDefaultIcon()),
+      ),
+    );
+  }
+
+  // Widget para el ícono por defecto cuando no hay imagen
+  Widget _buildDefaultIcon() {
+    return Container(
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: RadialGradient(
+          colors: [
+            Color(0x33BDA206), // Color dorado con transparencia
+            Color(0x1ABDA206), // Más transparente hacia afuera
+            Colors.transparent,
+          ],
+        ),
+      ),
+      child: const Center(
+        child: Icon(
+          Icons.waving_hand,
+          size: 45,
+          color: Colors.white,
+        ),
       ),
     );
   }

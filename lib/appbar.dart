@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import './l10n/app_localizations.dart';
 import 'theme_provider.dart';
 import '../integrations/notifications_service.dart';
+import '../integrations/employee_service.dart';
 
 //[-------------CONSTANTES GLOBALES--------------]
 const Color primaryColor = Color(0xFFBDA206);
@@ -10,7 +11,7 @@ const Color textColor = Colors.white;
 const Duration themeAnimationDuration = Duration(milliseconds: 300);
 
 //[-------------APPBAR PERSONALIZADO--------------]
-class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
+class CustomAppBar extends StatefulWidget implements PreferredSizeWidget {
   final String title;
   final VoidCallback onNotificationPressed;
   final bool isWide;
@@ -23,6 +24,42 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.isWide,
     this.showBackButton = false,
   });
+
+  @override
+  State<CustomAppBar> createState() => _CustomAppBarState();
+
+  @override
+  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
+}
+
+class _CustomAppBarState extends State<CustomAppBar> {
+  String? _cachedPhotoUrl;
+  bool _isLoadingProfile = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadEmployeeProfile();
+  }
+
+  Future<void> _loadEmployeeProfile() async {
+    try {
+      final profile = await EmployeeService.getCurrentEmployeeProfile();
+      if (mounted) {
+        setState(() {
+          _cachedPhotoUrl = profile?['photo_url'] as String?;
+          _isLoadingProfile = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _cachedPhotoUrl = null;
+          _isLoadingProfile = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -47,22 +84,14 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                 fontWeight: FontWeight.bold,
                 color: textColor,
               ),
-              child: Text(title),
+              child: Text(widget.title),
             ),
             actions: [
               _buildNotificationButton(context, isDark, localizations),
-              AnimatedContainer(
-                duration: themeAnimationDuration,
-                child: IconButton(
-                  icon: const Icon(Icons.account_circle),
-                  onPressed: () => Navigator.of(context).pushNamed('/profile'),
-                  tooltip: localizations.myProfile,
-                  color: isDark ? textColor : Colors.black87,
-                ),
-              ),
+              _buildProfileButton(context, isDark, localizations),
               const SizedBox(width: 8),
             ],
-            leading: showBackButton
+            leading: widget.showBackButton
                 ? AnimatedContainer(
                     duration: themeAnimationDuration,
                     child: IconButton(
@@ -72,7 +101,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                       color: isDark ? textColor : Colors.black87,
                     ),
                   )
-                : (isWide
+                : (widget.isWide
                     ? null
                     : Builder(
                         builder: (ctx) => AnimatedContainer(
@@ -154,8 +183,108 @@ Widget _buildNotificationButton(BuildContext context, bool isDark, AppLocalizati
     );
   }
 
-  @override
-  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
+  Widget _buildProfileButton(BuildContext context, bool isDark, AppLocalizations localizations) {
+    return AnimatedContainer(
+      duration: themeAnimationDuration,
+      child: GestureDetector(
+        onTap: () => Navigator.of(context).pushNamed('/profile'),
+        child: Container(
+          margin: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: Colors.amber,
+              width: 2,
+            ),
+          ),
+          child: _buildProfileAvatar(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfileAvatar() {
+    return ClipOval(
+      child: Container(
+        width: 36,
+        height: 36,
+        child: _isLoadingProfile
+            ? Stack(
+                children: [
+                  _buildDefaultProfileIcon(),
+                  Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.black.withValues(alpha: 0.3),
+                    ),
+                    child: const Center(
+                      child: SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.amber),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              )
+            : (_cachedPhotoUrl != null && _cachedPhotoUrl!.isNotEmpty
+                ? Stack(
+                    children: [
+                      // Fondo con el ícono por defecto
+                      _buildDefaultProfileIcon(),
+                      // Imagen que aparece encima con fade
+                      AnimatedOpacity(
+                        duration: const Duration(milliseconds: 500),
+                        opacity: 1.0,
+                        child: Image.network(
+                          _cachedPhotoUrl!,
+                          fit: BoxFit.cover,
+                          width: 36,
+                          height: 36,
+                          errorBuilder: (context, error, stackTrace) {
+                            return const SizedBox.shrink(); // No mostrar nada si hay error
+                          },
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) {
+                              // Imagen completamente cargada
+                              return child;
+                            }
+                            // Mientras carga, no mostrar nada (se verá el fondo)
+                            return const SizedBox.shrink();
+                          },
+                        ),
+                      ),
+                    ],
+                  )
+                : _buildDefaultProfileIcon()),
+      ),
+    );
+  }
+
+  Widget _buildDefaultProfileIcon() {
+    return Container(
+      width: 36,
+      height: 36,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: RadialGradient(
+          colors: [
+            Colors.amber.withValues(alpha: 0.3),
+            Colors.amber.withValues(alpha: 0.1),
+            Colors.transparent,
+          ],
+        ),
+      ),
+      child: Icon(
+        Icons.person,
+        color: Colors.grey[600],
+        size: 20,
+      ),
+    );
+  }
 }
 
 //[-------------HOJA INFERIOR DE NOTIFICACIONES DINÁMICAS--------------]

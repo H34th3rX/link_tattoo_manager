@@ -7,12 +7,14 @@ import 'theme_provider.dart';
 import 'appbar.dart';
 import './integrations/clients_service.dart';
 import './integrations/employee_service.dart';
-import 'package:intl/intl.dart'; 
+import 'package:intl/intl.dart';
 import './l10n/app_localizations.dart';
 import 'localization_provider.dart';
 import 'services/auth_service.dart';
 import 'reset_password_page.dart';
 import '../services/notification_scheduler.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:typed_data';
 
 // Constantes globales para estilos y animaciones
 const Color primaryColor = Color(0xFFBDA206);
@@ -58,6 +60,8 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
   int _appointmentsThisMonth = 0;
 
   late Future<Map<String, dynamic>?> _nextAppointmentFuture;
+  final ImagePicker _imagePicker = ImagePicker();
+  bool _isUploadingPhoto = false;
 
   @override
   void initState() {
@@ -91,7 +95,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     try {
       final user = Supabase.instance.client.auth.currentUser!;
       final profile = await EmployeeService.getEmployeeProfile(user.id);
-      
+
       if (user.email != null) {
         final userStatus = await AuthService.checkUserCanResetPassword(user.email!);
         if (!mounted) return;
@@ -236,6 +240,60 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     } finally {
       if (mounted) {
         setState(() => _loading = false);
+      }
+    }
+  }
+
+  Future<void> _selectAndUploadPhoto() async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+
+      if (image == null) return;
+
+      setState(() {
+        _isUploadingPhoto = true;
+      });
+
+      final Uint8List imageBytes = await image.readAsBytes();
+      final String fileName = 'profile_${DateTime.now().millisecondsSinceEpoch}.jpg';
+
+      final String newPhotoUrl = await EmployeeService.updateEmployeePhoto(
+        employeeId: Supabase.instance.client.auth.currentUser!.id,
+        photoBytes: imageBytes,
+        fileName: fileName,
+        currentPhotoUrl: _employeeProfile?['photo_url'],
+      );
+
+      setState(() {
+        _employeeProfile?['photo_url'] = newPhotoUrl;
+        _isUploadingPhoto = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(AppLocalizations.of(context)!.profileUpdatedSuccessfully),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _isUploadingPhoto = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al actualizar la foto: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }
@@ -528,12 +586,6 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
   }
 
   Widget _buildProfileHeader(bool isDark, AppLocalizations localizations) {
-    final String initials = (_employeeProfile?['username'] as String? ?? 'UN')
-        .split(' ')
-        .map((word) => word.isNotEmpty ? word[0].toUpperCase() : '')
-        .join()
-        .substring(0, ((_employeeProfile?['username'] as String? ?? 'UN').split(' ').map((word) => word.isNotEmpty ? word[0].toUpperCase() : '').join().length > 1 ? 2 : 1));
-
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -553,33 +605,58 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    colors: [primaryColor, primaryColor.withValues(alpha: 0.7)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: primaryColor.withValues(alpha: 0.3),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
+              GestureDetector(
+                onTap: _selectAndUploadPhoto,
+                child: Stack(
+                  children: [
+                    Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: primaryColor,
+                          width: 2,
+                        ),
+                        image: DecorationImage(
+                          fit: BoxFit.cover,
+                          image: _employeeProfile?['photo_url'] != null
+                              ? NetworkImage(_employeeProfile!['photo_url']) as ImageProvider<Object>
+                              : const AssetImage('assets/images/default_profile.png'),
+                        ),
+                      ),
+                    ),
+                    if (_isUploadingPhoto)
+                      Positioned.fill(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.6),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Center(
+                            child: CircularProgressIndicator(
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          ),
+                        ),
+                      ),
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: primaryColor,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.camera_alt,
+                          size: 16,
+                          color: Colors.black,
+                        ),
+                      ),
                     ),
                   ],
-                ),
-                child: Center(
-                  child: Text(
-                    initials,
-                    style: const TextStyle(
-                      color: Colors.black,
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
                 ),
               ),
               const SizedBox(width: 20),
@@ -701,7 +778,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
               final appointment = snapshot.data!;
               final startTimeStr = appointment['start_time'] as String;
               DateTime startTime;
-              
+
               if (startTimeStr.endsWith('+00:00')) {
                 final timeWithoutOffset = startTimeStr.replaceAll('+00:00', '');
                 startTime = DateTime.parse(timeWithoutOffset);
@@ -710,7 +787,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
               } else {
                 startTime = DateTime.parse(startTimeStr);
               }
-              
+
               nextAppointmentText = DateFormat('HH:mm').format(startTime);
               nextAppointmentColor = Colors.purple.shade600;
             }
@@ -758,7 +835,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
             ),
           ),
           const SizedBox(height: 24),
-          
+
           // Configuración de idioma
           _buildSettingSection(
             title: 'Idioma',
@@ -797,16 +874,16 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
               style: TextStyle(color: isDark ? primaryColor : Colors.black87),
             ),
           ),
-          
+
           const SizedBox(height: 24),
-          
+
           // Configuración de notificaciones
           _buildNotificationSettings(isDark),
         ],
       ),
     );
   }
-  
+
   Widget _buildSettingSection({
     required String title,
     required IconData icon,
@@ -842,7 +919,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
       ],
     );
   }
-  
+
   Widget _buildNotificationSettings(bool isDark) {
     return _buildSettingSection(
       title: 'Notificaciones de Citas',
@@ -859,7 +936,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
               ),
             );
           }
-          
+
           final diagnosticInfo = snapshot.data ?? {};
           final hasPermissions = diagnosticInfo['hasPermissions'] ?? false;
           final canScheduleExact = diagnosticInfo['canScheduleExact'] ?? false;
@@ -867,30 +944,30 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
           final currentMinutes = diagnosticInfo['notificationTime'] ?? 60;
           final isEnabled = diagnosticInfo['isEnabled'] ?? false;
           final systemReady = diagnosticInfo['systemReady'] ?? false;
-          
+
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Estado del sistema
               _buildSystemStatusCard(isDark, hasPermissions, canScheduleExact, pendingCount, systemReady),
-              
+
               const SizedBox(height: 16),
-              
+
               // Switch principal para habilitar/deshabilitar notificaciones
               _buildNotificationToggle(isDark, isEnabled),
-              
+
               const SizedBox(height: 16),
-              
+
               // Configuración de tiempo (solo si están habilitadas)
               if (isEnabled) ...[
                 _buildTimeConfiguration(isDark, currentMinutes),
                 const SizedBox(height: 16),
               ],
-              
+
               // Solo botón de permisos si es necesario
               if (!hasPermissions)
                 _buildPermissionsButton(isDark),
-              
+
               // Información de ayuda
               const SizedBox(height: 16),
               _buildHelpInfo(isDark, hasPermissions, canScheduleExact),
@@ -906,7 +983,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     Color statusColor;
     String statusText;
     IconData statusIcon;
-    
+
     if (systemReady) {
       statusColor = successColor;
       statusText = 'Sistema funcionando correctamente';
