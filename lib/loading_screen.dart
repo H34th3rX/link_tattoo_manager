@@ -50,6 +50,8 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
 
   // Timer para garantizar duración mínima
   Timer? _minimumDurationTimer;
+  Timer? _logoutTimeoutTimer;
+  Timer? _logoutMessageTimer;
   bool _animationCompleted = false;
   bool _minimumTimeElapsed = false;
   bool _userCheckCompleted = false;
@@ -60,10 +62,8 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
   String _displayName = '';
   String? _redirectRoute;
   
-  // Variables para el perfil del empleado - OPTIMIZADAS
+  // Variables para el perfil del empleado - SIMPLIFICADAS
   String? _cachedPhotoUrl;
-  bool _isLoadingProfile = false; // Cambio: inicia en false
-// Nueva variable para control
 
   // Variables específicas para logout
   final List<String> _logoutMessages = [
@@ -73,7 +73,6 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
     '¡Hasta pronto!',
   ];
   int _currentLogoutMessageIndex = 0;
-  Timer? _logoutMessageTimer;
 
   @override
   void initState() {
@@ -90,10 +89,13 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
   }
 
   void _initializeControllers() {
-    // Duraciones ajustables según el tipo
-    final mainDuration = widget.type == LoadingScreenType.login
-        ? (kDebugMode ? const Duration(seconds: 4) : const Duration(seconds: 6))
-        : const Duration(seconds: 3); // Logout más rápido
+    final Duration mainDuration;
+    
+    if (widget.type == LoadingScreenType.logout) {
+      mainDuration = const Duration(seconds: 6);
+    } else {
+      mainDuration = kDebugMode ? const Duration(seconds: 4) : const Duration(seconds: 6);
+    }
 
     _mainController = AnimationController(duration: mainDuration, vsync: this);
     _pulseController = AnimationController(
@@ -109,7 +111,7 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
       duration: const Duration(milliseconds: 1200), vsync: this,
     );
     _fadeOutController = AnimationController(
-      duration: const Duration(milliseconds: 800), vsync: this,
+      duration: const Duration(milliseconds: 1200), vsync: this,
     );
   }
 
@@ -152,7 +154,9 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
     _statusMessage = 'Iniciando...';
     _startMinimumDurationTimer();
     _checkUserStatus();
-    _loadEmployeeProfile();
+    
+    // Precargar perfil silenciosamente ANTES de mostrar la UI
+    _silentPreloadEmployeeProfile();
     
     Future.delayed(const Duration(milliseconds: 300), () {
       if (mounted) {
@@ -166,13 +170,16 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
     _statusMessage = _logoutMessages[0];
     _displayName = widget.userName ?? 'Usuario';
     
-    // CAMBIO PRINCIPAL: Cargar el perfil ANTES de iniciar el logout
-    _loadEmployeeProfileForLogout();
-    
+    _silentPreloadEmployeeProfileForLogout();
     _startLogoutMessageCycle();
-    _performLogout();
     
-    Future.delayed(const Duration(milliseconds: 300), () {
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) {
+        _performLogout();
+      }
+    });
+    _setupLogoutTimeout();
+    Future.delayed(const Duration(milliseconds: 500), () {
       if (mounted) {
         _mainController.forward();
         _textController.forward();
@@ -180,47 +187,136 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
     });
   }
 
-  // NUEVA FUNCIÓN: Cargar perfil específicamente para logout
-  Future<void> _loadEmployeeProfileForLogout() async {
-    if (!mounted) return;
-    
-    setState(() {
-      _isLoadingProfile = true;
+  // Configurar timeout de seguridad para logout
+  void _setupLogoutTimeout() {
+    final timeoutDuration = kDebugMode 
+        ? const Duration(seconds: 8) 
+        : const Duration(seconds: 10);
+    _logoutTimeoutTimer = Timer(timeoutDuration, () {
+      if (mounted && !_isLogoutComplete) {
+        if (kDebugMode) {
+          print('Timeout de logout alcanzado, forzando navegación');
+        }
+        
+        setState(() {
+          _statusMessage = '¡Hasta pronto!';
+          _isLogoutComplete = true;
+        });
+        
+        _completeLogout();
+      }
     });
+  }
+
+  // Logout básico forzado
+
+  // NUEVO: Método silencioso para precargar imagen (login)
+  Future<void> _silentPreloadEmployeeProfile() async {
+    if (widget.type != LoadingScreenType.login || !mounted) {
+      return;
+    }
 
     try {
       final user = Supabase.instance.client.auth.currentUser;
       if (user != null) {
         final profile = await EmployeeService.getCurrentEmployeeProfile();
-        if (mounted) {
-          setState(() {
-            _cachedPhotoUrl = profile?['photo_url'] as String?;
-            _isLoadingProfile = false;
-          });
-        }
-      } else {
-        if (mounted) {
-          setState(() {
-            _cachedPhotoUrl = null;
-            _isLoadingProfile = false;
-          });
+        final photoUrl = profile?['photo_url'] as String?;
+        
+        if (mounted && photoUrl != null && photoUrl.isNotEmpty) {
+          // Precargar la imagen en caché antes de mostrarla
+          await _preloadNetworkImage(photoUrl);
+          
+          if (mounted) {
+            setState(() {
+              _cachedPhotoUrl = photoUrl;
+            });
+          }
         }
       }
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _cachedPhotoUrl = null;
-          _isLoadingProfile = false;
-        });
-      }
+      // Error silencioso
       if (kDebugMode) {
-        print('Error al cargar perfil para logout: $e');
+        print('Error silencioso al cargar perfil en loading screen: $e');
+      }
+    }
+  }
+
+  // NUEVO: Cargar perfil específicamente para logout de forma silenciosa
+  Future<void> _silentPreloadEmployeeProfileForLogout() async {
+    if (!mounted) return;
+
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user != null) {
+        // Agregar timeout para evitar que se cuelgue
+        final profile = await EmployeeService.getCurrentEmployeeProfile().timeout(
+          const Duration(seconds: 3),
+          onTimeout: () => null,
+        );
+        
+        final photoUrl = profile?['photo_url'] as String?;
+        
+        if (mounted && photoUrl != null && photoUrl.isNotEmpty) {
+          // Precargar la imagen antes de mostrarla
+          await _preloadNetworkImage(photoUrl);
+          
+          if (mounted) {
+            setState(() {
+              _cachedPhotoUrl = photoUrl;
+            });
+          }
+        }
+      }
+    } catch (e) {
+      // Error silencioso
+      if (kDebugMode) {
+        print('Error silencioso al cargar perfil para logout: $e');
+      }
+    }
+  }
+
+  // Método para precargar imagen de red en caché
+  Future<void> _preloadNetworkImage(String imageUrl) async {
+    try {
+      final ImageProvider provider = NetworkImage(imageUrl);
+      final ImageStream stream = provider.resolve(ImageConfiguration.empty);
+      final Completer<void> completer = Completer<void>();
+      
+      late final ImageStreamListener listener;
+      listener = ImageStreamListener(
+        (ImageInfo info, bool synchronousCall) {
+          if (!completer.isCompleted) {
+            completer.complete();
+          }
+        },
+        onError: (Object error, StackTrace? stackTrace) {
+          if (!completer.isCompleted) {
+            completer.complete(); // Completar incluso con error
+          }
+        },
+      );
+      
+      stream.addListener(listener);
+      
+      // Timeout para evitar esperas indefinidas
+      await completer.future.timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {
+          // No hacer nada, simplemente continuar
+        },
+      );
+      
+      stream.removeListener(listener);
+    } catch (e) {
+      // Error al precargar, continuar sin imagen
+      if (kDebugMode) {
+        print('Error al precargar imagen: $e');
       }
     }
   }
 
   void _startLogoutMessageCycle() {
-    _logoutMessageTimer = Timer.periodic(const Duration(milliseconds: 800), (timer) {
+    _logoutMessageTimer = Timer.periodic(const Duration(milliseconds: 2000), (timer) { // Aumentado de 1500ms
       if (mounted && _currentLogoutMessageIndex < _logoutMessages.length - 1) {
         setState(() {
           _currentLogoutMessageIndex++;
@@ -228,103 +324,158 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
         });
       } else {
         timer.cancel();
+        // NUEVO: Asegurar que el último mensaje se mantenga visible
+        if (mounted) {
+          Future.delayed(const Duration(milliseconds: 1500), () {
+            if (mounted && !_isLogoutComplete) {
+              setState(() {
+                _isLogoutComplete = true;
+              });
+            }
+          });
+        }
       }
     });
   }
 
+  // Logout con mejor manejo de errores y timeouts
   Future<void> _performLogout() async {
     try {
-      // Simular proceso de logout con delays realistas
-      await Future.delayed(const Duration(milliseconds: 600)); // Cerrando sesión
+      if (kDebugMode) {
+        print('Iniciando proceso de logout...');
+      }
+      await Future.delayed(const Duration(milliseconds: 1000));
+      
+      if (!mounted) return;
+      
+      setState(() {
+        _statusMessage = _logoutMessages[1];
+      });
+      
+      try {
+        if (kDebugMode) {
+          print('Ejecutando AuthService.signOut()...');
+        }
+        await AuthService.signOut().timeout(
+          const Duration(seconds: 5),
+          onTimeout: () {
+            if (kDebugMode) {
+              print('Timeout en AuthService.signOut(), continuando...');
+            }
+          },
+        );
+        
+        if (kDebugMode) {
+          print('AuthService.signOut() completado exitosamente');
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          print('Error en AuthService.signOut(): $e');
+        }
+        
+        try {
+          await Supabase.instance.client.auth.signOut().timeout(
+            const Duration(seconds: 3),
+            onTimeout: () {
+              if (kDebugMode) {
+                print('Timeout en logout básico, continuando...');
+              }
+            },
+          );
+        } catch (fallbackError) {
+          if (kDebugMode) {
+            print('Error en logout básico: $fallbackError');
+          }
+        }
+      }
+      
+      if (!mounted) return;
+      
+      // CAMBIO: Delay más largo entre pasos
+      await Future.delayed(const Duration(milliseconds: 1000)); // Aumentado de 600ms
+      
+      setState(() {
+        _statusMessage = _logoutMessages[2]; // Guardando configuración
+      });
+      
+      // CAMBIO: Delay final más largo para mostrar mensaje de despedida
+      await Future.delayed(const Duration(milliseconds: 1500)); // Aumentado de 600ms
+      
+      if (!mounted) return;
+      
+      setState(() {
+        _statusMessage = _logoutMessages[3]; // ¡Hasta pronto!
+      });
+      
+      // NUEVO: Delay adicional para asegurar que se vea el mensaje final
+      await Future.delayed(const Duration(milliseconds: 1000));
       
       if (mounted) {
         setState(() {
-          _statusMessage = _logoutMessages[1]; // Limpiando datos
+          _isLogoutComplete = true;
         });
       }
       
-      // Ejecutar logout real
-      await AuthService.signOut();
-      await Future.delayed(const Duration(milliseconds: 600));
-      
-      if (mounted) {
-        setState(() {
-          _statusMessage = _logoutMessages[2]; // Guardando configuración
-        });
+      if (kDebugMode) {
+        print('Proceso de logout marcado como completo');
       }
-      
-      await Future.delayed(const Duration(milliseconds: 600));
-      
-      if (mounted) {
-        setState(() {
-          _statusMessage = _logoutMessages[3]; // ¡Hasta pronto!
-        });
-      }
-      
-      _isLogoutComplete = true;
-      await Future.delayed(const Duration(milliseconds: 800));
       
     } catch (e) {
       if (kDebugMode) {
-        print('Error durante logout: $e');
+        print('Error general durante logout: $e');
       }
-      // Continuar con logout forzado
-      try {
-        await Supabase.instance.client.auth.signOut();
-      } catch (_) {}
-      _isLogoutComplete = true;
+      
+      if (mounted) {
+        // CAMBIO: Delay antes de marcar como completo incluso en error
+        await Future.delayed(const Duration(milliseconds: 1000));
+        setState(() {
+          _statusMessage = '¡Hasta pronto!';
+          _isLogoutComplete = true;
+        });
+      }
     }
   }
 
+  // Completar logout con mejor manejo
   void _completeLogout() {
-    if (_isLogoutComplete && mounted) {
-      _fadeOutController.forward().then((_) {
-        if (mounted) {
-          Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
-        }
-      });
-    }
-  }
-
-  // Cargar el perfil del empleado (optimizado para login)
-  Future<void> _loadEmployeeProfile() async {
-    if (widget.type != LoadingScreenType.login || !mounted) {
+    if (!mounted) {
+      if (kDebugMode) {
+        print('Widget no montado, abortando _completeLogout');
+      }
       return;
     }
-
-    setState(() {
-      _isLoadingProfile = true;
-    });
-
-    try {
-      final user = Supabase.instance.client.auth.currentUser;
-      if (user != null) {
-        final profile = await EmployeeService.getCurrentEmployeeProfile();
-        if (mounted) {
-          setState(() {
-            _cachedPhotoUrl = profile?['photo_url'] as String?;
-            _isLoadingProfile = false;
-          });
-        }
-      } else {
-        if (mounted) {
-          setState(() {
-            _cachedPhotoUrl = null;
-            _isLoadingProfile = false;
-          });
-        }
-      }
-    } catch (e) {
+    
+    if (kDebugMode) {
+      print('_completeLogout llamado - _isLogoutComplete: $_isLogoutComplete, _animationCompleted: $_animationCompleted');
+    }
+    
+    Future.delayed(const Duration(milliseconds: 800), () {
       if (mounted) {
-        setState(() {
-          _cachedPhotoUrl = null;
-          _isLoadingProfile = false;
+        // Ejecutar fade out y navegación
+        _fadeOutController.forward().then((_) {
+          if (mounted) {
+            if (kDebugMode) {
+              print('Navegando a login...');
+            }
+            
+            // CAMBIO: Delay adicional antes de navegar
+            Future.delayed(const Duration(milliseconds: 300), () {
+              if (mounted) {
+                Navigator.of(context).pushNamedAndRemoveUntil(
+                  '/login',
+                  (route) => false,
+                  arguments: {'forceLogin': true},
+                );
+              }
+            });
+          } else {
+            if (kDebugMode) {
+              print('Widget no montado después de fade out');
+            }
+          }
         });
       }
-      if (kDebugMode) {
-        print('Error al cargar perfil del empleado en loading screen: $e');
-      }
-    }
+    });
   }
 
   // Verificar el estado del usuario (solo para login)
@@ -465,6 +616,7 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
   @override
   void dispose() {
     _minimumDurationTimer?.cancel();
+    _logoutTimeoutTimer?.cancel();
     _logoutMessageTimer?.cancel();
     _mainController.dispose();
     _pulseController.dispose();
@@ -740,7 +892,7 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
     );
   }
 
-  // Widget optimizado para mostrar la imagen del perfil
+  // Widget simplificado para mostrar la imagen del perfil sin animaciones de carga
   Widget _buildProfileImage(Color accentColor) {
     return Container(
       width: 90,
@@ -763,59 +915,27 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
         border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 2),
       ),
       child: ClipOval(
-        child: _buildImageContent(),
+        child: Stack(
+          children: [
+            // Fondo siempre visible para evitar pestañeo
+            _buildDefaultIcon(),
+            
+            // Imagen directa sin animación de opacidad
+            if (_cachedPhotoUrl != null && _cachedPhotoUrl!.isNotEmpty)
+              Image.network(
+                _cachedPhotoUrl!,
+                fit: BoxFit.cover,
+                width: 90,
+                height: 90,
+                gaplessPlayback: true,
+                errorBuilder: (context, error, stackTrace) {
+                  return const SizedBox.shrink(); // Mostrar solo el fondo
+                },
+              ),
+          ],
+        ),
       ),
     );
-  }
-
-  // Contenido de la imagen optimizado
-  Widget _buildImageContent() {
-    // Si está cargando, mostrar loading
-    if (_isLoadingProfile) {
-      return Container(
-        color: Colors.grey[300],
-        child: const Center(
-          child: SizedBox(
-            width: 30,
-            height: 30,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-            ),
-          ),
-        ),
-      );
-    }
-
-    // Si tenemos URL de foto, mostrarla
-    if (_cachedPhotoUrl != null && _cachedPhotoUrl!.isNotEmpty) {
-      return Image.network(
-        _cachedPhotoUrl!,
-        fit: BoxFit.cover,
-        width: 90,
-        height: 90,
-        errorBuilder: (context, error, stackTrace) => _buildDefaultIcon(),
-        loadingBuilder: (context, child, loadingProgress) {
-          if (loadingProgress == null) return child;
-          return Container(
-            color: Colors.grey[300],
-            child: const Center(
-              child: SizedBox(
-                width: 30,
-                height: 30,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                ),
-              ),
-            ),
-          );
-        },
-      );
-    }
-
-    // Si no hay foto o no se cargó correctamente, mostrar icono por defecto
-    return _buildDefaultIcon();
   }
 
   Widget _buildDefaultIcon() {

@@ -1,4 +1,5 @@
 import 'dart:ui' as ui;
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/foundation.dart';
@@ -27,15 +28,15 @@ class NavPanel extends StatefulWidget {
 }
 
 class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
-  // Controladores de animación para efectos de hover y pulso
+  // Controladores de animación para efectos de hover (sin pulso)
   late AnimationController _hoverController;
-  late AnimationController _pulseController;
   int _hoveredIndex = -1; // Índice del elemento con hover
   
   // Variables para manejo de imagen de perfil
   String? _cachedPhotoUrl;
-  bool _isLoadingProfile = true;
-  bool _isLoggingOut = false; // Nueva variable para controlar el estado de logout
+  // CAMBIO: Inicializar como true para evitar construcción hasta que la imagen esté lista
+  bool _imagePreloaded = false;
+  bool _isLoggingOut = false;
 
   @override
   void initState() {
@@ -45,39 +46,91 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
       duration: const Duration(milliseconds: 200),
       vsync: this,
     );
-    // Inicializa el controlador para efecto de pulso en el header
-    _pulseController = AnimationController(
-      duration: const Duration(milliseconds: 1500),
-      vsync: this,
-    )..repeat();
     
-    // Cargar el perfil del empleado
-    _loadEmployeeProfile();
+    // CAMBIO: Precargar el perfil del empleado ANTES de mostrar la UI
+    _preloadProfileImageBeforeShow();
   }
 
   @override
   void dispose() {
     // Libera los controladores de animación
     _hoverController.dispose();
-    _pulseController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadEmployeeProfile() async {
+Future<void> _preloadProfileImageBeforeShow() async {
     try {
+      // Obtener el perfil del empleado
       final profile = await EmployeeService.getCurrentEmployeeProfile();
-      if (mounted) {
-        setState(() {
-          _cachedPhotoUrl = profile?['photo_url'] as String?;
-          _isLoadingProfile = false;
-        });
+      final photoUrl = profile?['photo_url'] as String?;
+      
+      if (mounted && photoUrl != null && photoUrl.isNotEmpty) {
+        // Precargar la imagen completamente antes de mostrar la UI
+        await _preloadNetworkImage(photoUrl);
+        
+        if (mounted) {
+          setState(() {
+            _cachedPhotoUrl = photoUrl;
+            _imagePreloaded = true; // Marcar como lista
+          });
+        }
+      } else {
+        // Si no hay imagen, marcar como lista para mostrar fallback
+        if (mounted) {
+          setState(() {
+            _imagePreloaded = true;
+          });
+        }
       }
     } catch (e) {
+      // En caso de error, mostrar fallback
+      if (kDebugMode) {
+        print('Error cargando perfil: $e');
+      }
       if (mounted) {
         setState(() {
-          _cachedPhotoUrl = null;
-          _isLoadingProfile = false;
+          _imagePreloaded = true;
         });
+      }
+    }
+  }
+
+  // Método para precargar imagen de red en caché
+   Future<void> _preloadNetworkImage(String imageUrl) async {
+    try {
+      final ImageProvider provider = NetworkImage(imageUrl);
+      final ImageStream stream = provider.resolve(ImageConfiguration.empty);
+      final Completer<void> completer = Completer<void>();
+      
+      late final ImageStreamListener listener;
+      listener = ImageStreamListener(
+        (ImageInfo info, bool synchronousCall) {
+          if (!completer.isCompleted) {
+            completer.complete();
+          }
+        },
+        onError: (Object error, StackTrace? stackTrace) {
+          if (!completer.isCompleted) {
+            completer.complete(); // Completar incluso con error
+          }
+        },
+      );
+      
+      stream.addListener(listener);
+      
+      // CAMBIO: Timeout más corto para no retrasar mucho la UI
+      await completer.future.timeout(
+        const Duration(seconds: 3), // Reducido de 5 a 3 segundos
+        onTimeout: () {
+          // No hacer nada, simplemente continuar
+        },
+      );
+      
+      stream.removeListener(listener);
+    } catch (e) {
+      // Error al precargar, continuar sin imagen
+      if (kDebugMode) {
+        print('Error al precargar imagen: $e');
       }
     }
   }
@@ -85,6 +138,30 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
   //[-------------CONSTRUCCIÓN DEL PANEL--------------]
   @override
   Widget build(BuildContext context) {
+    // CAMBIO: No mostrar nada hasta que la imagen esté precargada
+    if (!_imagePreloaded) {
+      return Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Theme.of(context).brightness == Brightness.dark
+                  ? const Color(0xFF2A2A2A)
+                  : const Color(0xFFF8F9FA),
+              Theme.of(context).brightness == Brightness.dark
+                  ? const Color(0xFF1A1A1A)
+                  : const Color(0xFFE9ECEF),
+              Theme.of(context).brightness == Brightness.dark
+                  ? const Color(0xFF000000)
+                  : const Color(0xFFDEE2E6),
+            ],
+          ),
+        ),
+        // Mostrar container vacío con el mismo fondo mientras precarga
+      );
+    }
+
     final String current = ModalRoute.of(context)?.settings.name ?? '';
     final themeProvider = Provider.of<ThemeProvider>(context);
     final theme = Theme.of(context);
@@ -136,7 +213,7 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
   }
 
   //[-------------ENCABEZADO DEL PANEL--------------]
-  // Construye el encabezado con el avatar animado y datos del usuario
+  // Construye el encabezado con el avatar y datos del usuario
   Widget _buildModernHeader(ThemeProvider themeProvider, ui.Color accent) {
     return AnimatedContainer(
       duration: themeAnimationDuration,
@@ -181,74 +258,30 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
     );
   }
 
+  // Avatar simplificado sin animaciones de pulso o aparición
   Widget _buildProfileAvatar(ui.Color accent) {
-    return AnimatedBuilder(
-      animation: _pulseController,
-      builder: (context, child) {
-        return Container(
-          width: 80,
-          height: 80,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.white.withValues(alpha: 0.3 + 0.2 * _pulseController.value),
-                blurRadius: 20,
-                spreadRadius: 2,
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(40),
-            child: Stack(
-              children: [
-                // Fondo por defecto que siempre está presente
-                _buildFallbackAvatar(accent),
-                // Imagen que aparece encima con fade (solo si está cargando o hay imagen)
-                if (_isLoadingProfile)
-                  Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.black.withValues(alpha: 0.3),
-                    ),
-                    child: const Center(
-                      child: SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                        ),
-                      ),
-                    ),
-                  )
-                else if (_cachedPhotoUrl != null && _cachedPhotoUrl!.isNotEmpty)
-                  AnimatedOpacity(
-                    duration: const Duration(milliseconds: 500),
-                    opacity: 1.0,
-                    child: Image.network(
-                      _cachedPhotoUrl!,
-                      width: 80,
-                      height: 80,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return const SizedBox.shrink(); // No mostrar nada si hay error, se verá el fondo
-                      },
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) {
-                          return child; // Imagen completamente cargada
-                        }
-                        return const SizedBox.shrink(); // Mientras carga, no mostrar nada
-                      },
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        );
-      },
+    return Container(
+      width: 80,
+      height: 80,
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(40),
+        child: _cachedPhotoUrl != null && _cachedPhotoUrl!.isNotEmpty
+            ? Image.network(
+                _cachedPhotoUrl!,
+                width: 80,
+                height: 80,
+                fit: BoxFit.cover,
+                gaplessPlayback: true,
+                errorBuilder: (context, error, stackTrace) {
+                  // En caso de error en tiempo real, mostrar fallback
+                  return _buildFallbackAvatar(accent);
+                },
+              )
+            : _buildFallbackAvatar(accent),
+      ),
     );
   }
 
@@ -618,6 +651,13 @@ class _NavPanelState extends State<NavPanel> with TickerProviderStateMixin {
 
   // Método público para refrescar el perfil
   void refreshProfile() {
-    _loadEmployeeProfile();
+    // CAMBIO: Resetear estado y recargar imagen
+    setState(() {
+      _imagePreloaded = false;
+      _cachedPhotoUrl = null;
+    });
+    
+    // Recargar imagen
+    _preloadProfileImageBeforeShow();
   }
 }

@@ -215,61 +215,93 @@ class AuthService {
 
   //[-------------CERRAR SESIÓN MEJORADO CON LIMPIEZA COMPLETA--------------]
   static Future<void> signOut() async {
-    try {
-      if (kDebugMode) {
-        print('Iniciando logout completo...');
-      }
-      
-      // 1. En Web, limpiar Google OAuth primero
-      if (kIsWeb) {
-        web_utils.ensureWebUtilsInitialized(); // Asegurar inicialización
-        await _clearWebGoogleAuth();
-      } else {
-        // 2. En Mobile, cerrar sesión de Google
-        if (await _googleSignIn.isSignedIn()) {
-          if (kDebugMode) {
-            print('Cerrando sesión de Google en Mobile...');
-          }
-          await _googleSignIn.disconnect();
-        }
-      }
-      
-      // 3. Cerrar sesión en Supabase
-      await _supabase.auth.signOut();
-      
-      if (kDebugMode) {
-        print('Sesión de Supabase cerrada');
-      }
-      
-      // 4. Limpiar URL y recargar en Web
-      if (kIsWeb) {
-        await _cleanUrlAndNavigate();
-        // Esperar un momento para asegurar que la limpieza se complete antes de recargar
-        await Future.delayed(const Duration(milliseconds: 300));
-        web_utils.reloadWindowUtil(); // Usar el helper de web_utils
-      }
-      
-      if (kDebugMode) {
-        print('Logout completo finalizado');
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('Error durante logout: $e');
-      }
-      
-      // Logout de emergencia
+  try {
+    if (kDebugMode) {
+      print('Iniciando logout completo...');
+    }
+    
+    // 1. Verificar si hay un usuario de Google activo en móvil
+    if (!kIsWeb) {
       try {
-        await _supabase.auth.signOut();
-        if (kIsWeb) {
-          web_utils.reloadWindowUtil(); // Usar el helper de web_utils
+        final googleUser = await getCurrentGoogleUser();
+        if (googleUser != null) {
+          if (kDebugMode) {
+            print('Cerrando sesión de Google en Mobile para: ${googleUser.email}');
+          }
+          await _googleSignIn.disconnect().timeout(
+            const Duration(seconds: 2),
+            onTimeout: () {
+              if (kDebugMode) {
+                print('Timeout en GoogleSignIn.disconnect, continuando...');
+              }
+              return null;
+            },
+          );
+        } else {
+          if (kDebugMode) {
+            print('No hay usuario de Google activo, omitiendo desconexión');
+          }
         }
-      } catch (emergencyError) {
+      } catch (e) {
         if (kDebugMode) {
-          print('Error en logout de emergencia: $emergencyError');
+          print('Error al desconectar Google en Mobile: $e');
         }
       }
     }
+    
+    // 2. Cerrar sesión en Supabase con limpieza completa
+    try {
+      await _supabase.auth.signOut(scope: SignOutScope.global).timeout(
+        const Duration(seconds: 3),
+        onTimeout: () {
+          if (kDebugMode) {
+            print('Timeout en Supabase.auth.signOut, continuando...');
+          }
+        },
+      );
+      if (kDebugMode) {
+        print('Sesión de Supabase cerrada (global scope)');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error al cerrar sesión en Supabase: $e');
+      }
+    }
+    
+    // 3. Limpiar URL y recargar en Web
+    if (kIsWeb) {
+      web_utils.ensureWebUtilsInitialized();
+      await _clearWebGoogleAuth();
+      await _cleanUrlAndNavigate();
+      await Future.delayed(const Duration(milliseconds: 300));
+      web_utils.reloadWindowUtil();
+    }
+    
+    if (kDebugMode) {
+      print('Logout completo finalizado');
+    }
+  } catch (e) {
+    if (kDebugMode) {
+      print('Error general durante logout: $e');
+    }
+    
+    // Logout de emergencia
+    try {
+      await _supabase.auth.signOut(scope: SignOutScope.global).timeout(
+        const Duration(seconds: 2),
+        onTimeout: () {
+          if (kDebugMode) {
+            print('Timeout en logout de emergencia, continuando...');
+          }
+        },
+      );
+    } catch (emergencyError) {
+      if (kDebugMode) {
+        print('Error en logout de emergencia: $emergencyError');
+      }
+    }
   }
+}
 
   //[-------------LIMPIAR AUTENTICACIÓN WEB DE GOOGLE--------------]
   static Future<void> _clearWebGoogleAuth() async {
@@ -377,59 +409,77 @@ class AuthService {
   }
 
   //[-------------SETUP LISTENER PARA AUTH STATE CHANGES--------------]
-  static void setupAuthListener({
-    required Function(User user) onSignIn,
-    required Function() onSignOut,
-    required Function(String error) onError,
-  }) {
-    _supabase.auth.onAuthStateChange.listen((data) {
-      try {
-        final AuthChangeEvent event = data.event;
-        final Session? session = data.session;
+ static void setupAuthListener({
+  required Function(User user) onSignIn,
+  required Function() onSignOut,
+  required Function(String error) onError,
+}) {
+  bool justSignedOut = false; // Bandera para rastrear logout reciente
 
-        if (kDebugMode) {
-          print('Auth State Change: $event');
-          if (session?.user != null) {
-            print('Usuario: ${session!.user.email}');
-          }
-        }
+  _supabase.auth.onAuthStateChange.listen((data) async {
+    try {
+      final AuthChangeEvent event = data.event;
+      final Session? session = data.session;
 
-        switch (event) {
-          case AuthChangeEvent.signedIn:
-            if (session?.user != null) {
-              // Limpiar URL después de login exitoso
-              if (kIsWeb) {
-                web_utils.ensureWebUtilsInitialized(); // Asegurar inicialización
-                _cleanUrlAndNavigate();
-              }
-              onSignIn(session!.user);
-            }
-            break;
-          case AuthChangeEvent.passwordRecovery:
-            // Manejar el evento de recuperación de contraseña
-            if (kDebugMode) {
-              print('Password recovery event detected');
-            }
-            // El usuario será redirigido automáticamente por el deep link
-            break;
-          case AuthChangeEvent.signedOut:
-            onSignOut();
-            break;
-          case AuthChangeEvent.tokenRefreshed:
-            if (session?.user != null && kDebugMode) {
-              if (kDebugMode) {
-                print('Token refreshed for user: ${session!.user.email}');
-              }
-            }
-            break;
-          default:
-            break;
+      if (kDebugMode) {
+        print('Auth State Change: $event');
+        if (session?.user != null) {
+          print('Usuario: ${session!.user.email}');
         }
-      } catch (e) {
-        onError('Error en auth state change: $e');
       }
-    });
-  }
+
+      switch (event) {
+        case AuthChangeEvent.signedIn:
+          if (justSignedOut) {
+            if (kDebugMode) {
+              print('Ignorando evento signedIn después de logout');
+            }
+            justSignedOut = false; // Resetear bandera
+            return;
+          }
+          if (session?.user != null) {
+            // Limpiar URL después de login exitoso
+            if (kIsWeb) {
+              web_utils.ensureWebUtilsInitialized();
+              await _cleanUrlAndNavigate();
+            }
+            onSignIn(session!.user);
+          }
+          break;
+        case AuthChangeEvent.passwordRecovery:
+          if (kDebugMode) {
+            print('Password recovery event detected');
+          }
+          // El usuario será redirigido automáticamente por el deep link
+          break;
+        case AuthChangeEvent.signedOut:
+          if (justSignedOut) {
+            if (kDebugMode) {
+              print('Ignorando evento signedOut repetido');
+            }
+            return; // Evitar procesar eventos signedOut repetidos
+          }
+          justSignedOut = true; // Marcar que acabamos de cerrar sesión
+          onSignOut();
+          if (kDebugMode) {
+            print('Usuario desconectado, listener procesado');
+          }
+          break;
+        case AuthChangeEvent.tokenRefreshed:
+          if (session?.user != null && kDebugMode) {
+            if (kDebugMode) {
+              print('Token refreshed for user: ${session!.user.email}');
+            }
+          }
+          break;
+        default:
+          break;
+      }
+    } catch (e) {
+      onError('Error en auth state change: $e');
+    }
+  });
+}
 
   //[-------------INICIALIZAR ESTADO DE AUTENTICACIÓN--------------]
   static Future<void> initializeAuthState() async {
