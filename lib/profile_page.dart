@@ -842,7 +842,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
             icon: Icons.language,
             isDark: isDark,
             child: DropdownButtonFormField<String>(
-              value: currentPreference,
+              initialValue: currentPreference,
               hint: Text(localizations.selectLanguage, style: TextStyle(color: isDark ? hintColor : Colors.grey[600])),
               items: [
                 DropdownMenuItem(
@@ -1148,7 +1148,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                 _showError('Error actualizando configuración: $e');
               }
             },
-            activeColor: primaryColor,
+            activeThumbColor: primaryColor,
             activeTrackColor: primaryColor.withValues(alpha: 0.3),
           ),
         ],
@@ -1179,7 +1179,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
         ),
         const SizedBox(height: 12),
         DropdownButtonFormField<int>(
-          value: currentMinutes,
+          initialValue: currentMinutes,
           items: [
             DropdownMenuItem(
               value: 5,
@@ -1804,7 +1804,7 @@ class _ProfileEditPopupState extends State<ProfileEditPopup> with TickerProvider
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 DropdownButtonFormField<String>(
-                  value: _selectedSpecialty,
+                  initialValue: _selectedSpecialty,
                   hint: Text(localizations.selectSpecialty, style: TextStyle(color: isDark ? hintColor : Colors.grey[600])),
                   items: _specialties.map((String specialty) {
                     return DropdownMenuItem<String>(

@@ -375,7 +375,7 @@ class _ReportsPageState extends State<ReportsPage> with TickerProviderStateMixin
           
           // Tipo de reporte
           DropdownButtonFormField<String>(
-            value: _selectedReportType,
+            initialValue: _selectedReportType,
             decoration: _buildInputDecoration('Tipo de Reporte', Icons.analytics, isDark),
             dropdownColor: isDark ? Colors.grey[800] : Colors.white,
             style: TextStyle(color: isDark ? textColor : Colors.black87),
@@ -394,7 +394,7 @@ class _ReportsPageState extends State<ReportsPage> with TickerProviderStateMixin
             Column(
               children: [
                 DropdownButtonFormField<String>(
-                  value: _selectedPeriod,
+                  initialValue: _selectedPeriod,
                   decoration: _buildInputDecoration('Período', Icons.calendar_today, isDark),
                   dropdownColor: isDark ? Colors.grey[800] : Colors.white,
                   style: TextStyle(color: isDark ? textColor : Colors.black87),
@@ -466,7 +466,7 @@ class _ReportsPageState extends State<ReportsPage> with TickerProviderStateMixin
               ),
               value: _includeInactiveClients,
               onChanged: (value) => setState(() => _includeInactiveClients = value),
-              activeColor: primaryColor,
+              activeThumbColor: primaryColor,
             ),
             TextFormField(
               initialValue: _minAppointments.toString(),
@@ -480,7 +480,7 @@ class _ReportsPageState extends State<ReportsPage> with TickerProviderStateMixin
           if (_selectedReportType == 'appointments') ...[
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              value: _appointmentStatus,
+              initialValue: _appointmentStatus,
               decoration: _buildInputDecoration('Estado de Citas', Icons.event_note, isDark),
               dropdownColor: isDark ? Colors.grey[800] : Colors.white,
               style: TextStyle(color: isDark ? textColor : Colors.black87),

@@ -974,7 +974,7 @@ class ClientCard extends StatelessWidget {
                       child: Switch(
                         value: isActive,
                         onChanged: isLoading ? null : (_) => onToggleStatus(),
-                        activeColor: primaryColor,
+                        activeThumbColor: primaryColor,
                         inactiveThumbColor: Colors.grey,
                       ),
                     ),

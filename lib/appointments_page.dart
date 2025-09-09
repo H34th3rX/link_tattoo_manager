@@ -2415,7 +2415,7 @@ class _AppointmentPopupState extends State<AppointmentPopup>
             Flexible(
               flex: 1,
               child: DropdownButtonFormField<int>(
-                value: _selectedDuration,
+                initialValue: _selectedDuration,
                 decoration: _buildInputDecoration('Duración', Icons.timer_outlined, isDropdown: true),
                 dropdownColor: widget.isDark ? Colors.grey[800] : Colors.white,
                 style: TextStyle(color: widget.isDark ? textColor : Colors.black87),
@@ -2432,7 +2432,7 @@ class _AppointmentPopupState extends State<AppointmentPopup>
             Flexible(
               flex: 1,
               child: DropdownButtonFormField<String>(
-                value: _selectedStatus,
+                initialValue: _selectedStatus,
                 decoration: _buildInputDecoration('Estado', Icons.flag_outlined, isDropdown: true),
                 dropdownColor: widget.isDark ? Colors.grey[800] : Colors.white,
                 style: TextStyle(color: widget.isDark ? textColor : Colors.black87),
@@ -2495,7 +2495,7 @@ class _AppointmentPopupState extends State<AppointmentPopup>
               Switch(
                 value: _notifyMe,
                 onChanged: _isSaving ? null : (value) => setState(() => _notifyMe = value),
-                activeColor: widget.isPostponedAppointment ? postponedColor : primaryColor,
+                activeThumbColor: widget.isPostponedAppointment ? postponedColor : primaryColor,
                 inactiveThumbColor: widget.isDark ? Colors.grey[600] : Colors.grey[400],
                 inactiveTrackColor: widget.isDark ? Colors.grey[700] : Colors.grey[300],
               ),

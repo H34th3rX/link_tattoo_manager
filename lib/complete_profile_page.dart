@@ -572,7 +572,7 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
 
           if (_userType == 'employee') ...[
             DropdownButtonFormField<String>(
-              value: _selectedSpecialty,
+              initialValue: _selectedSpecialty,
               hint: Text('Selecciona una especialidad', style: TextStyle(color: _hintColor)),
               items: _specialties.map((String specialty) {
                 return DropdownMenuItem<String>(
@@ -637,7 +637,7 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
 
           if (_userType == 'client') ...[
             DropdownButtonFormField<String>(
-              value: _selectedContactMethod,
+              initialValue: _selectedContactMethod,
               decoration: InputDecoration(
                 labelText: 'Método de contacto preferido',
                 labelStyle: TextStyle(color: _hintColor),
@@ -665,7 +665,7 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
             ),
             const SizedBox(height: 20),
             DropdownButtonFormField<String>(
-              value: _selectedEmployeeId,
+              initialValue: _selectedEmployeeId,
               decoration: InputDecoration(
                 labelText: 'Seleccionar tatuador *', // Etiqueta actualizada
                 labelStyle: TextStyle(color: _hintColor),

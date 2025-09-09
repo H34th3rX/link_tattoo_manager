@@ -11,7 +11,7 @@ android {
 
     defaultConfig {
         applicationId = "com.headev.link_tattoo_manager"
-        minSdk = 21   
+        minSdk = flutter.minSdkVersion   
         targetSdk = 35
         versionCode = 1
         versionName = "1.0.0"
