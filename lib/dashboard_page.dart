@@ -9,7 +9,7 @@ import 'theme_provider.dart';
 import 'appbar.dart';
 import './integrations/clients_service.dart';
 import './integrations/appointments_service.dart';
-import './l10n/app_localizations.dart'; // Importar el archivo generado
+import './l10n/app_localizations.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});

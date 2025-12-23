@@ -311,7 +311,7 @@ class ReportsService {
 
 //[-------------GENERACIÓN DE PDFs--------------]
   
-  /// Generar PDF para cualquier tipo de reporte
+ /// Generar PDF para cualquier tipo de reporte
   static Future<void> generatePDF({
     required String reportType,
     required String title,
@@ -345,84 +345,116 @@ class ReportsService {
   static pw.Page _buildFinancialPDF(String title, Map<String, dynamic> data) {
     return pw.Page(
       pageFormat: PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.all(40),
       build: (pw.Context context) {
         return pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            // Header
-            pw.Container(
-              padding: const pw.EdgeInsets.all(20),
-              color: PdfColors.amber,
-              child: pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Text(
-                    title,
-                    style: pw.TextStyle(
-                      fontSize: 24,
-                      fontWeight: pw.FontWeight.bold,
-                    ),
+            // Header profesional
+            pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  title.toUpperCase(),
+                  style: pw.TextStyle(
+                    fontSize: 20,
+                    fontWeight: pw.FontWeight.bold,
+                    letterSpacing: 1.5,
                   ),
-                  pw.SizedBox(height: 5),
-                  pw.Text(
-                    'Período: ${_formatPeriodForPDF(data['period'])}',
-                    style: const pw.TextStyle(fontSize: 12),
-                  ),
-                  pw.Text(
-                    'Desde: ${_formatDateForPDF(data['start_date'])} - Hasta: ${_formatDateForPDF(data['end_date'])}',
-                    style: const pw.TextStyle(fontSize: 10),
-                  ),
-                ],
-              ),
+                ),
+                pw.Container(
+                  margin: const pw.EdgeInsets.only(top: 4, bottom: 12),
+                  height: 2,
+                  width: 100,
+                  color: PdfColors.black,
+                ),
+                pw.Text(
+                  'Período: ${_formatPeriodForPDF(data['period'])}',
+                  style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
+                ),
+                pw.Text(
+                  'Desde: ${_formatDateForPDF(data['start_date'])} - Hasta: ${_formatDateForPDF(data['end_date'])}',
+                  style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
+                ),
+              ],
             ),
             
-            pw.SizedBox(height: 20),
+            pw.SizedBox(height: 24),
             
             // Resumen financiero
-            pw.Container(
-              padding: const pw.EdgeInsets.all(15),
-              decoration: pw.BoxDecoration(
-                border: pw.Border.all(color: PdfColors.grey400),
-                borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
-              ),
-              child: pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Text('Resumen Financiero', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
-                  pw.Divider(),
-                  _buildPDFRow('Ingresos Totales:', '\$${data['total_revenue']?.toStringAsFixed(2) ?? '0.00'}'),
-                  _buildPDFRow('Depósitos Recibidos:', '\$${data['total_deposits']?.toStringAsFixed(2) ?? '0.00'}'),
-                  _buildPDFRow('Pendiente de Cobro:', '\$${data['pending_revenue']?.toStringAsFixed(2) ?? '0.00'}'),
-                  _buildPDFRow('Total de Citas:', '${data['total_appointments'] ?? 0}'),
-                  _buildPDFRow('Citas Completadas:', '${data['completed_appointments'] ?? 0}'),
-                ],
-              ),
+            pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  'RESUMEN FINANCIERO',
+                  style: pw.TextStyle(
+                    fontSize: 12,
+                    fontWeight: pw.FontWeight.bold,
+                    letterSpacing: 1,
+                  ),
+                ),
+                pw.SizedBox(height: 8),
+                pw.Container(
+                  padding: const pw.EdgeInsets.all(12),
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(color: PdfColors.grey400, width: 1),
+                  ),
+                  child: pw.Column(
+                    children: [
+                      _buildPDFRow('Ingresos Totales:', '\$${data['total_revenue']?.toStringAsFixed(2) ?? '0.00'}', isBold: true),
+                      pw.Divider(color: PdfColors.grey300),
+                      _buildPDFRow('Depósitos Recibidos:', '\$${data['total_deposits']?.toStringAsFixed(2) ?? '0.00'}'),
+                      _buildPDFRow('Pendiente de Cobro:', '\$${data['pending_revenue']?.toStringAsFixed(2) ?? '0.00'}'),
+                      pw.Divider(color: PdfColors.grey300),
+                      _buildPDFRow('Total de Citas:', '${data['total_appointments'] ?? 0}'),
+                      _buildPDFRow('Citas Completadas:', '${data['completed_appointments'] ?? 0}'),
+                    ],
+                  ),
+                ),
+              ],
             ),
             
-            pw.SizedBox(height: 20),
+            pw.SizedBox(height: 24),
             
             // Tabla de citas
             if (data['appointments'] != null && (data['appointments'] as List).isNotEmpty) ...[
-              pw.Text('Detalle de Citas', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
-              pw.SizedBox(height: 10),
+              pw.Text(
+                'DETALLE DE CITAS',
+                style: pw.TextStyle(
+                  fontSize: 12,
+                  fontWeight: pw.FontWeight.bold,
+                  letterSpacing: 1,
+                ),
+              ),
+              pw.SizedBox(height: 8),
               pw.Table(
-                border: pw.TableBorder.all(color: PdfColors.grey400),
+                border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+                columnWidths: {
+                  0: const pw.FlexColumnWidth(2),
+                  1: const pw.FlexColumnWidth(2),
+                  2: const pw.FlexColumnWidth(2),
+                  3: const pw.FlexColumnWidth(2),
+                },
                 children: [
                   // Header
                   pw.TableRow(
-                    decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+                    decoration: pw.BoxDecoration(
+                      border: pw.Border(
+                        bottom: pw.BorderSide(color: PdfColors.black, width: 1.5),
+                      ),
+                    ),
                     children: [
-                      _buildTableCell('Fecha', isHeader: true),
-                      _buildTableCell('Estado', isHeader: true),
-                      _buildTableCell('Precio', isHeader: true),
-                      _buildTableCell('Depósito', isHeader: true),
+                      _buildTableCell('FECHA', isHeader: true),
+                      _buildTableCell('ESTADO', isHeader: true),
+                      _buildTableCell('PRECIO', isHeader: true),
+                      _buildTableCell('DEPÓSITO', isHeader: true),
                     ],
                   ),
                   // Rows
-                  ...(data['appointments'] as List).take(10).map((apt) => pw.TableRow(
+                  ...(data['appointments'] as List).take(12).map((apt) => pw.TableRow(
                     children: [
                       _buildTableCell(_formatDateForPDF(apt['start_time'])),
-                      _buildTableCell(apt['status'] ?? 'N/A'),
+                      _buildTableCell(_capitalizeStatus(apt['status'] ?? 'N/A')),
                       _buildTableCell('\$${apt['price']?.toStringAsFixed(2) ?? '0.00'}'),
                       _buildTableCell('\$${apt['deposit_paid']?.toStringAsFixed(2) ?? '0.00'}'),
                     ],
@@ -434,12 +466,19 @@ class ReportsService {
             pw.Spacer(),
             
             // Footer
-            pw.Container(
-              padding: const pw.EdgeInsets.only(top: 20),
-              child: pw.Text(
-                'Generado el ${DateTime.now().toString().split('.')[0]}',
-                style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey),
-              ),
+            pw.Divider(color: PdfColors.grey400),
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text(
+                  'LinkTattoo Manager',
+                  style: pw.TextStyle(fontSize: 9, color: PdfColors.grey700, fontWeight: pw.FontWeight.bold),
+                ),
+                pw.Text(
+                  'Generado: ${_formatDateTimeForPDF(DateTime.now())}',
+                  style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
+                ),
+              ],
             ),
           ],
         );
@@ -451,66 +490,85 @@ class ReportsService {
   static pw.Page _buildClientsPDF(String title, Map<String, dynamic> data) {
     return pw.Page(
       pageFormat: PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.all(40),
       build: (pw.Context context) {
         return pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
             // Header
-            pw.Container(
-              padding: const pw.EdgeInsets.all(20),
-              color: PdfColors.amber,
-              child: pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Text(title, style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
-                  pw.SizedBox(height: 5),
-                  pw.Text('Total de clientes: ${data['total_clients'] ?? 0}', style: const pw.TextStyle(fontSize: 12)),
-                ],
-              ),
+            pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  title.toUpperCase(),
+                  style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold, letterSpacing: 1.5),
+                ),
+                pw.Container(
+                  margin: const pw.EdgeInsets.only(top: 4, bottom: 12),
+                  height: 2,
+                  width: 100,
+                  color: PdfColors.black,
+                ),
+                pw.Text(
+                  'Total de clientes: ${data['total_clients'] ?? 0}',
+                  style: const pw.TextStyle(fontSize: 11, color: PdfColors.grey700),
+                ),
+              ],
             ),
             
-            pw.SizedBox(height: 20),
+            pw.SizedBox(height: 24),
             
             // Estadísticas
-            pw.Container(
-              padding: const pw.EdgeInsets.all(15),
-              decoration: pw.BoxDecoration(
-                border: pw.Border.all(color: PdfColors.grey400),
-                borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
-              ),
-              child: pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Text('Estadísticas', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
-                  pw.Divider(),
-                  _buildPDFRow('Clientes Activos:', '${data['active_clients'] ?? 0}'),
-                  _buildPDFRow('Clientes Inactivos:', '${data['inactive_clients'] ?? 0}'),
-                  _buildPDFRow('Nuevos este mes:', '${data['new_clients_this_month'] ?? 0}'),
-                  _buildPDFRow('Promedio de citas por cliente:', '${data['average_appointments_per_client'] ?? '0.0'}'),
-                  _buildPDFRow('Total de citas (todos):', '${data['total_appointments_all_clients'] ?? 0}'),
-                ],
-              ),
+            pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text('ESTADÍSTICAS', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, letterSpacing: 1)),
+                pw.SizedBox(height: 8),
+                pw.Container(
+                  padding: const pw.EdgeInsets.all(12),
+                  decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey400, width: 1)),
+                  child: pw.Column(
+                    children: [
+                      _buildPDFRow('Clientes Activos:', '${data['active_clients'] ?? 0}', isBold: true),
+                      pw.Divider(color: PdfColors.grey300),
+                      _buildPDFRow('Clientes Inactivos:', '${data['inactive_clients'] ?? 0}'),
+                      _buildPDFRow('Nuevos este mes:', '${data['new_clients_this_month'] ?? 0}'),
+                      pw.Divider(color: PdfColors.grey300),
+                      _buildPDFRow('Promedio citas/cliente:', '${data['average_appointments_per_client'] ?? '0.0'}'),
+                      _buildPDFRow('Total citas (todos):', '${data['total_appointments_all_clients'] ?? 0}'),
+                    ],
+                  ),
+                ),
+              ],
             ),
             
-            pw.SizedBox(height: 20),
+            pw.SizedBox(height: 24),
             
             // Tabla de clientes
             if (data['clients'] != null && (data['clients'] as List).isNotEmpty) ...[
-              pw.Text('Lista de Clientes', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
-              pw.SizedBox(height: 10),
+              pw.Text('LISTA DE CLIENTES', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, letterSpacing: 1)),
+              pw.SizedBox(height: 8),
               pw.Table(
-                border: pw.TableBorder.all(color: PdfColors.grey400),
+                border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+                columnWidths: {
+                  0: const pw.FlexColumnWidth(3),
+                  1: const pw.FlexColumnWidth(2),
+                  2: const pw.FlexColumnWidth(1.5),
+                  3: const pw.FlexColumnWidth(1.5),
+                },
                 children: [
                   pw.TableRow(
-                    decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+                    decoration: pw.BoxDecoration(
+                      border: pw.Border(bottom: pw.BorderSide(color: PdfColors.black, width: 1.5)),
+                    ),
                     children: [
-                      _buildTableCell('Nombre', isHeader: true),
-                      _buildTableCell('Teléfono', isHeader: true),
-                      _buildTableCell('Citas', isHeader: true),
-                      _buildTableCell('Estado', isHeader: true),
+                      _buildTableCell('NOMBRE', isHeader: true),
+                      _buildTableCell('TELÉFONO', isHeader: true),
+                      _buildTableCell('CITAS', isHeader: true),
+                      _buildTableCell('ESTADO', isHeader: true),
                     ],
                   ),
-                  ...(data['clients'] as List).take(15).map((client) => pw.TableRow(
+                  ...(data['clients'] as List).take(18).map((client) => pw.TableRow(
                     children: [
                       _buildTableCell(client['name'] ?? 'N/A'),
                       _buildTableCell(client['phone'] ?? 'N/A'),
@@ -523,12 +581,13 @@ class ReportsService {
             ],
             
             pw.Spacer(),
-            pw.Container(
-              padding: const pw.EdgeInsets.only(top: 20),
-              child: pw.Text(
-                'Generado el ${DateTime.now().toString().split('.')[0]}',
-                style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey),
-              ),
+            pw.Divider(color: PdfColors.grey400),
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text('LinkTattoo Manager', style: pw.TextStyle(fontSize: 9, color: PdfColors.grey700, fontWeight: pw.FontWeight.bold)),
+                pw.Text('Generado: ${_formatDateTimeForPDF(DateTime.now())}', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
+              ],
             ),
           ],
         );
@@ -540,6 +599,7 @@ class ReportsService {
   static pw.Page _buildAppointmentsPDF(String title, Map<String, dynamic> data) {
     return pw.Page(
       pageFormat: PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.all(40),
       build: (pw.Context context) {
         final statusBreakdown = data['status_breakdown'] as Map<String, dynamic>? ?? {};
         
@@ -547,69 +607,72 @@ class ReportsService {
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
             // Header
-            pw.Container(
-              padding: const pw.EdgeInsets.all(20),
-              color: PdfColors.amber,
-              child: pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Text(title, style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
-                  pw.SizedBox(height: 5),
-                  pw.Text('Período: ${_formatPeriodForPDF(data['period'])}', style: const pw.TextStyle(fontSize: 12)),
-                  pw.Text('Total de citas: ${data['total_appointments'] ?? 0}', style: const pw.TextStyle(fontSize: 12)),
-                ],
-              ),
+            pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(title.toUpperCase(), style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold, letterSpacing: 1.5)),
+                pw.Container(margin: const pw.EdgeInsets.only(top: 4, bottom: 12), height: 2, width: 100, color: PdfColors.black),
+                pw.Text('Período: ${_formatPeriodForPDF(data['period'])}', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                pw.Text('Total de citas: ${data['total_appointments'] ?? 0}', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
+              ],
             ),
             
-            pw.SizedBox(height: 20),
+            pw.SizedBox(height: 24),
             
             // Desglose por estado
-            pw.Container(
-              padding: const pw.EdgeInsets.all(15),
-              decoration: pw.BoxDecoration(
-                border: pw.Border.all(color: PdfColors.grey400),
-                borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
-              ),
-              child: pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Text('Desglose por Estado', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
-                  pw.Divider(),
-                  _buildPDFRow('Pendientes:', '${statusBreakdown['pendiente'] ?? 0}'),
-                  _buildPDFRow('Confirmadas:', '${statusBreakdown['confirmada'] ?? 0}'),
-                  _buildPDFRow('Completadas:', '${statusBreakdown['completa'] ?? 0}'),
-                  _buildPDFRow('Canceladas:', '${statusBreakdown['cancelada'] ?? 0}'),
-                  _buildPDFRow('Aplazadas:', '${statusBreakdown['aplazada'] ?? 0}'),
-                  _buildPDFRow('Perdidas:', '${statusBreakdown['perdida'] ?? 0}'),
-                  pw.Divider(),
-                  _buildPDFRow('Ingresos Totales:', '\$${data['total_revenue']?.toStringAsFixed(2) ?? '0.00'}', isBold: true),
-                ],
-              ),
+            pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text('DESGLOSE POR ESTADO', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, letterSpacing: 1)),
+                pw.SizedBox(height: 8),
+                pw.Container(
+                  padding: const pw.EdgeInsets.all(12),
+                  decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey400, width: 1)),
+                  child: pw.Column(
+                    children: [
+                      _buildPDFRow('Pendientes:', '${statusBreakdown['pendiente'] ?? 0}'),
+                      _buildPDFRow('Confirmadas:', '${statusBreakdown['confirmada'] ?? 0}'),
+                      _buildPDFRow('Completadas:', '${statusBreakdown['completa'] ?? 0}'),
+                      _buildPDFRow('Canceladas:', '${statusBreakdown['cancelada'] ?? 0}'),
+                      _buildPDFRow('Aplazadas:', '${statusBreakdown['aplazada'] ?? 0}'),
+                      _buildPDFRow('Perdidas:', '${statusBreakdown['perdida'] ?? 0}'),
+                      pw.Divider(color: PdfColors.grey400),
+                      _buildPDFRow('Ingresos Totales:', '\$${data['total_revenue']?.toStringAsFixed(2) ?? '0.00'}', isBold: true),
+                    ],
+                  ),
+                ),
+              ],
             ),
             
-            pw.SizedBox(height: 20),
+            pw.SizedBox(height: 24),
             
             // Tabla de citas
             if (data['appointments'] != null && (data['appointments'] as List).isNotEmpty) ...[
-              pw.Text('Detalle de Citas', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
-              pw.SizedBox(height: 10),
+              pw.Text('DETALLE DE CITAS', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, letterSpacing: 1)),
+              pw.SizedBox(height: 8),
               pw.Table(
-                border: pw.TableBorder.all(color: PdfColors.grey400),
+                border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+                columnWidths: {
+                  0: const pw.FlexColumnWidth(2),
+                  1: const pw.FlexColumnWidth(3),
+                  2: const pw.FlexColumnWidth(2),
+                  3: const pw.FlexColumnWidth(2),
+                },
                 children: [
                   pw.TableRow(
-                    decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+                    decoration: pw.BoxDecoration(border: pw.Border(bottom: pw.BorderSide(color: PdfColors.black, width: 1.5))),
                     children: [
-                      _buildTableCell('Fecha', isHeader: true),
-                      _buildTableCell('Descripción', isHeader: true),
-                      _buildTableCell('Estado', isHeader: true),
-                      _buildTableCell('Precio', isHeader: true),
+                      _buildTableCell('FECHA', isHeader: true),
+                      _buildTableCell('DESCRIPCIÓN', isHeader: true),
+                      _buildTableCell('ESTADO', isHeader: true),
+                      _buildTableCell('PRECIO', isHeader: true),
                     ],
                   ),
-                  ...(data['appointments'] as List).take(12).map((apt) => pw.TableRow(
+                  ...(data['appointments'] as List).take(14).map((apt) => pw.TableRow(
                     children: [
                       _buildTableCell(_formatDateForPDF(apt['start_time'])),
                       _buildTableCell(apt['description'] ?? 'N/A'),
-                      _buildTableCell(apt['status'] ?? 'N/A'),
+                      _buildTableCell(_capitalizeStatus(apt['status'] ?? 'N/A')),
                       _buildTableCell('\$${apt['price']?.toStringAsFixed(2) ?? '0.00'}'),
                     ],
                   )),
@@ -618,12 +681,13 @@ class ReportsService {
             ],
             
             pw.Spacer(),
-            pw.Container(
-              padding: const pw.EdgeInsets.only(top: 20),
-              child: pw.Text(
-                'Generado el ${DateTime.now().toString().split('.')[0]}',
-                style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey),
-              ),
+            pw.Divider(color: PdfColors.grey400),
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text('LinkTattoo Manager', style: pw.TextStyle(fontSize: 9, color: PdfColors.grey700, fontWeight: pw.FontWeight.bold)),
+                pw.Text('Generado: ${_formatDateTimeForPDF(DateTime.now())}', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
+              ],
             ),
           ],
         );
@@ -635,6 +699,7 @@ class ReportsService {
   static pw.Page _buildServicesPDF(String title, Map<String, dynamic> data) {
     return pw.Page(
       pageFormat: PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.all(40),
       build: (pw.Context context) {
         final servicesBreakdown = data['services_breakdown'] as Map<String, dynamic>? ?? {};
         
@@ -642,60 +707,64 @@ class ReportsService {
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
             // Header
-            pw.Container(
-              padding: const pw.EdgeInsets.all(20),
-              color: PdfColors.amber,
-              child: pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Text(title, style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
-                  pw.SizedBox(height: 5),
-                  pw.Text('Período: ${_formatPeriodForPDF(data['period'])}', style: const pw.TextStyle(fontSize: 12)),
-                  pw.Text('Total de servicios: ${data['total_services'] ?? 0}', style: const pw.TextStyle(fontSize: 12)),
-                ],
-              ),
+            pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(title.toUpperCase(), style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold, letterSpacing: 1.5)),
+                pw.Container(margin: const pw.EdgeInsets.only(top: 4, bottom: 12), height: 2, width: 100, color: PdfColors.black),
+                pw.Text('Período: ${_formatPeriodForPDF(data['period'])}', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                pw.Text('Total de servicios: ${data['total_services'] ?? 0}', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
+              ],
             ),
             
-            pw.SizedBox(height: 20),
+            pw.SizedBox(height: 24),
             
             // Resumen
-            pw.Container(
-              padding: const pw.EdgeInsets.all(15),
-              decoration: pw.BoxDecoration(
-                border: pw.Border.all(color: PdfColors.grey400),
-                borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
-              ),
-              child: pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Text('Resumen de Servicios', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
-                  pw.Divider(),
-                  _buildPDFRow('Servicios Únicos:', '${data['unique_services'] ?? 0}'),
-                  _buildPDFRow('Total de Servicios:', '${data['total_services'] ?? 0}'),
-                  _buildPDFRow('Servicio Más Popular:', data['most_popular_service'] ?? 'N/A'),
-                ],
-              ),
+            pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text('RESUMEN DE SERVICIOS', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, letterSpacing: 1)),
+                pw.SizedBox(height: 8),
+                pw.Container(
+                  padding: const pw.EdgeInsets.all(12),
+                  decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey400, width: 1)),
+                  child: pw.Column(
+                    children: [
+                      _buildPDFRow('Servicios Únicos:', '${data['unique_services'] ?? 0}', isBold: true),
+                      pw.Divider(color: PdfColors.grey300),
+                      _buildPDFRow('Total de Servicios:', '${data['total_services'] ?? 0}'),
+                      _buildPDFRow('Servicio Más Popular:', data['most_popular_service'] ?? 'N/A'),
+                    ],
+                  ),
+                ),
+              ],
             ),
             
-            pw.SizedBox(height: 20),
+            pw.SizedBox(height: 24),
             
             // Tabla de servicios
             if (servicesBreakdown.isNotEmpty) ...[
-              pw.Text('Desglose de Servicios', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
-              pw.SizedBox(height: 10),
+              pw.Text('DESGLOSE DE SERVICIOS', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, letterSpacing: 1)),
+              pw.SizedBox(height: 8),
               pw.Table(
-                border: pw.TableBorder.all(color: PdfColors.grey400),
+                border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+                columnWidths: {
+                  0: const pw.FlexColumnWidth(4),
+                  1: const pw.FlexColumnWidth(2),
+                  2: const pw.FlexColumnWidth(2),
+                  3: const pw.FlexColumnWidth(2),
+                },
                 children: [
                   pw.TableRow(
-                    decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+                    decoration: pw.BoxDecoration(border: pw.Border(bottom: pw.BorderSide(color: PdfColors.black, width: 1.5))),
                     children: [
-                      _buildTableCell('Servicio', isHeader: true),
-                      _buildTableCell('Cantidad', isHeader: true),
-                      _buildTableCell('Ingresos', isHeader: true),
-                      _buildTableCell('Promedio', isHeader: true),
+                      _buildTableCell('SERVICIO', isHeader: true),
+                      _buildTableCell('CANTIDAD', isHeader: true),
+                      _buildTableCell('INGRESOS', isHeader: true),
+                      _buildTableCell('PROMEDIO', isHeader: true),
                     ],
                   ),
-                  ...servicesBreakdown.entries.take(15).map((entry) {
+                  ...servicesBreakdown.entries.take(16).map((entry) {
                     final serviceData = entry.value as Map<String, dynamic>;
                     return pw.TableRow(
                       children: [
@@ -711,12 +780,13 @@ class ReportsService {
             ],
             
             pw.Spacer(),
-            pw.Container(
-              padding: const pw.EdgeInsets.only(top: 20),
-              child: pw.Text(
-                'Generado el ${DateTime.now().toString().split('.')[0]}',
-                style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey),
-              ),
+            pw.Divider(color: PdfColors.grey400),
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text('LinkTattoo Manager', style: pw.TextStyle(fontSize: 9, color: PdfColors.grey700, fontWeight: pw.FontWeight.bold)),
+                pw.Text('Generado: ${_formatDateTimeForPDF(DateTime.now())}', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
+              ],
             ),
           ],
         );
@@ -727,12 +797,24 @@ class ReportsService {
   // Funciones auxiliares para PDFs
   static pw.Widget _buildPDFRow(String label, String value, {bool isBold = false}) {
     return pw.Padding(
-      padding: const pw.EdgeInsets.symmetric(vertical: 4),
+      padding: const pw.EdgeInsets.symmetric(vertical: 3),
       child: pw.Row(
         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
         children: [
-          pw.Text(label, style: pw.TextStyle(fontSize: 12, fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal)),
-          pw.Text(value, style: pw.TextStyle(fontSize: 12, fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal)),
+          pw.Text(
+            label,
+            style: pw.TextStyle(
+              fontSize: 10,
+              fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal,
+            ),
+          ),
+          pw.Text(
+            value,
+            style: pw.TextStyle(
+              fontSize: 10,
+              fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal,
+            ),
+          ),
         ],
       ),
     );
@@ -740,12 +822,13 @@ class ReportsService {
 
   static pw.Widget _buildTableCell(String text, {bool isHeader = false}) {
     return pw.Padding(
-      padding: const pw.EdgeInsets.all(5),
+      padding: const pw.EdgeInsets.all(6),
       child: pw.Text(
         text,
         style: pw.TextStyle(
-          fontSize: isHeader ? 10 : 9,
+          fontSize: isHeader ? 9 : 8.5,
           fontWeight: isHeader ? pw.FontWeight.bold : pw.FontWeight.normal,
+          letterSpacing: isHeader ? 0.5 : 0,
         ),
       ),
     );
@@ -761,6 +844,10 @@ class ReportsService {
     }
   }
 
+  static String _formatDateTimeForPDF(DateTime date) {
+    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+  }
+
   static String _formatPeriodForPDF(String? period) {
     switch (period) {
       case 'weekly': return 'Semanal';
@@ -769,5 +856,10 @@ class ReportsService {
       case 'custom': return 'Personalizado';
       default: return period ?? 'N/A';
     }
+  }
+
+  static String _capitalizeStatus(String status) {
+    if (status.isEmpty) return status;
+    return status[0].toUpperCase() + status.substring(1);
   }
 }

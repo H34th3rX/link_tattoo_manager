@@ -795,7 +795,7 @@ class ReportPopup extends StatelessWidget {
                         );
                       } catch (e) {
                         // Error silencioso o log en consola
-                        print('Error al generar PDF: $e');
+                       
                       }
                     },
                     icon: const Icon(Icons.picture_as_pdf, color: Colors.white),
@@ -821,7 +821,7 @@ class ReportPopup extends StatelessWidget {
                           data: data,
                         );
                       } catch (e) {
-                        print('Error al imprimir: $e');
+                        //
                       }
                     },
                     icon: const Icon(Icons.print, color: Colors.black),
