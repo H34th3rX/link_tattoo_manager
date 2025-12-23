@@ -137,13 +137,23 @@ class ClientsService {
 
   // Obtener las últimas tres citas de un empleado
   static Future<List<Map>> getLastThreeAppointments(String employeeId) async {
+    final now = DateTime.now();
+    
     final response = await client
         .from('appointments')
         .select('id, client_id, start_time, status')
         .eq('employee_id', employeeId)
-        .order('start_time', ascending: false)
+        // Excluir citas perdidas
+        .neq('status', 'perdida')
+        // Excluir citas canceladas
+        .neq('status', 'cancelada')
+        // Solo citas futuras o de hoy
+        .gte('start_time', now.toIso8601String())
+        // Ordenar por fecha ascendente (próximas primero)
+        .order('start_time', ascending: true)
         .limit(3);
     
+    // Convertir fechas a hora local del dispositivo
     for (var appointment in response) {
       if (appointment['start_time'] != null) {
         final utcDate = DateTime.parse(appointment['start_time']);

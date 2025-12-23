@@ -22,9 +22,10 @@ const Color successColor = Color(0xFF4CAF50);
 const Color confirmedColor = Color(0xFF4CAF50);
 const Color completeColor = Color(0xFF2196F3);
 const Color inProgressColor = Color(0xFFFF9800);
-const Color pendingColor = Color(0xFFFF5722);
+const Color pendingColor = ui.Color.fromARGB(255, 171, 209, 36);
 const Color cancelledColor = Color(0xFF9E9E9E);
-const Color postponedColor = Color(0xFF9C27B0); // Color morado para aplazadas
+const Color postponedColor = Color(0xFF9C27B0);
+const Color missedColor = Color(0xFFFF5722); 
 const double borderRadius = 12.0;
 const Duration themeAnimationDuration = Duration(milliseconds: 300);
 
@@ -922,6 +923,13 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
             });
             _fetchAppointments();
           }),
+          const SizedBox(width: 8),
+          _buildStatusFilterChip('Perdidas', 'perdida', _selectedStatus, isDark, (value) {
+            setState(() {
+              _selectedStatus = value;
+            });
+            _fetchAppointments();
+          }),
         ],
       ),
     );
@@ -980,6 +988,10 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
       case 'aplazada':
         chipColor = postponedColor;
         break;
+      case 'perdida':
+        chipColor = missedColor;
+        break;
+
     }
 
     return GestureDetector(
@@ -1016,6 +1028,7 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
     final confirmedCount = _appointments.where((a) => a['status'] == 'confirmada').length;
     final completeCount = _appointments.where((a) => a['status'] == 'completa').length;
     final pendingCount = _appointments.where((a) => a['status'] == 'pendiente').length;
+    final missedCount = _appointments.where((a) => a['status'] == 'perdida').length;
 
     return AnimatedContainer(
       duration: themeAnimationDuration,
@@ -1035,6 +1048,8 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
           _buildStatDot(completeColor, completeCount),
           const SizedBox(width: 12),
           _buildStatDot(pendingColor, pendingCount),
+          const SizedBox(width: 12),
+          _buildStatDot(missedColor, missedCount),
         ],
       ),
     );
@@ -1390,6 +1405,10 @@ class AppointmentCard extends StatelessWidget {
       case 'aplazada':
         statusColor = postponedColor;
         statusText = 'Aplazada';
+        break;
+      case 'perdida':
+        statusColor = missedColor;
+        statusText = 'Perdida';
         break;
     }
 
@@ -2451,6 +2470,9 @@ class _AppointmentPopupState extends State<AppointmentPopup>
                     case 'cancelada':
                       displayText = 'Cancelada';
                       break;
+                    case 'perdida':
+                      displayText = 'Perdida';
+                      break;
                   }
                   return DropdownMenuItem(
                     value: status,
@@ -2803,6 +2825,10 @@ class AppointmentDetailsDialog extends StatelessWidget {
         statusColor = postponedColor;
         statusText = 'Aplazada';
         break;
+      case 'perdida':
+      statusColor = missedColor;
+      statusText = 'Perdida';
+      break;
     }
 
     return Dialog(

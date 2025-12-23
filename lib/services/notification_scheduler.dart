@@ -23,7 +23,7 @@ class NotificationScheduler {
     
     // Set local timezone properly
     try {
-      tz.setLocalLocation(tz.getLocation('America/Mexico_City'));
+      tz.setLocalLocation(tz.getLocation('America/Santo_Domingo'));
     } catch (e) {
       // Fallback to system timezone
     }

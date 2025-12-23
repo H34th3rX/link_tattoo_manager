@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-// Added debug mode import
+import './services/appointment_auto_updater.dart';
 import 'profile_page.dart';
 import 'supabase_service.dart';
 import 'theme_provider.dart';
@@ -29,7 +29,8 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SupabaseService.initialize();
-  await NotificationScheduler.initialize();  
+  await NotificationScheduler.initialize();
+  await AppointmentAutoUpdater.initialize();  
   // Configurar el listener de deep links para manejar confirmaciones de email
   _setupDeepLinkListener();
   

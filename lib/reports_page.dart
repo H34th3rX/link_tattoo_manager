@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -5,7 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'nav_panel.dart';
 import 'theme_provider.dart';
 import 'appbar.dart';
-import './integrations/reports_service.dart'; // Importar el nuevo servicio
+import './integrations/reports_service.dart'; 
 
 // Constantes globales para la página de reportes
 const Color primaryColor = Color(0xFFBDA206);
@@ -778,25 +780,49 @@ class ReportPopup extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
+                  // Botón Exportar PDF
                   ElevatedButton.icon(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Funcionalidad de exportación próximamente')),
-                      );
+                    onPressed: () async {
+                      // Cerrar el diálogo primero
+                      Navigator.of(context).pop();
+                      
+                      // Luego generar el PDF
+                      try {
+                        await ReportsService.generatePDF(
+                          reportType: reportType,
+                          title: title,
+                          data: data,
+                        );
+                      } catch (e) {
+                        // Error silencioso o log en consola
+                        print('Error al generar PDF: $e');
+                      }
                     },
-                    icon: const Icon(Icons.download, color: Colors.white),
+                    icon: const Icon(Icons.picture_as_pdf, color: Colors.white),
                     label: const Text('Exportar PDF', style: TextStyle(color: Colors.white)),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blueGrey,
+                      backgroundColor: Colors.red,
                       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                   ),
+                  
+                  // Botón Imprimir
                   ElevatedButton.icon(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Funcionalidad de impresión próximamente')),
-                      );
+                    onPressed: () async {
+                      // Cerrar el diálogo primero
+                      Navigator.of(context).pop();
+                      
+                      // Luego abrir impresión
+                      try {
+                        await ReportsService.generatePDF(
+                          reportType: reportType,
+                          title: title,
+                          data: data,
+                        );
+                      } catch (e) {
+                        print('Error al imprimir: $e');
+                      }
                     },
                     icon: const Icon(Icons.print, color: Colors.black),
                     label: const Text('Imprimir', style: TextStyle(color: Colors.black)),

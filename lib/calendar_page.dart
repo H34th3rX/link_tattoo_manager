@@ -20,9 +20,10 @@ const Color successColor = Color(0xFF4CAF50);
 const Color confirmedColor = Color(0xFF4CAF50);
 const Color completeColor = Color(0xFF2196F3);
 const Color inProgressColor = Color(0xFFFF9800);
-const Color pendingColor = Color(0xFFFF5722);
+const Color pendingColor = ui.Color.fromARGB(255, 171, 209, 36);
 const Color cancelledColor = Color(0xFF9E9E9E);
 const Color postponedColor = Color(0xFF9C27B0); // Color morado para aplazadas
+const Color missedColor = Color(0xFFFF5722);
 const double borderRadius = 12.0;
 const Duration themeAnimationDuration = Duration(milliseconds: 300);
 
@@ -161,6 +162,8 @@ class _CalendarPageState extends State<CalendarPage> with TickerProviderStateMix
         return cancelledColor;
       case 'aplazada':
         return postponedColor;
+      case 'perdida':
+        return missedColor;
       default:
         return primaryColor;
     }
@@ -180,6 +183,8 @@ class _CalendarPageState extends State<CalendarPage> with TickerProviderStateMix
         return 'Cancelada';
       case 'aplazada':
         return 'Aplazada';
+      case 'perdida':
+        return 'Perdida';
       default:
         return 'Desconocido';
     }
@@ -604,6 +609,8 @@ class _CalendarPageState extends State<CalendarPage> with TickerProviderStateMix
                     dominantColor = completeColor;
                   } else if (appointmentsForDate.any((apt) => apt['status'] == 'pendiente')) {
                     dominantColor = pendingColor;
+                  } else if (appointmentsForDate.any((apt) => apt['status'] == 'perdida')) {
+                    dominantColor = missedColor;
                   } else {
                     dominantColor = primaryColor;
                   }
@@ -1114,6 +1121,7 @@ class _AppointmentDetailCardState extends State<AppointmentDetailCard> {
             _buildStatusOption('completa', 'Completada', currentStatus),
             _buildStatusOption('cancelada', 'Cancelada', currentStatus),
             _buildStatusOption('aplazada', 'Aplazada', currentStatus),
+            _buildStatusOption('perdida', 'Perdida', currentStatus),
           ],
         ),
       ),

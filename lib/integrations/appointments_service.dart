@@ -30,7 +30,7 @@ class AppointmentsService {
   }
 
   static List<String> getAvailableStatusesForForm() {
-    return ['pendiente', 'confirmada', 'completa', 'cancelada'];
+    return ['pendiente', 'confirmada', 'completa', 'cancelada', 'perdida'];
   }
 
   //[-------------OPERACIONES CRUD PARA CITAS--------------]
@@ -373,6 +373,7 @@ class AppointmentsService {
       'completa': 0,
       'cancelada': 0,
       'aplazada': 0,
+      'perdida': 0,
     };
     
     for (final appointment in response) {

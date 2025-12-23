@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../services/notification_scheduler.dart';
 
-//[-------------MODELO DE NOTIFICACIÓN--------------]
+// [-------------MODELO DE NOTIFICACIÓN--------------]
 class NotificationItem {
   final String id;
   final String type;
@@ -21,9 +22,29 @@ class NotificationItem {
   });
 }
 
-//[-------------SERVICIO DE NOTIFICACIONES--------------]
+// [-------------SERVICIO DE NOTIFICACIONES MEJORADO--------------]
 class NotificationsService {
   static final client = Supabase.instance.client;
+
+  static Future<void> scheduleAppointmentNotifications() async {
+    await NotificationScheduler.rescheduleAllNotifications();
+  }
+
+  static Future<void> scheduleNotificationForAppointment({
+    required String appointmentId,
+    required String clientName,
+    required DateTime appointmentTime,
+  }) async {
+    await NotificationScheduler.scheduleAppointmentNotification(
+      appointmentId: appointmentId,
+      clientName: clientName,
+      appointmentTime: appointmentTime,
+    );
+  }
+
+  static Future<void> cancelNotificationForAppointment(String appointmentId) async {
+    await NotificationScheduler.cancelAppointmentNotification(appointmentId);
+  }
 
   static Future<String?> _getCurrentEmployeeId() async {
     try {
@@ -243,7 +264,7 @@ class NotificationsService {
   }
 
   // Resumen de citas de hoy
-  static Future<NotificationItem?> _getTodayAppointmentsNotification(String employeeId) async {
+    static Future<NotificationItem?> _getTodayAppointmentsNotification(String employeeId) async {
     try {
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
@@ -258,9 +279,15 @@ class NotificationsService {
           .lte('start_time', endOfDay.toIso8601String());
 
       if (response.isNotEmpty) {
-        final totalToday = response.length;
-        final completed = response.where((apt) => apt['status'] == 'completa').length;
+        // 🆕 CAMBIO: Excluir citas perdidas y canceladas del conteo
+        final validAppointments = response.where(
+          (apt) => apt['status'] != 'perdida' && apt['status'] != 'cancelada'
+        ).toList();
         
+        final totalToday = validAppointments.length;
+        final completed = validAppointments.where((apt) => apt['status'] == 'completa').length;
+        
+        // Solo mostrar notificación si hay citas válidas
         if (totalToday > 0) {
           return NotificationItem(
             id: 'today_summary',

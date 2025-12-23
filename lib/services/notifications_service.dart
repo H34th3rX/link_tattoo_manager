@@ -264,7 +264,7 @@ class NotificationsService {
   }
 
   // Resumen de citas de hoy
-  static Future<NotificationItem?> _getTodayAppointmentsNotification(String employeeId) async {
+    static Future<NotificationItem?> _getTodayAppointmentsNotification(String employeeId) async {
     try {
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
@@ -279,9 +279,15 @@ class NotificationsService {
           .lte('start_time', endOfDay.toIso8601String());
 
       if (response.isNotEmpty) {
-        final totalToday = response.length;
-        final completed = response.where((apt) => apt['status'] == 'completa').length;
+        // 🆕 CAMBIO: Excluir citas perdidas y canceladas del conteo
+        final validAppointments = response.where(
+          (apt) => apt['status'] != 'perdida' && apt['status'] != 'cancelada'
+        ).toList();
         
+        final totalToday = validAppointments.length;
+        final completed = validAppointments.where((apt) => apt['status'] == 'completa').length;
+        
+        // Solo mostrar notificación si hay citas válidas
         if (totalToday > 0) {
           return NotificationItem(
             id: 'today_summary',
