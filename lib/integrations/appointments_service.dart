@@ -618,4 +618,189 @@ class AppointmentsService {
     
     return weeklyData;
   }
+
+   //[-------------DATOS PARA GRÁFICOS DASHBOARD--------------]
+  
+  /// Obtener distribución de citas por estado (para gráfico de pastel)
+  static Future<Map<String, int>> getAppointmentsStatusDistribution(String employeeId) async {
+    try {
+      // Obtener todas las citas del mes actual
+      final now = DateTime.now();
+      final startOfMonth = DateTime(now.year, now.month, 1);
+      final endOfMonth = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
+      
+      final response = await client
+          .from('appointments')
+          .select('status')
+          .eq('employee_id', employeeId)
+          .gte('start_time', startOfMonth.toIso8601String())
+          .lte('start_time', endOfMonth.toIso8601String());
+      
+      // Contar por estado
+      Map<String, int> distribution = {
+        'Completadas': 0,
+        'Confirmadas': 0,
+        'Pendientes': 0,
+        'Canceladas': 0,
+        'Perdidas': 0,
+      };
+      
+      for (var appointment in response) {
+        final status = appointment['status'] as String?;
+        switch (status) {
+          case 'completa':
+            distribution['Completadas'] = (distribution['Completadas'] ?? 0) + 1;
+            break;
+          case 'confirmada':
+            distribution['Confirmadas'] = (distribution['Confirmadas'] ?? 0) + 1;
+            break;
+          case 'pendiente':
+            distribution['Pendientes'] = (distribution['Pendientes'] ?? 0) + 1;
+            break;
+          case 'cancelada':
+            distribution['Canceladas'] = (distribution['Canceladas'] ?? 0) + 1;
+            break;
+          case 'perdida':
+            distribution['Perdidas'] = (distribution['Perdidas'] ?? 0) + 1;
+            break;
+        }
+      }
+      
+      return distribution;
+    } catch (e) {
+      return {
+        'Completadas': 0,
+        'Confirmadas': 0,
+        'Pendientes': 0,
+        'Canceladas': 0,
+        'Perdidas': 0,
+      };
+    }
+  }
+  
+  /// Obtener servicios más populares (para gráfico de dona)
+  static Future<List<Map<String, dynamic>>> getTopServices(String employeeId, {int limit = 5}) async {
+    try {
+      // Obtener citas completadas del mes actual
+      final now = DateTime.now();
+      final startOfMonth = DateTime(now.year, now.month, 1);
+      final endOfMonth = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
+      
+      final response = await client
+          .from('appointments')
+          .select('description, price')
+          .eq('employee_id', employeeId)
+          .eq('status', 'completa')
+          .gte('start_time', startOfMonth.toIso8601String())
+          .lte('start_time', endOfMonth.toIso8601String());
+      
+      // Agrupar por servicio
+      Map<String, Map<String, dynamic>> servicesMap = {};
+      
+      for (var appointment in response) {
+        final description = appointment['description'] as String? ?? 'Sin descripción';
+        final price = (appointment['price'] as num?)?.toDouble() ?? 0.0;
+        
+        if (servicesMap.containsKey(description)) {
+          servicesMap[description]!['count'] += 1;
+          servicesMap[description]!['total'] += price;
+        } else {
+          servicesMap[description] = {
+            'service': description,
+            'count': 1,
+            'total': price,
+          };
+        }
+      }
+      
+      // Convertir a lista y ordenar por cantidad
+      List<Map<String, dynamic>> servicesList = servicesMap.values.toList();
+      servicesList.sort((a, b) => (b['count'] as int).compareTo(a['count'] as int));
+      
+      // Retornar top servicios
+      return servicesList.take(limit).toList();
+    } catch (e) {
+      return [];
+    }
+  }
+  
+  /// Obtener comparación de citas por día de la semana (para gráfico radial)
+  static Future<Map<String, int>> getAppointmentsByDayOfWeek(String employeeId) async {
+    try {
+      // Obtener citas del mes actual
+      final now = DateTime.now();
+      final startOfMonth = DateTime(now.year, now.month, 1);
+      final endOfMonth = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
+      
+      final response = await client
+          .from('appointments')
+          .select('start_time')
+          .eq('employee_id', employeeId)
+          .gte('start_time', startOfMonth.toIso8601String())
+          .lte('start_time', endOfMonth.toIso8601String());
+      
+      // Contar por día de la semana
+      Map<String, int> dayDistribution = {
+        'Lun': 0,
+        'Mar': 0,
+        'Mié': 0,
+        'Jue': 0,
+        'Vie': 0,
+        'Sáb': 0,
+        'Dom': 0,
+      };
+      
+      for (var appointment in response) {
+        final startTime = DateTime.parse(appointment['start_time']).toLocal();
+        final weekday = startTime.weekday;
+        
+        switch (weekday) {
+          case 1: dayDistribution['Lun'] = (dayDistribution['Lun'] ?? 0) + 1; break;
+          case 2: dayDistribution['Mar'] = (dayDistribution['Mar'] ?? 0) + 1; break;
+          case 3: dayDistribution['Mié'] = (dayDistribution['Mié'] ?? 0) + 1; break;
+          case 4: dayDistribution['Jue'] = (dayDistribution['Jue'] ?? 0) + 1; break;
+          case 5: dayDistribution['Vie'] = (dayDistribution['Vie'] ?? 0) + 1; break;
+          case 6: dayDistribution['Sáb'] = (dayDistribution['Sáb'] ?? 0) + 1; break;
+          case 7: dayDistribution['Dom'] = (dayDistribution['Dom'] ?? 0) + 1; break;
+        }
+      }
+      
+      return dayDistribution;
+    } catch (e) {
+      return {
+        'Lun': 0,
+        'Mar': 0,
+        'Mié': 0,
+        'Jue': 0,
+        'Vie': 0,
+        'Sáb': 0,
+        'Dom': 0,
+      };
+    }
+  }
+  
+  /// Obtener tasa de conversión de citas (para medidor)
+  static Future<double> getAppointmentConversionRate(String employeeId) async {
+    try {
+      final now = DateTime.now();
+      final startOfMonth = DateTime(now.year, now.month, 1);
+      final endOfMonth = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
+      
+      final response = await client
+          .from('appointments')
+          .select('status')
+          .eq('employee_id', employeeId)
+          .gte('start_time', startOfMonth.toIso8601String())
+          .lte('start_time', endOfMonth.toIso8601String());
+      
+      if (response.isEmpty) return 0.0;
+      
+      final total = response.length;
+      final completed = response.where((apt) => apt['status'] == 'completa').length;
+      
+      return (completed / total) * 100;
+    } catch (e) {
+      return 0.0;
+    }
+  }
 }

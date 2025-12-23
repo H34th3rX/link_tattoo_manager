@@ -233,8 +233,10 @@ class _MainContentState extends State<MainContent> {
   late Future<double> _totalRevenue;
   late Future<int> _todayConfirmedCount;
   late Future<Map<String, dynamic>?> _nextConfirmedAppointment;
-  // NUEVO: Agregar datos del gráfico semanal
   late Future<List<Map<String, dynamic>>> _weeklyRevenueData;
+  late Future<Map<String, int>> _statusDistribution;
+  late Future<List<Map<String, dynamic>>> _topServices;
+  late Future<Map<String, int>> _dayOfWeekData;
 
   @override
   void initState() {
@@ -268,6 +270,9 @@ class _MainContentState extends State<MainContent> {
     
     // NUEVO: Cargar datos reales del gráfico semanal
     _weeklyRevenueData = AppointmentsService.getWeeklyRevenueData(userId);
+    _statusDistribution = AppointmentsService.getAppointmentsStatusDistribution(userId);
+    _topServices = AppointmentsService.getTopServices(userId, limit: 5);
+    _dayOfWeekData = AppointmentsService.getAppointmentsByDayOfWeek(userId);
   }
 
   @override
@@ -541,8 +546,43 @@ class _MainContentState extends State<MainContent> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 40),
+                // Fila de gráficos nuevos (Pastel y Dona)
+                const SizedBox(height: 32),
+                AnimatedAppearance(
+                  delay: 600,
+                  child: isWide
+                      ? Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Gráfico de Pastel - Estados de Citas
+                            Expanded(
+                              child: _buildPieChart(),
+                            ),
+                            const SizedBox(width: 16),
+                            // Gráfico de Dona - Servicios Populares
+                            Expanded(
+                              child: _buildDoughnutChart(),
+                            ),
+                          ],
+                        )
+                      : Column(
+                          children: [
+                            _buildPieChart(),
+                            const SizedBox(height: 16),
+                            _buildDoughnutChart(),
+                          ],
+                        ),
+                ),
+
+                // Gráfico Radial - Citas por día de la semana
+                const SizedBox(height: 32),
+                AnimatedAppearance(
+                  delay: 750,
+                  child: _buildRadialChart(),
+                ),
+
                 // Actividad Reciente (delay: 750ms) - Improved design
+                const SizedBox(height: 40),
                 AnimatedAppearance(
                   delay: 750,
                   child: FutureBuilder(
@@ -751,6 +791,413 @@ class _MainContentState extends State<MainContent> {
       ],
     );
   }
+
+  /// Gráfico de Pastel - Distribución de Estados de Citas
+  Widget _buildPieChart() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: widget.isDark ? Colors.grey[850] : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const ui.Color(0xFFBDA206).withValues(alpha: 0.3),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: widget.isDark
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.grey.withValues(alpha: 0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const ui.Color(0xFFBDA206).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.pie_chart,
+                  size: 20,
+                  color: ui.Color(0xFFBDA206),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Estados de Citas - Este Mes',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: widget.isDark ? Colors.white : Colors.black87,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          
+          // Gráfico
+          FutureBuilder<Map<String, int>>(
+            future: _statusDistribution,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const SizedBox(
+                  height: 250,
+                  child: Center(child: CircularProgressIndicator(color: ui.Color(0xFFBDA206))),
+                );
+              }
+              
+              if (!snapshot.hasData || snapshot.data!.values.every((v) => v == 0)) {
+                return SizedBox(
+                  height: 250,
+                  child: Center(
+                    child: Text(
+                      'No hay datos para este mes',
+                      style: TextStyle(
+                        color: widget.isDark ? Colors.grey[400] : Colors.grey[600],
+                      ),
+                    ),
+                  ),
+                );
+              }
+              
+              final data = snapshot.data!;
+              final chartData = data.entries
+                  .where((e) => e.value > 0)
+                  .map((e) => _ChartData(e.key, e.value))
+                  .toList();
+              
+              return SizedBox(
+                height: 250,
+                child: SfCircularChart(
+                  legend: Legend(
+                    isVisible: true,
+                    position: LegendPosition.bottom,
+                    textStyle: TextStyle(
+                      color: widget.isDark ? Colors.white : Colors.black87,
+                      fontSize: 11,
+                    ),
+                  ),
+                  tooltipBehavior: TooltipBehavior(
+                    enable: true,
+                    format: 'point.x: point.y citas',
+                    textStyle: const TextStyle(fontSize: 12),
+                  ),
+                  series: <CircularSeries>[
+                    PieSeries<_ChartData, String>(
+                      dataSource: chartData,
+                      xValueMapper: (_ChartData data, _) => data.label,
+                      yValueMapper: (_ChartData data, _) => data.value,
+                      pointColorMapper: (_ChartData data, _) => _getStatusColor(data.label),
+                      dataLabelSettings: DataLabelSettings(
+                        isVisible: true,
+                        labelPosition: ChartDataLabelPosition.outside,
+                        textStyle: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: widget.isDark ? Colors.white : Colors.black87,
+                        ),
+                      ),
+                      dataLabelMapper: (_ChartData data, _) => '${data.value}',
+                      enableTooltip: true,
+                      explode: true,
+                      explodeIndex: 0,
+                      explodeOffset: '5%',
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Gráfico de Dona - Servicios Más Populares
+  Widget _buildDoughnutChart() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: widget.isDark ? Colors.grey[850] : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const ui.Color(0xFFBDA206).withValues(alpha: 0.3),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: widget.isDark
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.grey.withValues(alpha: 0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const ui.Color(0xFFBDA206).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.donut_large,
+                  size: 20,
+                  color: ui.Color(0xFFBDA206),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Top 5 Servicios - Este Mes',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: widget.isDark ? Colors.white : Colors.black87,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          
+          // Gráfico
+          FutureBuilder<List<Map<String, dynamic>>>(
+            future: _topServices,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const SizedBox(
+                  height: 250,
+                  child: Center(child: CircularProgressIndicator(color: ui.Color(0xFFBDA206))),
+                );
+              }
+              
+              if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                return SizedBox(
+                  height: 250,
+                  child: Center(
+                    child: Text(
+                      'No hay servicios este mes',
+                      style: TextStyle(
+                        color: widget.isDark ? Colors.grey[400] : Colors.grey[600],
+                      ),
+                    ),
+                  ),
+                );
+              }
+              
+              final data = snapshot.data!;
+              final chartData = data.map((e) {
+                String serviceName = e['service'] as String;
+                if (serviceName.length > 20) {
+                  serviceName = '${serviceName.substring(0, 20)}...';
+                }
+                return _ChartData(serviceName, e['count'] as int);
+              }).toList();
+              
+              return SizedBox(
+                height: 250,
+                child: SfCircularChart(
+                  legend: Legend(
+                    isVisible: true,
+                    position: LegendPosition.bottom,
+                    overflowMode: LegendItemOverflowMode.wrap,
+                    textStyle: TextStyle(
+                      color: widget.isDark ? Colors.white : Colors.black87,
+                      fontSize: 10,
+                    ),
+                  ),
+                  tooltipBehavior: TooltipBehavior(
+                    enable: true,
+                    format: 'point.x: point.y veces',
+                    textStyle: const TextStyle(fontSize: 12),
+                  ),
+                  series: <CircularSeries>[
+                    DoughnutSeries<_ChartData, String>(
+                      dataSource: chartData,
+                      xValueMapper: (_ChartData data, _) => data.label,
+                      yValueMapper: (_ChartData data, _) => data.value,
+                      pointColorMapper: (_ChartData data, _) => _getServiceColor(chartData.indexOf(data)),
+                      dataLabelSettings: DataLabelSettings(
+                        isVisible: true,
+                        labelPosition: ChartDataLabelPosition.outside,
+                        textStyle: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: widget.isDark ? Colors.white : Colors.black87,
+                        ),
+                      ),
+                      dataLabelMapper: (_ChartData data, _) => '${data.value}',
+                      enableTooltip: true,
+                      innerRadius: '60%',
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Gráfico Radial - Citas por Día de la Semana
+  Widget _buildRadialChart() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: widget.isDark ? Colors.grey[850] : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const ui.Color(0xFFBDA206).withValues(alpha: 0.3),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: widget.isDark
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.grey.withValues(alpha: 0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const ui.Color(0xFFBDA206).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.radar,
+                  size: 20,
+                  color: ui.Color(0xFFBDA206),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Citas por Día de la Semana - Este Mes',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: widget.isDark ? Colors.white : Colors.black87,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          
+          // Gráfico
+          FutureBuilder<Map<String, int>>(
+            future: _dayOfWeekData,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const SizedBox(
+                  height: 300,
+                  child: Center(child: CircularProgressIndicator(color: ui.Color(0xFFBDA206))),
+                );
+              }
+              
+              if (!snapshot.hasData || snapshot.data!.values.every((v) => v == 0)) {
+                return SizedBox(
+                  height: 300,
+                  child: Center(
+                    child: Text(
+                      'No hay datos para este mes',
+                      style: TextStyle(
+                        color: widget.isDark ? Colors.grey[400] : Colors.grey[600],
+                      ),
+                    ),
+                  ),
+                );
+              }
+              
+              final data = snapshot.data!;
+              final chartData = data.entries.map((e) => _ChartData(e.key, e.value)).toList();
+              
+              return SizedBox(
+                height: 300,
+                child: SfCircularChart(
+                  legend: Legend(
+                    isVisible: false,
+                  ),
+                  tooltipBehavior: TooltipBehavior(
+                    enable: true,
+                    format: 'point.x: point.y citas',
+                    textStyle: const TextStyle(fontSize: 12),
+                  ),
+                  series: <CircularSeries>[
+                    RadialBarSeries<_ChartData, String>(
+                      dataSource: chartData,
+                      xValueMapper: (_ChartData data, _) => data.label,
+                      yValueMapper: (_ChartData data, _) => data.value,
+                      pointColorMapper: (_ChartData data, _) => const ui.Color(0xFFBDA206),
+                      dataLabelSettings: DataLabelSettings(
+                        isVisible: true,
+                        textStyle: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: widget.isDark ? Colors.white : Colors.black87,
+                        ),
+                      ),
+                      dataLabelMapper: (_ChartData data, _) => '${data.label}\n${data.value}',
+                      cornerStyle: CornerStyle.bothCurve,
+                      enableTooltip: true,
+                      maximumValue: chartData.map((e) => e.value).reduce((a, b) => a > b ? a : b).toDouble() * 1.2,
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Helper: Obtener color por estado
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'Completadas': return const Color(0xFF4CAF50); // Verde
+      case 'Confirmadas': return const Color(0xFF2196F3); // Azul
+      case 'Pendientes': return const Color(0xFFFF9800); // Naranja
+      case 'Canceladas': return const Color(0xFF9E9E9E); // Gris
+      case 'Perdidas': return const Color(0xFFFF5722); // Rojo
+      default: return const Color(0xFFBDA206); // Amarillo
+    }
+  }
+
+  /// Helper: Obtener color por índice de servicio
+  Color _getServiceColor(int index) {
+    final colors = [
+      const ui.Color(0xFFBDA206), // Amarillo
+      const Color(0xFF4CAF50), // Verde
+      const Color(0xFF2196F3), // Azul
+      const Color(0xFF9C27B0), // Morado
+      const Color(0xFFFF5722), // Rojo-naranja
+    ];
+    return colors[index % colors.length];
+  }
+
 }
 
 class ActivityCard extends StatelessWidget {
@@ -1318,4 +1765,11 @@ class NotificationsBottomSheet extends StatelessWidget {
       ),
     );
   }
+}
+
+// Clase auxiliar para datos de gráficos
+class _ChartData {
+  _ChartData(this.label, this.value);
+  final String label;
+  final int value;
 }
