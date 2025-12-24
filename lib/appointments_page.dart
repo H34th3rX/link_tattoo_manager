@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -11,6 +13,7 @@ import 'dart:collection';
 import './integrations/clients_service.dart';
 import './integrations/appointments_service.dart';
 import './services/notification_scheduler.dart';
+import './services/services_service.dart';
 
 //[------------- CONSTANTES GLOBALES DE ESTILO --------------]
 const Color primaryColor = Color(0xFFBDA206);
@@ -355,7 +358,7 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
   Future<void> _deleteAppointment(String id) async {
     try {
       final user = Supabase.instance.client.auth.currentUser!;
-      
+      if (!mounted) return;
       // Mostrar diálogo de confirmación
       final confirmed = await showDialog<bool>(
         context: context,
@@ -1703,6 +1706,9 @@ class _AppointmentPopupState extends State<AppointmentPopup>
   final _clientPhoneCtrl = TextEditingController();
   final _clientEmailCtrl = TextEditingController();
   final _descriptionCtrl = TextEditingController();
+  List<Map<String, dynamic>> _services = [];
+  String? _selectedServiceId;
+  bool _loadingServices = true;
   final _notesCtrl = TextEditingController();
   final _priceCtrl = TextEditingController();
   final _depositCtrl = TextEditingController();
@@ -1747,6 +1753,7 @@ class _AppointmentPopupState extends State<AppointmentPopup>
     ).animate(CurvedAnimation(parent: _animationController, curve: Curves.easeOut));
 
     _animationController.forward();
+    _loadServices();
     _initializeFields();
   }
 
@@ -1821,6 +1828,50 @@ class _AppointmentPopupState extends State<AppointmentPopup>
     _priceCtrl.dispose();
     _depositCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadServices() async {
+    try {
+      final userId = Supabase.instance.client.auth.currentUser!.id;
+      final services = await ServicesService.getServices(userId, onlyActive: true);
+      
+      if (mounted) {
+        setState(() {
+          _services = services;
+          _loadingServices = false;
+          
+          // Validar si el servicio seleccionado todavía existe
+          if (_selectedServiceId != null) {
+            final serviceExists = _services.any((s) => s['id'] == _selectedServiceId);
+            if (!serviceExists) {
+              _selectedServiceId = null;
+              _descriptionCtrl.clear();
+            }
+          }
+          
+          // Intentar matchear con servicio existente si estamos editando
+          if (widget.initialAppointment != null && _selectedServiceId == null) {
+            final currentDescription = widget.initialAppointment!['description']?.toString() ?? '';
+            for (var service in _services) {
+              if (service['name'] == currentDescription) {
+                _selectedServiceId = service['id'];
+                _descriptionCtrl.text = service['name'];
+                break;
+              }
+            }
+            // Si no match, mantener el texto original
+            if (_selectedServiceId == null && currentDescription.isNotEmpty) {
+              _descriptionCtrl.text = currentDescription;
+            }
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Error cargando servicios: $e');
+      if (mounted) {
+        setState(() => _loadingServices = false);
+      }
+    }
   }
 
   void _closeWithAnimation() async {
@@ -2009,6 +2060,21 @@ class _AppointmentPopupState extends State<AppointmentPopup>
         debugPrint('Could not show SnackBar: $e');
       }
     }
+  }
+
+  Future<void> _showServicesManagementDialog() async {
+    final userId = Supabase.instance.client.auth.currentUser!.id;
+    
+    await showDialog(
+      context: context,
+      builder: (context) => ServicesManagementDialog(
+        userId: userId,
+        isDark: widget.isDark,
+      ),
+    );
+    
+    // Actualizar dropdown
+    await _loadServices();
   }
 
   @override
@@ -2304,16 +2370,123 @@ class _AppointmentPopupState extends State<AppointmentPopup>
           ],
         ),
         const SizedBox(height: 16),
-        TextFormField(
-          controller: _descriptionCtrl,
-          style: TextStyle(color: widget.isDark ? textColor : Colors.black87),
-          decoration: _buildInputDecoration('Servicio/Descripción *', Icons.work_outline),
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'La descripción del servicio es requerida';
-            }
-            return null;
-          },
+        Row(
+          children: [
+            Expanded(
+              child: _loadingServices
+                  ? Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: widget.isDark ? Colors.grey[800] : Colors.grey[200],
+                        borderRadius: BorderRadius.circular(borderRadius),
+                        border: Border.all(
+                          color: primaryColor.withValues(alpha:0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: const Row(
+                        children: [
+                          SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: primaryColor,
+                            ),
+                          ),
+                          SizedBox(width: 12),
+                          Text('Cargando servicios...'),
+                        ],
+                      ),
+                    )
+                  : _services.isEmpty
+                      ? Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: widget.isDark ? Colors.grey[800] : Colors.grey[200],
+                            borderRadius: BorderRadius.circular(borderRadius),
+                            border: Border.all(
+                              color: errorColor.withValues(alpha:0.5),
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.warning_amber, color: errorColor, size: 20),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'No hay servicios. Crea uno usando el botón →',
+                                  style: TextStyle(
+                                    color: widget.isDark ? textColor : Colors.black87,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : DropdownButtonFormField<String>(
+                          initialValue: _selectedServiceId, 
+                          dropdownColor: widget.isDark ? Colors.grey[800] : Colors.white,
+                          decoration: _buildInputDecoration('Servicio *', Icons.work_outline),
+                          style: TextStyle(color: widget.isDark ? textColor : Colors.black87),
+                          validator: (value) {
+                            if ((value == null || value.isEmpty) && _descriptionCtrl.text.isEmpty) {
+                              return 'Selecciona un servicio o ingresa una descripción';
+                            }
+                            return null;
+                          },
+                          items: _services.map((service) {
+                            return DropdownMenuItem<String>(
+                              value: service['id'],
+                              child: Text(
+                                service['name'],
+                                style: TextStyle(
+                                  color: widget.isDark ? textColor : Colors.black87,
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (value) {
+                            setState(() {
+                              _selectedServiceId = value;
+                              if (value != null) {
+                                final service = _services.firstWhere((s) => s['id'] == value);
+                                _descriptionCtrl.text = service['name'];
+                              }
+                            });
+                          },
+                          hint: Text(
+                            'Seleccionar servicio',
+                            style: TextStyle(
+                              color: widget.isDark ? hintColor : Colors.grey[600],
+                            ),
+                          ),
+                        ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              decoration: BoxDecoration(
+                color: primaryColor,
+                borderRadius: BorderRadius.circular(borderRadius),
+                boxShadow: [
+                  BoxShadow(
+                    color: primaryColor.withValues(alpha:0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: IconButton(
+                icon: const Icon(Icons.settings, color: Colors.black),
+                tooltip: 'Gestionar servicios',
+                onPressed: () async {
+                  await _showServicesManagementDialog();
+                },
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 16),
         Row(
@@ -3410,6 +3583,635 @@ class NotificationsBottomSheet extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       child: const Text('Notificaciones'),
+    );
+  }
+}
+//[------------- DIÁLOGO DE GESTIÓN DE SERVICIOS --------------]
+class ServicesManagementDialog extends StatefulWidget {
+  final String userId;
+  final bool isDark;
+
+  const ServicesManagementDialog({
+    super.key,
+    required this.userId,
+    required this.isDark,
+  });
+
+  @override
+  State<ServicesManagementDialog> createState() => _ServicesManagementDialogState();
+}
+
+class _ServicesManagementDialogState extends State<ServicesManagementDialog> {
+  List<Map<String, dynamic>> _services = [];
+  bool _loading = true;
+  bool _showInactive = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadServices();
+  }
+
+  Future<void> _loadServices() async {
+    try {
+      setState(() => _loading = true);
+      
+      final services = await ServicesService.getServices(
+        widget.userId,
+        onlyActive: _showInactive ? null : true,
+      );
+      
+      if (mounted) {
+        setState(() {
+          _services = services;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error cargando servicios: $e');
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
+  }
+
+
+  void _showToast(String message, {bool isError = false}) {
+    final overlay = Overlay.of(context);
+    final overlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        bottom: 50,
+        left: 20,
+        right: 20,
+        child: Material(
+          color: Colors.transparent,
+          child: Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              decoration: BoxDecoration(
+                color: isError ? errorColor : successColor,
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.3),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    isError ? Icons.error_outline : Icons.check_circle_outline,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 12),
+                  Flexible(
+                    child: Text(
+                      message,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    overlay.insert(overlayEntry);
+
+    Future.delayed(const Duration(seconds: 2), () {
+      overlayEntry.remove();
+    });
+  }
+  Future<void> _createService() async {
+    final nameController = TextEditingController();
+    if (!mounted) return;
+    
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: widget.isDark ? Colors.grey[900] : Colors.white,
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: primaryColor.withValues(alpha:0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.add, color: primaryColor, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Nuevo Servicio',
+              style: TextStyle(
+                color: widget.isDark ? textColor : Colors.black87,
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextFormField(
+              controller: nameController,
+              autofocus: true,
+              style: TextStyle(color: widget.isDark ? textColor : Colors.black87),
+              decoration: InputDecoration(
+                labelText: 'Nombre del servicio *',
+                labelStyle: TextStyle(
+                  color: widget.isDark ? hintColor : Colors.grey[600],
+                ),
+                prefixIcon: Icon(
+                  Icons.work_outline,
+                  color: widget.isDark ? primaryColor : Colors.black54,
+                ),
+                filled: true,
+                fillColor: widget.isDark ? Colors.grey[800] : Colors.grey[100],
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(borderRadius),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(borderRadius),
+                  borderSide: const BorderSide(color: primaryColor, width: 2),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, null),
+            child: Text(
+              'Cancelar',
+              style: TextStyle(color: widget.isDark ? textColor : Colors.black87),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryColor,
+              foregroundColor: Colors.black,
+            ),
+            onPressed: () async {
+              final name = nameController.text.trim();
+              
+              if (name.isEmpty) {
+                Navigator.pop(dialogContext, {'error': 'El nombre del servicio es requerido'});
+                return;
+              }
+              
+              final exists = await ServicesService.serviceNameExists(
+                widget.userId,
+                name,
+              );
+              
+              if (exists) {
+                Navigator.pop(dialogContext, {'error': 'Ya existe un servicio con ese nombre'});
+                return;
+              }
+              
+              try {
+                await ServicesService.createService(
+                  employeeId: widget.userId,
+                  name: name,
+                );
+
+                Navigator.pop(dialogContext, {'success': true});
+              } catch (e) {
+                Navigator.pop(dialogContext, {'error': 'Error al crear servicio: $e'});
+              }
+            },
+            child: const Text('Crear'),
+          ),
+        ],
+      ),
+    );
+    
+    if (!mounted) return;
+    
+    if (result != null) {
+      if (result['success'] == true) {
+        _showToast('✓ Servicio creado exitosamente');
+        await _loadServices();
+        
+        if (!mounted) return;
+      } else if (result['error'] != null) {
+        _showToast(result['error'], isError: true);
+      }
+    }
+  }
+
+  Future<void> _editService(Map<String, dynamic> service) async {
+    final nameController = TextEditingController(text: service['name']);
+    final serviceId = service['id'];
+    
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: widget.isDark ? Colors.grey[900] : Colors.white,
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: primaryColor.withValues(alpha:0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.edit, color: primaryColor, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Editar Servicio',
+                style: TextStyle(
+                  color: widget.isDark ? textColor : Colors.black87,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextFormField(
+              controller: nameController,
+              autofocus: true,
+              style: TextStyle(color: widget.isDark ? textColor : Colors.black87),
+              decoration: InputDecoration(
+                labelText: 'Nombre del servicio *',
+                labelStyle: TextStyle(
+                  color: widget.isDark ? hintColor : Colors.grey[600],
+                ),
+                prefixIcon: Icon(
+                  Icons.work_outline,
+                  color: widget.isDark ? primaryColor : Colors.black54,
+                ),
+                filled: true,
+                fillColor: widget.isDark ? Colors.grey[800] : Colors.grey[100],
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(borderRadius),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(borderRadius),
+                  borderSide: const BorderSide(color: primaryColor, width: 2),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, null),
+            child: Text(
+              'Cancelar',
+              style: TextStyle(color: widget.isDark ? textColor : Colors.black87),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryColor,
+              foregroundColor: Colors.black,
+            ),
+            onPressed: () async {
+              final newName = nameController.text.trim();
+              
+              if (newName.isEmpty) {
+                Navigator.pop(dialogContext, {'error': 'El nombre del servicio es requerido'});
+                return;
+              }
+              
+              final exists = await ServicesService.serviceNameExists(
+                widget.userId,
+                newName,
+                excludeId: serviceId,
+              );
+              
+              if (exists) {
+                Navigator.pop(dialogContext, {'error': 'Ya existe un servicio con ese nombre'});
+                return;
+              }
+              
+              try {
+                await ServicesService.updateService(
+                  serviceId: serviceId,
+                  employeeId: widget.userId,
+                  name: newName,
+                );
+                
+                Navigator.pop(dialogContext, {'success': true});
+              } catch (e) {
+                Navigator.pop(dialogContext, {'error': 'Error al actualizar servicio: $e'});
+              }
+            },
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
+    );
+    
+    if (result != null) {
+      if (result['success'] == true) {
+        _showToast('✓ Servicio actualizado exitosamente');
+        await _loadServices();
+      } else if (result['error'] != null) {
+        _showToast(result['error'], isError: true);
+      }
+    }
+  }
+
+  Future<void> _toggleServiceStatus(Map<String, dynamic> service) async {
+    final serviceId = service['id'];
+    final isActive = service['is_active'] as bool;
+    final newStatus = !isActive;
+    
+    try {
+      await ServicesService.toggleServiceStatus(
+        serviceId: serviceId,
+        employeeId: widget.userId,
+        newStatus: newStatus,
+      );
+      
+      _showToast(
+        newStatus 
+            ? '✓ Servicio activado exitosamente' 
+            : '✓ Servicio desactivado exitosamente'
+      );
+      
+      await _loadServices();
+    } catch (e) {
+      _showToast('Error al cambiar estado: $e', isError: true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 500, maxHeight: 600),
+        decoration: BoxDecoration(
+          color: widget.isDark ? Colors.grey[900] : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha:0.3),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: primaryColor,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  topRight: Radius.circular(20),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha:0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.settings, color: Colors.black, size: 24),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'Gestión de Servicios',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.black),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+            
+            
+            // Filtro mostrar inactivos
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              decoration: BoxDecoration(
+                color: widget.isDark ? Colors.grey[850] : Colors.grey[100],
+                border: Border(
+                  bottom: BorderSide(
+                    color: widget.isDark ? Colors.grey[700]! : Colors.grey[300]!,
+                    width: 1,
+                  ),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.filter_list,
+                    size: 18,
+                    color: widget.isDark ? textColor : Colors.black87,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Mostrar inactivos',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: widget.isDark ? textColor : Colors.black87,
+                    ),
+                  ),
+                  const Spacer(),
+                  Switch(
+                    value: _showInactive,
+                    onChanged: (value) {
+                      setState(() => _showInactive = value);
+                      _loadServices();
+                    },
+                    activeTrackColor: primaryColor.withValues(alpha:0.5),
+                    activeThumbColor: primaryColor,
+                  ),
+                ],
+              ),
+            ),
+            
+            // Lista de servicios
+            Expanded(
+              child: _loading
+                  ? const Center(
+                      child: CircularProgressIndicator(color: primaryColor),
+                    )
+                  : _services.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.inbox,
+                                size: 64,
+                                color: widget.isDark ? Colors.grey[700] : Colors.grey[400],
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'No hay servicios',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: widget.isDark ? Colors.grey[400] : Colors.grey[600],
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Crea tu primer servicio',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: widget.isDark ? Colors.grey[500] : Colors.grey[500],
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: _services.length,
+                          itemBuilder: (context, index) {
+                            final service = _services[index];
+                            final isActive = service['is_active'] as bool;
+                            
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              decoration: BoxDecoration(
+                                color: widget.isDark ? Colors.grey[800] : Colors.grey[50],
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isActive
+                                      ? primaryColor.withValues(alpha:0.3)
+                                      : Colors.grey.withValues(alpha:0.2),
+                                  width: 1,
+                                ),
+                              ),
+                              child: ListTile(
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 8,
+                                ),
+                                leading: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: (isActive ? primaryColor : Colors.grey)
+                                        .withValues(alpha:0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Icon(
+                                    Icons.work_outline,
+                                    color: isActive ? primaryColor : Colors.grey,
+                                  ),
+                                ),
+                                title: Text(
+                                  service['name'],
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w500,
+                                    color: widget.isDark
+                                        ? (isActive ? textColor : Colors.grey[500])
+                                        : (isActive ? Colors.black87 : Colors.grey[600]),
+                                    decoration: isActive ? null : TextDecoration.lineThrough,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  isActive ? 'Activo' : 'Inactivo',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isActive ? successColor : Colors.grey,
+                                  ),
+                                ),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      icon: Icon(
+                                        Icons.edit,
+                                        color: widget.isDark ? primaryColor : Colors.black54,
+                                        size: 20,
+                                      ),
+                                      onPressed: () => _editService(service),
+                                      tooltip: 'Editar',
+                                    ),
+                                    Switch(
+                                      value: isActive,
+                                      onChanged: (value) => _toggleServiceStatus(service),
+                                      activeTrackColor: primaryColor.withValues(alpha:0.5),
+                                      activeThumbColor: primaryColor,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+            ),
+            
+            // Botón crear servicio
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: widget.isDark ? Colors.grey[850] : Colors.grey[100],
+                border: Border(
+                  top: BorderSide(
+                    color: widget.isDark ? Colors.grey[700]! : Colors.grey[300]!,
+                    width: 1,
+                  ),
+                ),
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(20),
+                  bottomRight: Radius.circular(20),
+                ),
+              ),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.add, color: Colors.black),
+                  label: const Text(
+                    'Crear Nuevo Servicio',
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryColor,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: _createService,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
