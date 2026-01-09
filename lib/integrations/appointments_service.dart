@@ -530,15 +530,19 @@ class AppointmentsService {
   static Future<double> getCompletedAppointmentsRevenue(String employeeId) async {
     final response = await client
         .from('appointments')
-        .select('price')
-        .eq('employee_id', employeeId)
-        .eq('status', 'completa');
+        .select('price, deposit_paid, status')
+        .eq('employee_id', employeeId);
     
     double total = 0.0;
     for (final appointment in response) {
-      final price = appointment['price'];
-      if (price != null) {
-        total += (price as num).toDouble();
+      final status = appointment['status'] as String?;
+      final price = (appointment['price'] as num?)?.toDouble() ?? 0.0;
+      final deposit = (appointment['deposit_paid'] as num?)?.toDouble() ?? 0.0;
+      
+      if (status == 'completa') {
+        total += price;
+      } else if ((status == 'perdida' || status == 'aplazada') && deposit > 0) {
+        total += deposit;
       }
     }
     

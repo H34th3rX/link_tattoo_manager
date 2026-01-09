@@ -686,7 +686,7 @@ class ReportsService {
                       _buildPDFRow('Pendiente de Cobro:', '\$${data['pending_revenue']?.toStringAsFixed(2) ?? '0.00'}'),
                       pw.Divider(color: PdfColors.grey300),
                       _buildPDFRow('Total de Citas:', '${data['total_appointments'] ?? 0}'),
-                      _buildPDFRow('Citas Completadas:', '${data['completed_appointments'] ?? 0}'),
+                      _buildPDFRow('Citas:', '${data['total_appointments'] ?? 0}'),
                     ],
                   ),
                 ),
@@ -705,13 +705,14 @@ class ReportsService {
                 ),
               ),
               pw.SizedBox(height: 8),
-              pw.Table(
+             pw.Table(
                 border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
                 columnWidths: {
                   0: const pw.FlexColumnWidth(2),
-                  1: const pw.FlexColumnWidth(2),
-                  2: const pw.FlexColumnWidth(2),
-                  3: const pw.FlexColumnWidth(2),
+                  1: const pw.FlexColumnWidth(2.5),
+                  2: const pw.FlexColumnWidth(1.5),
+                  3: const pw.FlexColumnWidth(1.5),
+                  4: const pw.FlexColumnWidth(1.5),
                 },
                 children: [
                   pw.TableRow(
@@ -722,6 +723,7 @@ class ReportsService {
                     ),
                     children: [
                       _buildTableCell('FECHA', isHeader: true),
+                      _buildTableCell('SERVICIO', isHeader: true),
                       _buildTableCell('ESTADO', isHeader: true),
                       _buildTableCell('PRECIO', isHeader: true),
                       _buildTableCell('DEPÓSITO', isHeader: true),
@@ -730,6 +732,7 @@ class ReportsService {
                   ...(data['appointments'] as List).take(12).map((apt) => pw.TableRow(
                     children: [
                       _buildTableCell(apt['formatted_date'] ?? _formatDateForPDF(apt['start_time'])),
+                      _buildTableCell(apt['service'] ?? 'Sin servicio'),
                       _buildTableCell(_capitalizeStatus(apt['status'] ?? 'N/A')),
                       _buildTableCell('\$${apt['price']?.toStringAsFixed(2) ?? '0.00'}'),
                       _buildTableCell('\$${apt['deposit_paid']?.toStringAsFixed(2) ?? '0.00'}'),
@@ -921,9 +924,10 @@ class ReportsService {
                 border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
                 columnWidths: {
                   0: const pw.FlexColumnWidth(2),
-                  1: const pw.FlexColumnWidth(3),
-                  2: const pw.FlexColumnWidth(2),
-                  3: const pw.FlexColumnWidth(2),
+                  1: const pw.FlexColumnWidth(2.5),
+                  2: const pw.FlexColumnWidth(1.5),
+                  3: const pw.FlexColumnWidth(1.5),
+                  4: const pw.FlexColumnWidth(1.5),
                 },
                 children: [
                   pw.TableRow(
@@ -933,6 +937,7 @@ class ReportsService {
                       _buildTableCell('DESCRIPCIÓN', isHeader: true),
                       _buildTableCell('ESTADO', isHeader: true),
                       _buildTableCell('PRECIO', isHeader: true),
+                      _buildTableCell('DEPÓSITO', isHeader: true),
                     ],
                   ),
                   ...(data['appointments'] as List).take(14).map((apt) => pw.TableRow(
@@ -941,6 +946,7 @@ class ReportsService {
                       _buildTableCell(apt['description'] ?? apt['service'] ?? 'N/A'),
                       _buildTableCell(_capitalizeStatus(apt['status'] ?? 'N/A')),
                       _buildTableCell('\$${apt['price']?.toStringAsFixed(2) ?? '0.00'}'),
+                      _buildTableCell('\$${apt['deposit_paid']?.toStringAsFixed(2) ?? '0.00'}'),
                     ],
                   )),
                 ],
