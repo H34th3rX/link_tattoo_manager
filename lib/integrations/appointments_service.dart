@@ -40,7 +40,7 @@ class AppointmentsService {
 
   //[-------------OPERACIONES CRUD PARA CITAS--------------]
   // Crear una nueva cita en la base de datos
-  static Future<Map> createAppointment({
+  static Future<String> createAppointment({
     required String clientId,
     required String employeeId,
     required DateTime startTime,
@@ -51,27 +51,37 @@ class AppointmentsService {
     double depositPaid = 0.00,
     String? notes,
   }) async {
-    final response = await client.from('appointments').insert({
-      'client_id': clientId,
-      'employee_id': employeeId,
-      'start_time': startTime.toIso8601String(),
-      'end_time': endTime.toIso8601String(),
-      'service_id': serviceId,
-      'status': status,
-      'price': price,
-      'deposit_paid': depositPaid,
-      'notes': notes,
-      'created_at': DateTime.now().toIso8601String(),
-    }).select('''
-      *,
-      clients(
-        id,
-        name,
-        phone,
-        email
-      )
-    ''').single();
-    return response;
+    try {
+      // OBTENER NOMBRE DEL SERVICIO ANTES DE INSERTAR
+      final serviceData = await Supabase.instance.client
+          .from('services')
+          .select('name')
+          .eq('id', serviceId)
+          .single();
+      
+      final serviceName = serviceData['name'] as String;
+      
+      final response = await Supabase.instance.client
+          .from('appointments')
+          .insert({
+            'client_id': clientId,
+            'employee_id': employeeId,
+            'start_time': startTime.toIso8601String(),
+            'end_time': endTime.toIso8601String(),
+            'service_id': serviceId,
+            'service_name_snapshot': serviceName,
+            'status': status,
+            'price': price,
+            'deposit_paid': depositPaid,
+            'notes': notes,
+          })
+          .select('id')
+          .single();
+
+      return response['id'] as String;
+    } catch (e) {
+      throw Exception('Error creating appointment: $e');
+    }
   }
 
   // Obtener todas las citas de un empleado, ordenadas por fecha de inicio
@@ -157,53 +167,51 @@ class AppointmentsService {
   }
 
   // Actualizar los datos de una cita existente
-  static Future<Map> updateAppointment({
+  static Future<void> updateAppointment({
     required String appointmentId,
     required String employeeId,
-    String? clientId,
-    DateTime? startTime,
-    DateTime? endTime,
-    required String serviceId,
+    required String clientId,
+    required DateTime startTime,
+    required DateTime endTime,
+    String? serviceId,
     String? status,
     double? price,
     double? depositPaid,
     String? notes,
   }) async {
-    final updateData = <String, dynamic>{};  
-    
-    if (clientId != null) updateData['client_id'] = clientId;
-    if (startTime != null) updateData['start_time'] = startTime.toIso8601String();
-    if (endTime != null) updateData['end_time'] = endTime.toIso8601String();
-    // ignore: unnecessary_null_comparison
-    if (serviceId != null) updateData['service_id'] = serviceId; 
-    if (status != null) updateData['status'] = status;
-    if (price != null) updateData['price'] = price;
-    if (depositPaid != null) updateData['deposit_paid'] = depositPaid;
-    if (notes != null) updateData['notes'] = notes;
-    
-    updateData['updated_at'] = DateTime.now().toIso8601String();
+    try {
+      final updates = <String, dynamic>{
+        'client_id': clientId,
+        'start_time': startTime.toIso8601String(),
+        'end_time': endTime.toIso8601String(),
+        'status': status,
+        'price': price,
+        'deposit_paid': depositPaid,
+        'notes': notes,
+      };
 
-    final response = await client
-        .from('appointments')
-        .update(updateData)
-        .eq('id', appointmentId)
-        .eq('employee_id', employeeId)
-        .select('''
-          *,
-        clients(
-            id,
-            name,
-            phone,
-            email
-          ),
-          services(
-            id,
-            name,
-            is_active
-          )
-        ''')
-        .single();
-    return response;
+      // SI CAMBIA EL SERVICIO, ACTUALIZAR SNAPSHOT
+      if (serviceId != null) {
+        updates['service_id'] = serviceId;
+        
+        // Obtener nombre actual del servicio
+        final serviceData = await Supabase.instance.client
+            .from('services')
+            .select('name')
+            .eq('id', serviceId)
+            .single();
+        
+        updates['service_name_snapshot'] = serviceData['name'] as String;
+      }
+
+      await Supabase.instance.client
+          .from('appointments')
+          .update(updates)
+          .eq('id', appointmentId)
+          .eq('employee_id', employeeId);
+    } catch (e) {
+      throw Exception('Error updating appointment: $e');
+    }
   }
 
   // Eliminar una cita de la base de datos
@@ -271,13 +279,13 @@ class AppointmentsService {
     final now = DateTime.now();
     final response = await client
         .from('appointments')
-        .select('''
+       .select('''
           id,
           client_id,
           start_time,
           end_time,
           status,
-          description,
+          service_name_snapshot,
           clients(name)
         ''')
         .eq('employee_id', employeeId)
@@ -576,7 +584,7 @@ class AppointmentsService {
           start_time,
           end_time,
           status,
-          description,
+          service_name_snapshot,
           clients(
             id,
             name

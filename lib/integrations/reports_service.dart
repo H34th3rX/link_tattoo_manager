@@ -1,3 +1,4 @@
+import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -8,286 +9,571 @@ class ReportsService {
   static final client = Supabase.instance.client;
 
   //[-------------REPORTES FINANCIEROS--------------]
-  // Obtener ingresos por período (semanal, mensual)
   static Future<Map<String, dynamic>> getFinancialReport({
     required String employeeId,
-    required String period, // 'weekly', 'monthly', 'yearly'
-    DateTime? startDate,
-    DateTime? endDate,
+    required DateTime startDate,
+    required DateTime endDate,
   }) async {
-    DateTime start, end;
-    
-    if (startDate != null && endDate != null) {
-      start = startDate;
-      end = endDate;
-    } else {
-      final now = DateTime.now();
-      switch (period) {
-        case 'weekly':
-          start = now.subtract(Duration(days: now.weekday - 1));
-          end = start.add(const Duration(days: 6));
-          break;
-        case 'monthly':
-          start = DateTime(now.year, now.month, 1);
-          end = DateTime(now.year, now.month + 1, 0);
-          break;
-        case 'yearly':
-          start = DateTime(now.year, 1, 1);
-          end = DateTime(now.year, 12, 31);
-          break;
-        default:
-          start = DateTime(now.year, now.month, 1);
-          end = DateTime(now.year, now.month + 1, 0);
-      }
-    }
+    try {
+      final response = await Supabase.instance.client
+          .from('appointments')
+          .select('id, client_id, start_time, end_time, status, price, deposit_paid, service_name_snapshot, clients(name, phone, email)')
+          .eq('employee_id', employeeId)
+          .gte('start_time', startDate.toIso8601String())
+          .lte('start_time', endDate.toIso8601String())
+          .order('start_time', ascending: true);
 
-    // Consulta para obtener ingresos del período
-    final response = await client
-        .from('appointments')
-        .select('price, deposit_paid, status, start_time')
-        .eq('employee_id', employeeId)
-        .gte('start_time', start.toIso8601String())
-        .lte('start_time', end.toIso8601String())
-        .inFilter('status', ['completa', 'confirmada']);
-
-    double totalRevenue = 0;
-    double totalDeposits = 0;
-    int totalAppointments = response.length;
-    int completedAppointments = 0;
-
-    for (var appointment in response) {
-      final price = (appointment['price'] as num?)?.toDouble() ?? 0.0;
-      final deposit = (appointment['deposit_paid'] as num?)?.toDouble() ?? 0.0;
+      final allAppointments = List<Map<String, dynamic>>.from(response);
       
-      totalRevenue += price;
-      totalDeposits += deposit;
-      
-      if (appointment['status'] == 'completa') {
-        completedAppointments++;
-      }
-    }
+      final appointments = allAppointments.where((apt) {
+        final status = apt['status'] as String;
+        final deposit = (apt['deposit_paid'] as num?)?.toDouble() ?? 0.0;
+        return status == 'completa' || 
+               (status == 'perdida' && deposit > 0) ||
+               (status == 'aplazada' && deposit > 0);
+      }).toList();
 
-    return {
-      'period': period,
-      'start_date': start.toIso8601String(),
-      'end_date': end.toIso8601String(),
-      'total_revenue': totalRevenue,
-      'total_deposits': totalDeposits,
-      'total_appointments': totalAppointments,
-      'completed_appointments': completedAppointments,
-      'pending_revenue': totalRevenue - totalDeposits,
-      'appointments': response,
-    };
+      // Calcular totales
+      double totalIncome = 0.0;
+      double totalDeposits = 0.0;
+      double totalPending = 0.0;
+      int totalAppointments = appointments.length;
+
+      // Agrupación por servicio usando SNAPSHOT
+      Map<String, Map<String, dynamic>> serviceStats = {};
+
+      // Lista de appointments con fechas formateadas
+      List<Map<String, dynamic>> formattedAppointments = [];
+
+      for (var appointment in appointments) {
+        final status = appointment['status'] as String;
+        final price = (appointment['price'] as num?)?.toDouble() ?? 0.0;
+        final deposit = (appointment['deposit_paid'] as num?)?.toDouble() ?? 0.0;
+        
+        double incomeForThis;
+        double pendingForThis;
+        
+        if (status == 'completa') {
+          incomeForThis = price;
+          pendingForThis = price - deposit;
+        } else {
+          incomeForThis = deposit;
+          pendingForThis = 0.0;
+        }
+
+        totalIncome += incomeForThis;
+        totalDeposits += deposit;
+        totalPending += pendingForThis;
+
+        final serviceName = appointment['service_name_snapshot'] ?? 'Sin servicio';
+
+        if (!serviceStats.containsKey(serviceName)) {
+          serviceStats[serviceName] = {
+            'name': serviceName,
+            'count': 0,
+            'total': 0.0,
+            'deposits': 0.0,
+            'pending': 0.0,
+          };
+        }
+
+        serviceStats[serviceName]!['count'] = 
+            (serviceStats[serviceName]!['count'] as int) + 1;
+        serviceStats[serviceName]!['total'] = 
+            (serviceStats[serviceName]!['total'] as double) + incomeForThis;
+        serviceStats[serviceName]!['deposits'] = 
+            (serviceStats[serviceName]!['deposits'] as double) + deposit;
+        serviceStats[serviceName]!['pending'] = 
+            (serviceStats[serviceName]!['pending'] as double) + pendingForThis;
+
+        formattedAppointments.add({
+          ...appointment,
+          'date': DateFormat('yyyy-MM-dd HH:mm').format(
+              DateTime.parse(appointment['start_time'])),
+          'formatted_date': DateFormat('yyyy-MM-dd HH:mm').format(
+              DateTime.parse(appointment['start_time'])),
+          'service': serviceName,
+        });
+      }
+
+      // Ordenar servicios por total (mayor a menor)
+      final sortedServices = serviceStats.values.toList()
+        ..sort((a, b) => (b['total'] as double).compareTo(a['total'] as double));
+
+      // ✅ ESTRUCTURA CORRECTA - reports_page busca en data['summary']
+      return {
+        'summary': {
+          'totalIncome': totalIncome,
+          'totalDeposits': totalDeposits,
+          'totalPending': totalPending,
+          'totalAppointments': totalAppointments,
+        },
+        'total_revenue': totalIncome,  // Para PDF
+        'total_deposits': totalDeposits,
+        'pending_revenue': totalPending,
+        'total_appointments': totalAppointments,
+        'completed_appointments': totalAppointments,
+        'serviceBreakdown': sortedServices,
+        'appointments': formattedAppointments,  // Con fechas formateadas
+        'period': 'custom',
+        'start_date': startDate.toIso8601String(),
+        'end_date': endDate.toIso8601String(),
+        'dateRange': {
+          'start': DateFormat('yyyy-MM-dd').format(startDate),
+          'end': DateFormat('yyyy-MM-dd').format(endDate),
+        },
+      };
+    } catch (e) {
+      throw Exception('Error generating financial report: $e');
+    }
   }
 
   //[-------------REPORTES DE CLIENTES--------------]
-  // Obtener reporte de clientes activos/inactivos
   static Future<Map<String, dynamic>> getClientsReport({
     required String employeeId,
-    bool includeInactive = false,
-    int minAppointments = 0,
+    required DateTime startDate,
+    required DateTime endDate,
+    String? clientId,
+    bool includeInactiveClients = false,
   }) async {
-    // ignore: unused_local_variable
-    String statusFilter = includeInactive ? '' : '.eq.true';
-    
-    final response = await client
-        .from('clients')
-        .select('id, name, phone, email, registration_date, last_appointment_date, total_appointments, status')
-        .eq('employee_id', employeeId)
-        .gte('total_appointments', minAppointments);
+    try {
+      // PASO 1: Obtener TODOS los clientes del empleado
+      var clientsQuery = Supabase.instance.client
+          .from('clients')
+          .select('id, name, phone, email, registration_date, status')
+          .eq('employee_id', employeeId);
+      
+      if (clientId != null) {
+        clientsQuery = clientsQuery.eq('id', clientId);
+      }
+      
+      final clientsResponse = await clientsQuery;
+      final allClients = List<Map<String, dynamic>>.from(clientsResponse);
+      
+      final filteredClients = includeInactiveClients 
+          ? allClients 
+          : allClients.where((client) => client['status'] == true).toList();
 
-    List<Map<String, dynamic>> clients = List<Map<String, dynamic>>.from(response);
-    
-    // Filtrar por status si no incluye inactivos
-    if (!includeInactive) {
-      clients = clients.where((client) => client['status'] == true).toList();
+      // PASO 2: Obtener citas del período
+      final appointmentsResponse = await Supabase.instance.client
+          .from('appointments')
+          .select('client_id, start_time, status, price, service_name_snapshot')
+          .eq('employee_id', employeeId)
+          .gte('start_time', startDate.toIso8601String())
+          .lte('start_time', endDate.toIso8601String())
+          .order('start_time', ascending: true);
+      
+      final periodAppointments = List<Map<String, dynamic>>.from(appointmentsResponse);
+      
+      // PASO 3: Obtener última cita de cada cliente
+      final lastAppointmentsResponse = await Supabase.instance.client
+          .from('appointments')
+          .select('client_id, start_time, status')
+          .eq('employee_id', employeeId)
+          .order('start_time', ascending: false);
+      
+      final allAppointments = List<Map<String, dynamic>>.from(lastAppointmentsResponse);
+      
+      // Mapa de última cita por cliente
+      Map<String, DateTime> lastAppointmentByClient = {};
+      for (var apt in allAppointments) {
+        final cid = apt['client_id'] as String;
+        if (!lastAppointmentByClient.containsKey(cid)) {
+          lastAppointmentByClient[cid] = DateTime.parse(apt['start_time']);
+        }
+      }
+      
+      // PASO 4: Construir estadísticas
+      Map<String, Map<String, dynamic>> clientStats = {};
+      final now = DateTime.now();
+      final thisMonthStart = DateTime(now.year, now.month, 1);  // ✅ AGREGADO
+      
+      int activeClientsCount = 0;
+      int inactiveClientsCount = 0;
+      int newClientsThisMonth = 0;  // ✅ AGREGADO
+      double totalRevenueAllClients = 0.0;
+      int totalAppointmentsAllClients = 0;  // ✅ AGREGADO
+      
+      for (var client in filteredClients) {
+        final cid = client['id'] as String;
+        final clientName = client['name'] ?? 'Sin nombre';
+        
+        // ✅ CALCULAR NUEVOS ESTE MES
+        final createdAt = client['registration_date'] != null 
+            ? DateTime.parse(client['registration_date'] as String)
+            : DateTime(2020, 1, 1);
+        
+        if (createdAt.isAfter(thisMonthStart)) {
+          newClientsThisMonth++;
+        }
+        
+        final isActive = client['status'] ?? true;
+        final lastAppointment = lastAppointmentByClient[cid];
+        
+        if (isActive) {
+          activeClientsCount++;
+        } else {
+          inactiveClientsCount++;
+        }
+        
+        // Inicializar estadísticas
+        clientStats[cid] = {
+          'clientId': cid,
+          'name': clientName,
+          'phone': client['phone'] ?? 'N/A',
+          'email': client['email'] ?? 'N/A',
+          'registration_date': client['registration_date'],
+          'status': isActive,  // ✅ Para PDF
+          'isActive': isActive,
+          'lastAppointment': lastAppointment?.toIso8601String(),
+          'total_appointments': 0,  // ✅ Snake case
+          'totalAppointments': 0,  // ✅ También camelCase para compatibilidad
+          'completed': 0,
+          'pending': 0,
+          'cancelled': 0,
+          'confirmed': 0,
+          'postponed': 0,
+          'missed': 0,
+          'totalSpent': 0.0,
+          'appointments': [],
+        };
+      }
+      
+      // PASO 5: Agregar estadísticas del período
+      for (var appointment in periodAppointments) {
+        final cid = appointment['client_id'] as String;
+        
+        if (!clientStats.containsKey(cid)) continue;
+        
+        final status = appointment['status'] as String;
+        final price = (appointment['price'] as num?)?.toDouble() ?? 0.0;
+        
+        clientStats[cid]!['total_appointments'] = 
+            (clientStats[cid]!['total_appointments'] as int) + 1;
+        clientStats[cid]!['totalAppointments'] = 
+            (clientStats[cid]!['totalAppointments'] as int) + 1;
+        totalAppointmentsAllClients++;  // ✅ AGREGADO
+        
+        // Agregar detalles
+        (clientStats[cid]!['appointments'] as List).add({
+          'date': DateFormat('yyyy-MM-dd HH:mm').format(
+              DateTime.parse(appointment['start_time'])),
+          'service': appointment['service_name_snapshot'] ?? 'Sin servicio',
+          'status': status,
+          'price': price,
+        });
+        
+        // Contar por estado
+        switch (status) {
+          case 'completa':
+            clientStats[cid]!['completed'] = 
+                (clientStats[cid]!['completed'] as int) + 1;
+            clientStats[cid]!['totalSpent'] = 
+                (clientStats[cid]!['totalSpent'] as double) + price;
+            totalRevenueAllClients += price;
+            break;
+          case 'pendiente':
+            clientStats[cid]!['pending'] = 
+                (clientStats[cid]!['pending'] as int) + 1;
+            break;
+          case 'cancelada':
+            clientStats[cid]!['cancelled'] = 
+                (clientStats[cid]!['cancelled'] as int) + 1;
+            break;
+          case 'confirmada':
+            clientStats[cid]!['confirmed'] = 
+                (clientStats[cid]!['confirmed'] as int) + 1;
+            break;
+          case 'aplazada':
+            clientStats[cid]!['postponed'] = 
+                (clientStats[cid]!['postponed'] as int) + 1;
+            break;
+          case 'perdida':
+            clientStats[cid]!['missed'] = 
+                (clientStats[cid]!['missed'] as int) + 1;
+            break;
+        }
+      }
+      
+      // Ordenar clientes por gasto total
+      final sortedClients = clientStats.values.toList()
+        ..sort((a, b) => 
+            (b['totalSpent'] as double).compareTo(a['totalSpent'] as double));
+      
+      // ✅ CLAVES CORRECTAS EN SNAKE_CASE
+      return {
+        'clients': sortedClients,
+        'total_clients': allClients.length,  // ✅ Snake case
+        'active_clients': activeClientsCount,  // ✅ Snake case
+        'inactive_clients': inactiveClientsCount,  // ✅ Snake case
+        'new_clients_this_month': newClientsThisMonth,  // ✅ AGREGADO
+        'total_appointments_all_clients': totalAppointmentsAllClients,  // ✅ AGREGADO
+        'average_appointments_per_client': allClients.isEmpty   // ✅ AGREGADO
+            ? '0.0' 
+            : (totalAppointmentsAllClients / allClients.length).toStringAsFixed(1),
+        'totalRevenue': totalRevenueAllClients,
+        'averageRevenuePerClient': allClients.isEmpty 
+            ? 0.0 
+            : totalRevenueAllClients / allClients.length,
+        'dateRange': {
+          'start': DateFormat('yyyy-MM-dd').format(startDate),
+          'end': DateFormat('yyyy-MM-dd').format(endDate),
+        },
+      };
+    } catch (e) {
+      throw Exception('Error generating client report: $e');
     }
-
-    // Calcular estadísticas
-    int activeClients = clients.where((c) => c['status'] == true).length;
-    int inactiveClients = clients.where((c) => c['status'] == false).length;
-    int totalAppointments = clients.fold(0, (sum, client) => sum + (client['total_appointments'] as int? ?? 0));
-    
-    // Clientes nuevos este mes
-    final now = DateTime.now();
-    final monthStart = DateTime(now.year, now.month, 1);
-    int newClientsThisMonth = clients.where((client) {
-      final regDate = DateTime.tryParse(client['registration_date'] ?? '');
-      return regDate != null && regDate.isAfter(monthStart);
-    }).length;
-
-    return {
-      'total_clients': clients.length,
-      'active_clients': activeClients,
-      'inactive_clients': inactiveClients,
-      'new_clients_this_month': newClientsThisMonth,
-      'total_appointments_all_clients': totalAppointments,
-      'average_appointments_per_client': clients.isNotEmpty ? (totalAppointments / clients.length).toStringAsFixed(1) : '0.0',
-      'clients': clients,
-    };
   }
 
   //[-------------REPORTES DE CITAS--------------]
-  // Obtener reporte de citas por período y estado
   static Future<Map<String, dynamic>> getAppointmentsReport({
     required String employeeId,
-    required String period, // 'weekly', 'monthly', 'yearly'
-    String? status, // 'pendiente', 'confirmada', 'completa', 'cancelada', 'aplazada'
-    DateTime? startDate,
-    DateTime? endDate,
+    required DateTime startDate,
+    required DateTime endDate,
   }) async {
-    DateTime start, end;
-    
-    if (startDate != null && endDate != null) {
-      start = startDate;
-      end = endDate;
-    } else {
-      final now = DateTime.now();
-      switch (period) {
-        case 'weekly':
-          start = now.subtract(Duration(days: now.weekday - 1));
-          end = start.add(const Duration(days: 6));
-          break;
-        case 'monthly':
-          start = DateTime(now.year, now.month, 1);
-          end = DateTime(now.year, now.month + 1, 0);
-          break;
-        case 'yearly':
-          start = DateTime(now.year, 1, 1);
-          end = DateTime(now.year, 12, 31);
-          break;
-        default:
-          start = DateTime(now.year, now.month, 1);
-          end = DateTime(now.year, now.month + 1, 0);
-      }
-    }
-
-    var query = client
+    try {
+      // Obtener todas las citas
+      final response = await Supabase.instance.client
         .from('appointments')
-        .select('id, client_id, start_time, end_time, description, status, price, deposit_paid, notes, created_at')
-        .eq('employee_id', employeeId)
-        .gte('start_time', start.toIso8601String())
-        .lte('start_time', end.toIso8601String());
+          .select('*, clients(name, phone), services(name)') 
+          .eq('employee_id', employeeId)
+          .gte('start_time', startDate.toIso8601String())
+          .lte('start_time', endDate.toIso8601String())
+          .order('start_time', ascending: true);
 
-    if (status != null && status != 'all') {
-      query = query.eq('status', status);
+      final appointments = List<Map<String, dynamic>>.from(response);
+
+      // Estadísticas generales
+      int totalAppointments = appointments.length;
+      int completed = 0;
+      int pending = 0;
+      int cancelled = 0;
+      int confirmed = 0;
+      int postponed = 0;
+      int missed = 0;
+      double totalRevenue = 0.0;
+
+      // Lista detallada
+      List<Map<String, dynamic>> appointmentDetails = [];
+
+      for (var appointment in appointments) {
+        final status = appointment['status'] as String;
+        final client = appointment['clients'];
+        final service = appointment['services'];
+        final price = (appointment['price'] as num?)?.toDouble() ?? 0.0;
+        final deposit = (appointment['deposit_paid'] as num?)?.toDouble() ?? 0.0;
+        
+        double revenueForThis;
+        if (status == 'completa') {
+          revenueForThis = price;
+        } else if (status == 'perdida' || status == 'aplazada') {
+          revenueForThis = deposit;
+        } else {
+          revenueForThis = 0.0;
+        }
+        
+        switch (status) {
+          case 'completa':
+            completed++;
+            break;
+          case 'pendiente':
+            pending++;
+            break;
+          case 'cancelada':
+            cancelled++;
+            break;
+          case 'confirmada':
+            confirmed++;
+            break;
+          case 'aplazada':
+            postponed++;
+            break;
+          case 'perdida':
+            missed++;
+            break;
+        }
+        
+        totalRevenue += revenueForThis;
+
+        appointmentDetails.add({
+        'date': DateFormat('yyyy-MM-dd HH:mm').format(
+            DateTime.parse(appointment['start_time'])),
+        'start_time': appointment['start_time'],
+        'client': client?['name'] ?? 'Sin nombre',
+        'phone': client?['phone'] ?? 'N/A',
+        'description': service?['name'] ?? appointment['service_name_snapshot'] ?? 'Sin servicio',
+        'service': service?['name'] ?? appointment['service_name_snapshot'] ?? 'Sin servicio',
+        'status': status,
+        'price': price,
+        'deposit_paid': deposit,
+        'notes': appointment['notes'] ?? '',
+      });
     }
 
-    final response = await query.order('start_time', ascending: false);
-
-    // Agrupar por estado
-    Map<String, int> statusCount = {
-      'pendiente': 0,
-      'confirmada': 0,
-      'completa': 0,
-      'cancelada': 0,
-      'aplazada': 0,
-      'perdida': 0,
-    };
-
-    double totalRevenue = 0;
-    for (var appointment in response) {
-      final appointmentStatus = appointment['status'] as String? ?? 'pendiente';
-      statusCount[appointmentStatus] = (statusCount[appointmentStatus] ?? 0) + 1;
-      
-      if (appointmentStatus == 'completa') {
-        totalRevenue += (appointment['price'] as num?)?.toDouble() ?? 0.0;
-      }
+      return {
+        'total_appointments': totalAppointments,
+        'completed_appointments': completed,
+        'total_revenue': totalRevenue,
+        'status_breakdown': {
+          'pendiente': pending,
+          'confirmada': confirmed,
+          'completa': completed,
+          'cancelada': cancelled,
+          'aplazada': postponed,
+          'perdida': missed,
+        },
+        'summary': {
+          'totalAppointments': totalAppointments,
+          'completed': completed,
+          'pending': pending,
+          'cancelled': cancelled,
+          'confirmed': confirmed,
+          'postponed': postponed,
+          'missed': missed,
+          'totalRevenue': totalRevenue,
+          'completionRate': totalAppointments > 0 
+              ? (completed / totalAppointments * 100).toStringAsFixed(1) 
+              : '0.0',
+        },
+        'appointments': appointmentDetails,
+        'period': 'custom',
+        'dateRange': {
+          'start': DateFormat('yyyy-MM-dd').format(startDate),
+          'end': DateFormat('yyyy-MM-dd').format(endDate),
+        },
+      };
+    } catch (e) {
+      throw Exception('Error generating appointment report: $e');
     }
-
-    return {
-      'period': period,
-      'start_date': start.toIso8601String(),
-      'end_date': end.toIso8601String(),
-      'total_appointments': response.length,
-      'status_breakdown': statusCount,
-      'total_revenue': totalRevenue,
-      'appointments': response,
-    };
   }
 
   //[-------------REPORTES DE SERVICIOS--------------]
-  // Obtener reporte de servicios más populares
-  static Future<Map<String, dynamic>> getServicesReport({
-    required String employeeId,
-    required String period, // 'weekly', 'monthly', 'yearly'
-    DateTime? startDate,
-    DateTime? endDate,
-  }) async {
-    DateTime start, end;
-    
-    if (startDate != null && endDate != null) {
-      start = startDate;
-      end = endDate;
-    } else {
-      final now = DateTime.now();
-      switch (period) {
-        case 'weekly':
-          start = now.subtract(Duration(days: now.weekday - 1));
-          end = start.add(const Duration(days: 6));
-          break;
-        case 'monthly':
-          start = DateTime(now.year, now.month, 1);
-          end = DateTime(now.year, now.month + 1, 0);
-          break;
-        case 'yearly':
-          start = DateTime(now.year, 1, 1);
-          end = DateTime(now.year, 12, 31);
-          break;
-        default:
-          start = DateTime(now.year, now.month, 1);
-          end = DateTime(now.year, now.month + 1, 0);
-      }
-    }
-
-    final response = await client
+ static Future<Map<String, dynamic>> getServicesReport({
+  required String employeeId,
+  required DateTime startDate,
+  required DateTime endDate,
+}) async {
+  try {
+    // Obtener todas las citas con JOIN a services
+    final response = await Supabase.instance.client
         .from('appointments')
-        .select('description, price, status, start_time')
+        .select('*, services(name)')
         .eq('employee_id', employeeId)
-        .eq('status', 'completa')
-        .gte('start_time', start.toIso8601String())
-        .lte('start_time', end.toIso8601String());
+        .gte('start_time', startDate.toIso8601String())
+        .lte('start_time', endDate.toIso8601String())
+        .order('start_time', ascending: true);
 
-    // Agrupar servicios por descripción
-    Map<String, Map<String, dynamic>> servicesData = {};
-    
-    for (var appointment in response) {
-      final description = appointment['description'] as String? ?? 'Servicio sin descripción';
+    final appointments = List<Map<String, dynamic>>.from(response);
+
+    // Agrupar por servicio
+    Map<String, Map<String, dynamic>> serviceStats = {};
+
+    for (var appointment in appointments) {
+      final service = appointment['services'];
+      final serviceName = service?['name'] ?? appointment['service_name_snapshot'] ?? 'Sin servicio';
+      final status = appointment['status'] as String;
       final price = (appointment['price'] as num?)?.toDouble() ?? 0.0;
-      
-      if (servicesData.containsKey(description)) {
-        servicesData[description]!['count'] += 1;
-        servicesData[description]!['total_revenue'] += price;
-      } else {
-        servicesData[description] = {
-          'count': 1,
-          'total_revenue': price,
-          'average_price': price,
+
+      if (!serviceStats.containsKey(serviceName)) {
+        serviceStats[serviceName] = {
+          'name': serviceName,
+          'totalAppointments': 0,
+          'count': 0,  // Para PDF
+          'completed': 0,
+          'pending': 0,
+          'cancelled': 0,
+          'confirmed': 0,
+          'postponed': 0,
+          'missed': 0,
+          'totalRevenue': 0.0,
+          'total_revenue': 0.0,  // Para PDF
+          'averagePrice': 0.0,
+          'average_price': 0.0,  // Para PDF
         };
       }
+
+      serviceStats[serviceName]!['totalAppointments'] = 
+          (serviceStats[serviceName]!['totalAppointments'] as int) + 1;
+      serviceStats[serviceName]!['count'] = 
+          (serviceStats[serviceName]!['count'] as int) + 1;
+      
+      // Contar por estado
+      switch (status) {
+        case 'completa':
+          serviceStats[serviceName]!['completed'] = 
+              (serviceStats[serviceName]!['completed'] as int) + 1;
+          serviceStats[serviceName]!['totalRevenue'] = 
+              (serviceStats[serviceName]!['totalRevenue'] as double) + price;
+          serviceStats[serviceName]!['total_revenue'] = 
+              (serviceStats[serviceName]!['total_revenue'] as double) + price;
+          break;
+        case 'pendiente':
+          serviceStats[serviceName]!['pending'] = 
+              (serviceStats[serviceName]!['pending'] as int) + 1;
+          break;
+        case 'cancelada':
+          serviceStats[serviceName]!['cancelled'] = 
+              (serviceStats[serviceName]!['cancelled'] as int) + 1;
+          break;
+        case 'confirmada':
+          serviceStats[serviceName]!['confirmed'] = 
+              (serviceStats[serviceName]!['confirmed'] as int) + 1;
+          break;
+        case 'aplazada':
+          serviceStats[serviceName]!['postponed'] = 
+              (serviceStats[serviceName]!['postponed'] as int) + 1;
+          break;
+        case 'perdida':
+          serviceStats[serviceName]!['missed'] = 
+              (serviceStats[serviceName]!['missed'] as int) + 1;
+          break;
+      }
     }
 
-    // Calcular precio promedio y ordenar por popularidad
-    servicesData.forEach((key, value) {
-      value['average_price'] = value['total_revenue'] / value['count'];
-    });
+    // Calcular promedios
+    for (var stats in serviceStats.values) {
+      final completed = stats['completed'] as int;
+      if (completed > 0) {
+        final avgPrice = (stats['totalRevenue'] as double) / completed;
+        stats['averagePrice'] = avgPrice;
+        stats['average_price'] = avgPrice;
+      }
+    }
 
-    final sortedServices = servicesData.entries.toList()
-      ..sort((a, b) => b.value['count'].compareTo(a.value['count']));
+    // Ordenar por total de citas
+    final sortedServices = serviceStats.values.toList()
+      ..sort((a, b) => 
+          (b['totalAppointments'] as int).compareTo(a['totalAppointments'] as int));
+
+    // Encontrar el más popular
+    String mostPopularService = 'N/A';
+    if (sortedServices.isNotEmpty) {
+      mostPopularService = sortedServices.first['name'] as String;
+    }
 
     return {
-      'period': period,
-      'start_date': start.toIso8601String(),
-      'end_date': end.toIso8601String(),
-      'total_services': response.length,
-      'unique_services': servicesData.length,
-      'services_breakdown': Map.fromEntries(sortedServices),
-      'most_popular_service': sortedServices.isNotEmpty ? sortedServices.first.key : 'N/A',
+      'total_services': sortedServices.length,
+      'unique_services': serviceStats.length,
+      'most_popular_service': mostPopularService,
+      'services': sortedServices,
+      'services_breakdown': Map.fromEntries(
+        sortedServices.map((service) => MapEntry(
+          service['name'] as String,
+          service,
+        ))
+      ),
+      'period': 'custom',
+      'dateRange': {
+        'start': DateFormat('yyyy-MM-dd').format(startDate),
+        'end': DateFormat('yyyy-MM-dd').format(endDate),
+      },
     };
+  } catch (e) {
+    throw Exception('Error generating service report: $e');
   }
+}
 
   //[-------------FUNCIONES AUXILIARES--------------]
-  // Obtener nombres de clientes por IDs (para reportes de citas)
   static Future<Map<String, String>> getClientNames(List<String> clientIds) async {
     if (clientIds.isEmpty) return {};
     
@@ -303,15 +589,13 @@ class ReportsService {
     return clientNames;
   }
 
-  // Validar fechas de período personalizado
   static bool isValidDateRange(DateTime startDate, DateTime endDate) {
     return startDate.isBefore(endDate) && 
-           endDate.difference(startDate).inDays <= 365; // Máximo 1 año
+           endDate.difference(startDate).inDays <= 365;
   }
 
 //[-------------GENERACIÓN DE PDFs--------------]
   
- /// Generar PDF para cualquier tipo de reporte
   static Future<void> generatePDF({
     required String reportType,
     required String title,
@@ -319,7 +603,6 @@ class ReportsService {
   }) async {
     final pdf = pw.Document();
 
-    // Agregar página según el tipo de reporte
     switch (reportType) {
       case 'financial':
         pdf.addPage(_buildFinancialPDF(title, data));
@@ -335,13 +618,11 @@ class ReportsService {
         break;
     }
 
-    // Mostrar diálogo de impresión/guardar
     await Printing.layoutPdf(
       onLayout: (PdfPageFormat format) async => pdf.save(),
     );
   }
 
-  /// PDF de Reporte Financiero
   static pw.Page _buildFinancialPDF(String title, Map<String, dynamic> data) {
     return pw.Page(
       pageFormat: PdfPageFormat.a4,
@@ -350,7 +631,6 @@ class ReportsService {
         return pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            // Header profesional
             pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
@@ -381,7 +661,6 @@ class ReportsService {
             
             pw.SizedBox(height: 24),
             
-            // Resumen financiero
             pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
@@ -416,7 +695,6 @@ class ReportsService {
             
             pw.SizedBox(height: 24),
             
-            // Tabla de citas
             if (data['appointments'] != null && (data['appointments'] as List).isNotEmpty) ...[
               pw.Text(
                 'DETALLE DE CITAS',
@@ -436,7 +714,6 @@ class ReportsService {
                   3: const pw.FlexColumnWidth(2),
                 },
                 children: [
-                  // Header
                   pw.TableRow(
                     decoration: pw.BoxDecoration(
                       border: pw.Border(
@@ -450,10 +727,9 @@ class ReportsService {
                       _buildTableCell('DEPÓSITO', isHeader: true),
                     ],
                   ),
-                  // Rows
                   ...(data['appointments'] as List).take(12).map((apt) => pw.TableRow(
                     children: [
-                      _buildTableCell(_formatDateForPDF(apt['start_time'])),
+                      _buildTableCell(apt['formatted_date'] ?? _formatDateForPDF(apt['start_time'])),
                       _buildTableCell(_capitalizeStatus(apt['status'] ?? 'N/A')),
                       _buildTableCell('\$${apt['price']?.toStringAsFixed(2) ?? '0.00'}'),
                       _buildTableCell('\$${apt['deposit_paid']?.toStringAsFixed(2) ?? '0.00'}'),
@@ -465,7 +741,6 @@ class ReportsService {
             
             pw.Spacer(),
             
-            // Footer
             pw.Divider(color: PdfColors.grey400),
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
@@ -486,7 +761,6 @@ class ReportsService {
     );
   }
 
-  /// PDF de Reporte de Clientes
   static pw.Page _buildClientsPDF(String title, Map<String, dynamic> data) {
     return pw.Page(
       pageFormat: PdfPageFormat.a4,
@@ -495,7 +769,6 @@ class ReportsService {
         return pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            // Header
             pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
@@ -518,7 +791,6 @@ class ReportsService {
             
             pw.SizedBox(height: 24),
             
-            // Estadísticas
             pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
@@ -544,7 +816,6 @@ class ReportsService {
             
             pw.SizedBox(height: 24),
             
-            // Tabla de clientes
             if (data['clients'] != null && (data['clients'] as List).isNotEmpty) ...[
               pw.Text('LISTA DE CLIENTES', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, letterSpacing: 1)),
               pw.SizedBox(height: 8),
@@ -572,7 +843,7 @@ class ReportsService {
                     children: [
                       _buildTableCell(client['name'] ?? 'N/A'),
                       _buildTableCell(client['phone'] ?? 'N/A'),
-                      _buildTableCell('${client['total_appointments'] ?? 0}'),
+                      _buildTableCell('${client['total_appointments'] ?? client['totalAppointments'] ?? 0}'),
                       _buildTableCell(client['status'] == true ? 'Activo' : 'Inactivo'),
                     ],
                   )),
@@ -595,7 +866,6 @@ class ReportsService {
     );
   }
 
-  /// PDF de Reporte de Citas
   static pw.Page _buildAppointmentsPDF(String title, Map<String, dynamic> data) {
     return pw.Page(
       pageFormat: PdfPageFormat.a4,
@@ -606,7 +876,6 @@ class ReportsService {
         return pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            // Header
             pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
@@ -619,7 +888,6 @@ class ReportsService {
             
             pw.SizedBox(height: 24),
             
-            // Desglose por estado
             pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
@@ -646,7 +914,6 @@ class ReportsService {
             
             pw.SizedBox(height: 24),
             
-            // Tabla de citas
             if (data['appointments'] != null && (data['appointments'] as List).isNotEmpty) ...[
               pw.Text('DETALLE DE CITAS', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, letterSpacing: 1)),
               pw.SizedBox(height: 8),
@@ -670,8 +937,8 @@ class ReportsService {
                   ),
                   ...(data['appointments'] as List).take(14).map((apt) => pw.TableRow(
                     children: [
-                      _buildTableCell(_formatDateForPDF(apt['start_time'])),
-                      _buildTableCell(apt['description'] ?? 'N/A'),
+                      _buildTableCell(apt['date'] ?? _formatDateForPDF(apt['start_time'])),
+                      _buildTableCell(apt['description'] ?? apt['service'] ?? 'N/A'),
                       _buildTableCell(_capitalizeStatus(apt['status'] ?? 'N/A')),
                       _buildTableCell('\$${apt['price']?.toStringAsFixed(2) ?? '0.00'}'),
                     ],
@@ -695,7 +962,6 @@ class ReportsService {
     );
   }
 
-  /// PDF de Reporte de Servicios
   static pw.Page _buildServicesPDF(String title, Map<String, dynamic> data) {
     return pw.Page(
       pageFormat: PdfPageFormat.a4,
@@ -706,20 +972,17 @@ class ReportsService {
         return pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            // Header
             pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
                 pw.Text(title.toUpperCase(), style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold, letterSpacing: 1.5)),
                 pw.Container(margin: const pw.EdgeInsets.only(top: 4, bottom: 12), height: 2, width: 100, color: PdfColors.black),
                 pw.Text('Período: ${_formatPeriodForPDF(data['period'])}', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
-                pw.Text('Total de servicios: ${data['total_services'] ?? 0}', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
               ],
             ),
             
             pw.SizedBox(height: 24),
             
-            // Resumen
             pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
@@ -732,7 +995,6 @@ class ReportsService {
                     children: [
                       _buildPDFRow('Servicios Únicos:', '${data['unique_services'] ?? 0}', isBold: true),
                       pw.Divider(color: PdfColors.grey300),
-                      _buildPDFRow('Total de Servicios:', '${data['total_services'] ?? 0}'),
                       _buildPDFRow('Servicio Más Popular:', data['most_popular_service'] ?? 'N/A'),
                     ],
                   ),
@@ -742,7 +1004,6 @@ class ReportsService {
             
             pw.SizedBox(height: 24),
             
-            // Tabla de servicios
             if (servicesBreakdown.isNotEmpty) ...[
               pw.Text('DESGLOSE DE SERVICIOS', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, letterSpacing: 1)),
               pw.SizedBox(height: 8),
@@ -794,7 +1055,6 @@ class ReportsService {
     );
   }
 
-  // Funciones auxiliares para PDFs
   static pw.Widget _buildPDFRow(String label, String value, {bool isBold = false}) {
     return pw.Padding(
       padding: const pw.EdgeInsets.symmetric(vertical: 3),

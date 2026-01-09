@@ -67,6 +67,19 @@ class _ReportsPageState extends State<ReportsPage> with TickerProviderStateMixin
     super.dispose();
   }
 
+  void _cleanupBeforeDialogClose() {
+  // Limpiar cualquier animación o estado pendiente
+  _errorAnimationController.stop();
+  _successAnimationController.stop();
+  
+  // Forzar un rebuild para limpiar cualquier widget problemático
+  if (mounted) {
+    setState(() {
+      _loading = false;
+    });
+  }
+}
+
   // [------------- CARGA DE DATOS DE USUARIO --------------]
   Future<void> _fetchUserData() async {
     try {
@@ -137,6 +150,50 @@ class _ReportsPageState extends State<ReportsPage> with TickerProviderStateMixin
     );
   }
 
+  // [------------- CALCULAR FECHAS SEGÚN PERÍODO --------------]
+  Map<String, DateTime> _getDateRangeFromPeriod() {
+    final now = DateTime.now();
+    DateTime startDate;
+    DateTime endDate = DateTime(now.year, now.month, now.day, 23, 59, 59);
+
+    switch (_selectedPeriod) {
+      case 'weekly':
+        // Última semana (7 días)
+        startDate = now.subtract(const Duration(days: 7));
+        break;
+      case 'monthly':
+        // Último mes
+        startDate = DateTime(now.year, now.month - 1, now.day);
+        break;
+      case 'yearly':
+        // Último año
+        startDate = DateTime(now.year - 1, now.month, now.day);
+        break;
+      case 'custom':
+        // Fechas personalizadas
+        if (_customStartDate == null || _customEndDate == null) {
+          throw Exception('Selecciona un rango de fechas válido');
+        }
+        startDate = _customStartDate!;
+        endDate = DateTime(
+          _customEndDate!.year,
+          _customEndDate!.month,
+          _customEndDate!.day,
+          23,
+          59,
+          59,
+        );
+        break;
+      default:
+        startDate = DateTime(now.year, now.month, 1);
+    }
+
+    return {
+      'start': startDate,
+      'end': endDate,
+    };
+  }
+
   // [------------- GENERACIÓN DE REPORTE --------------]
   Future<void> _generateReport() async {
     final user = Supabase.instance.client.auth.currentUser!;
@@ -144,23 +201,18 @@ class _ReportsPageState extends State<ReportsPage> with TickerProviderStateMixin
     setState(() => _loading = true);
     
     try {
+      // Calcular fechas según período seleccionado
+      final dateRange = _getDateRangeFromPeriod();
+      final startDate = dateRange['start']!;
+      final endDate = dateRange['end']!;
+
       Map<String, dynamic> reportData;
       String reportTitle;
-      
-      // Determinar fechas para período personalizado
-      DateTime? startDate = _customStartDate;
-      DateTime? endDate = _customEndDate;
-      
-      if (_selectedPeriod == 'custom' && (startDate == null || endDate == null)) {
-        _showError('Selecciona un rango de fechas válido para el período personalizado');
-        return;
-      }
 
       switch (_selectedReportType) {
         case 'financial':
           reportData = await ReportsService.getFinancialReport(
             employeeId: user.id,
-            period: _selectedPeriod,
             startDate: startDate,
             endDate: endDate,
           );
@@ -170,8 +222,9 @@ class _ReportsPageState extends State<ReportsPage> with TickerProviderStateMixin
         case 'clients':
           reportData = await ReportsService.getClientsReport(
             employeeId: user.id,
-            includeInactive: _includeInactiveClients,
-            minAppointments: _minAppointments,
+            startDate: startDate,
+            endDate: endDate,
+            includeInactiveClients: _includeInactiveClients,
           );
           reportTitle = 'Reporte de Clientes';
           break;
@@ -179,8 +232,6 @@ class _ReportsPageState extends State<ReportsPage> with TickerProviderStateMixin
         case 'appointments':
           reportData = await ReportsService.getAppointmentsReport(
             employeeId: user.id,
-            period: _selectedPeriod,
-            status: _appointmentStatus == 'all' ? null : _appointmentStatus,
             startDate: startDate,
             endDate: endDate,
           );
@@ -190,7 +241,6 @@ class _ReportsPageState extends State<ReportsPage> with TickerProviderStateMixin
         case 'services':
           reportData = await ReportsService.getServicesReport(
             employeeId: user.id,
-            period: _selectedPeriod,
             startDate: startDate,
             endDate: endDate,
           );
@@ -218,16 +268,40 @@ class _ReportsPageState extends State<ReportsPage> with TickerProviderStateMixin
     final bool isWide = MediaQuery.of(context).size.width >= 800;
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     
-    showDialog(
-      context: context,
-      builder: (context) => ReportPopup(
-        title: title,
-        data: data,
-        reportType: _selectedReportType,
-        isDark: themeProvider.isDark,
-        isWide: isWide,
-      ),
-    );
+    // Limpiar antes de abrir el diálogo
+    _cleanupBeforeDialogClose();
+    
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) {
+          return PopScope(
+            canPop: true,
+            onPopInvokedWithResult: (didPop, result) async {
+              if (didPop) return;
+              await Future.delayed(const Duration(milliseconds: 150));
+              _cleanupBeforeDialogClose();
+            },
+            child: ReportPopup(
+              key: Key('report_${DateTime.now().millisecondsSinceEpoch}'),
+              title: title,
+              data: data,
+              reportType: _selectedReportType,
+              isDark: themeProvider.isDark,
+              isWide: isWide,
+              onClose: () {
+                _cleanupBeforeDialogClose();
+                Navigator.of(context).pop();
+              },
+            ),
+          );
+        },
+      ).then((_) {
+        // Limpieza después de cerrar el diálogo
+        _cleanupBeforeDialogClose();
+      });
+    });
   }
 
   @override
@@ -681,6 +755,7 @@ class ReportPopup extends StatelessWidget {
   final String reportType;
   final bool isDark;
   final bool isWide;
+  final VoidCallback? onClose;
 
   const ReportPopup({
     super.key,
@@ -689,14 +764,16 @@ class ReportPopup extends StatelessWidget {
     required this.reportType,
     required this.isDark,
     required this.isWide,
+     this.onClose,
   });
 
   // Función para formatear precios
   String _formatPrice(double price) {
-    if (price >= 1000) {
-      return '\$${(price / 1000).toStringAsFixed(1)}K';
-    } else {
-      return '\$${price.toStringAsFixed(0)}';
+    if (price == 0) return '\$0.00';
+      if (price >= 1000) {
+        return '\$${(price / 1000).toStringAsFixed(1)}K';
+      } else {
+        return '\$${price.toStringAsFixed(2)}';
     }
   }
 
@@ -759,8 +836,15 @@ class ReportPopup extends StatelessWidget {
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.close, color: Colors.black),
-                    onPressed: () => Navigator.of(context).pop(),
+                   icon: const Icon(Icons.close, color: Colors.black),
+                    onPressed: () {
+                      // Usar el callback si existe, si no, usar Navigator.pop
+                      if (onClose != null) {
+                        onClose!();
+                      } else {
+                        Navigator.of(context).pop();
+                      }
+                    },
                   ),
                 ],
               ),
@@ -884,11 +968,11 @@ class ReportPopup extends StatelessWidget {
   }
 
   Widget _buildFinancialReport() {
-    final totalRevenue = data['total_revenue'] ?? 0.0;
-    final totalDeposits = data['total_deposits'] ?? 0.0;
-    final pendingRevenue = data['pending_revenue'] ?? 0.0;
-    final totalAppointments = data['total_appointments'] ?? 0;
-    final completedAppointments = data['completed_appointments'] ?? 0;
+    final summary = data['summary'] ?? {};
+    final totalIncome = (summary['totalIncome'] as num?)?.toDouble() ?? 0.0;
+    final totalDeposits = (summary['totalDeposits'] as num?)?.toDouble() ?? 0.0;
+    final totalPending = (summary['totalPending'] as num?)?.toDouble() ?? 0.0;
+    final totalAppointments = (summary['totalAppointments'] as num?)?.toInt() ?? 0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -896,25 +980,25 @@ class ReportPopup extends StatelessWidget {
         _buildSummaryCards([
           SummaryCardData(
             title: 'Ingresos Totales',
-            value: _formatPrice(totalRevenue.toDouble()),
+            value: '\$${totalIncome.toStringAsFixed(2)}',
             icon: Icons.attach_money,
             color: Colors.green,
           ),
           SummaryCardData(
             title: 'Depósitos Recibidos',
-            value: _formatPrice(totalDeposits.toDouble()),
+            value: '\$${totalDeposits.toStringAsFixed(2)}',
             icon: Icons.savings,
             color: Colors.blue,
           ),
           SummaryCardData(
             title: 'Ingresos Pendientes',
-            value: _formatPrice(pendingRevenue.toDouble()),
+            value: '\$${totalPending.toStringAsFixed(2)}',
             icon: Icons.schedule,
             color: Colors.orange,
           ),
           SummaryCardData(
-            title: 'Citas Completadas',
-            value: '$completedAppointments/$totalAppointments',
+            title: 'Citas',
+            value: '$totalAppointments',
             icon: Icons.check_circle,
             color: primaryColor,
           ),
@@ -924,7 +1008,7 @@ class ReportPopup extends StatelessWidget {
         
         if (data['appointments'] != null && (data['appointments'] as List).isNotEmpty) ...[
           Text(
-            'Detalles de Transacciones',
+            'Detalles de Citas',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
@@ -932,7 +1016,7 @@ class ReportPopup extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          _buildTransactionsList(data['appointments'] as List),
+          _buildAppointmentsList(data['appointments'] as List),
         ],
       ],
     );
@@ -997,10 +1081,22 @@ class ReportPopup extends StatelessWidget {
     );
   }
 
- Widget _buildAppointmentsReport() {
-    final totalAppointments = data['total_appointments'] ?? 0;
-    final statusBreakdown = data['status_breakdown'] as Map<String, int>? ?? {};
-    final totalRevenue = data['total_revenue'] ?? 0.0;
+  Widget _buildAppointmentsReport() {
+    final summary = data['summary'] ?? {};
+    final totalAppointments = summary['totalAppointments'] ?? 0;
+    final completed = summary['completed'] ?? 0;
+    final cancelled = summary['cancelled'] ?? 0;
+    final totalRevenue = (summary['totalRevenue'] as num?)?.toDouble() ?? 0.0;
+    
+    // Crear breakdown de estados
+    final statusBreakdown = {
+      'pendiente': summary['pending'] ?? 0,
+      'confirmada': summary['confirmed'] ?? 0,
+      'completa': completed,
+      'cancelada': cancelled,
+      'aplazada': summary['postponed'] ?? 0,
+      'perdida': summary['missed'] ?? 0,
+    };
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1014,19 +1110,19 @@ class ReportPopup extends StatelessWidget {
           ),
           SummaryCardData(
             title: 'Completadas',
-            value: statusBreakdown['completa']?.toString() ?? '0',
+            value: completed.toString(),
             icon: Icons.check_circle,
             color: Colors.green,
           ),
           SummaryCardData(
             title: 'Canceladas',
-            value: statusBreakdown['cancelada']?.toString() ?? '0',
+            value: cancelled.toString(),
             icon: Icons.cancel,
             color: Colors.red,
           ),
           SummaryCardData(
             title: 'Ingresos Generados',
-            value: _formatPrice(totalRevenue.toDouble()),
+            value: _formatPrice(totalRevenue),
             icon: Icons.attach_money,
             color: primaryColor,
           ),
@@ -1064,38 +1160,142 @@ class ReportPopup extends StatelessWidget {
   }
 
   Widget _buildServicesReport() {
-    final totalServices = data['total_services'] ?? 0;
-    final uniqueServices = data['unique_services'] ?? 0;
-    final mostPopular = data['most_popular_service'] ?? 'N/A';
-    final servicesBreakdown = data['services_breakdown'] as Map<String, dynamic>? ?? {};
+    final services = data['services'] as List? ?? [];
+    // ✅ Soporte para ambas convenciones de nombres
+    final uniqueServices = data['unique_services'] ?? data['uniqueServices'] ?? 0;
+    final mostPopular = data['most_popular_service'] ?? data['mostPopularService'] ?? 'N/A';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSummaryCards([
-          SummaryCardData(
-            title: 'Servicios Totales',
-            value: totalServices.toString(),
-            icon: Icons.design_services,
-            color: Colors.blue,
-          ),
-          SummaryCardData(
-            title: 'Tipos Únicos',
-            value: uniqueServices.toString(),
-            icon: Icons.category,
-            color: Colors.green,
-          ),
-          SummaryCardData(
-            title: 'Más Popular',
-            value: mostPopular.length > 15 ? '${mostPopular.substring(0, 15)}...' : mostPopular,
-            icon: Icons.star,
-            color: primaryColor,
-          ),
-        ]),
+        Column(
+          children: [
+            // Fila superior: 2 tarjetas lado a lado
+            Row(
+              children: [
+                // Tarjeta 1: Tipos Únicos
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.grey[800] : Colors.grey[50],
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.category, color: Colors.green, size: 32),
+                        const SizedBox(height: 12),
+                        Text(
+                          uniqueServices.toString(),
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? textColor : Colors.black87,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Tipos Únicos',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isDark ? hintColor : Colors.grey[600],
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                
+                const SizedBox(width: 16),
+                
+                // Tarjeta 2: Total de Citas
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.grey[800] : Colors.grey[50],
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.event, color: Colors.blue, size: 32),
+                        const SizedBox(height: 12),
+                        Text(
+                          services.fold<int>(0, (sum, service) => 
+                              sum + (service['totalAppointments'] as int? ?? 0)).toString(),
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? textColor : Colors.black87,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Total Citas',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isDark ? hintColor : Colors.grey[600],
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            
+            const SizedBox(height: 16),
+            
+            // Tarjeta inferior: Más Popular (COMPLETA - 100% ancho)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: isDark ? Colors.grey[800] : Colors.grey[50],
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: primaryColor.withValues(alpha: 0.3)),
+              ),
+              child: Column(
+                children: [
+                  Icon(Icons.star, color: primaryColor, size: 36),
+                  const SizedBox(height: 12),
+                  Text(
+                    mostPopular,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? textColor : Colors.black87,
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Servicio Más Popular',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: isDark ? hintColor : Colors.grey[600],
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
         
         const SizedBox(height: 24),
         
-        if (servicesBreakdown.isNotEmpty) ...[
+        if (services.isNotEmpty) ...[
           Text(
             'Desglose por Servicio',
             style: TextStyle(
@@ -1105,7 +1305,7 @@ class ReportPopup extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          _buildServicesBreakdown(servicesBreakdown),
+          _buildServicesBreakdown(services),
         ],
       ],
     );
@@ -1117,7 +1317,7 @@ class ReportPopup extends StatelessWidget {
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: isWide ? 4 : 2,
-        childAspectRatio: 1.2, // Cambiado de 1.5 a 1.2 para hacer las tarjetas más altas
+        childAspectRatio: 1.2, 
         crossAxisSpacing: 16,
         mainAxisSpacing: 16,
       ),
@@ -1134,7 +1334,7 @@ class ReportPopup extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(card.icon, color: card.color, size: 28), // Reducido de 32 a 28
+              Icon(card.icon, color: card.color, size: 28),
               const SizedBox(height: 8),
               Text(
                 card.value,
@@ -1151,7 +1351,7 @@ class ReportPopup extends StatelessWidget {
               Text(
                 card.title,
                 style: TextStyle(
-                  fontSize: 11, // Reducido de 12 a 11
+                  fontSize: 11,
                   color: isDark ? hintColor : Colors.grey[600],
                 ),
                 textAlign: TextAlign.center,
@@ -1202,65 +1402,6 @@ class ReportPopup extends StatelessWidget {
     );
   }
 
- Widget _buildTransactionsList(List transactions) {
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: transactions.length,
-      itemBuilder: (context, index) {
-        final transaction = transactions[index];
-        final startTime = DateTime.tryParse(transaction['start_time'] ?? '');
-        final price = (transaction['price'] as num?)?.toDouble() ?? 0.0;
-        final status = transaction['status'] ?? 'N/A';
-
-        return Container(
-          margin: const EdgeInsets.only(bottom: 8),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: isDark ? Colors.grey[800] : Colors.white,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: isDark ? Colors.grey[700]! : Colors.grey[200]!),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      startTime != null 
-                        ? '${startTime.day}/${startTime.month}/${startTime.year}'
-                        : 'Fecha N/A',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w500,
-                        color: isDark ? textColor : Colors.black87,
-                      ),
-                    ),
-                    Text(
-                      'Estado: $status',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isDark ? hintColor : Colors.grey[600],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Text(
-                _formatPrice(price),
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: status == 'completa' ? Colors.green : primaryColor,
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
 
   Widget _buildClientsList(List clients) {
     return ListView.builder(
@@ -1321,49 +1462,65 @@ class ReportPopup extends StatelessWidget {
     );
   }
 
-  Widget _buildStatusBreakdown(Map<String, int> statusBreakdown) {
-    return Column(
-      children: statusBreakdown.entries.map((entry) {
+  Widget _buildStatusBreakdown(Map<String, dynamic> statusBreakdown) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: isWide ? 3 : 2,
+        childAspectRatio: 1.9,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+      ),
+      itemCount: statusBreakdown.length,
+      itemBuilder: (context, index) {
+        final entry = statusBreakdown.entries.elementAt(index);
         final status = entry.key;
-        final count = entry.value;
+        final count = (entry.value is int) ? entry.value as int : 0;
         final statusName = _getStatusName(status);
         final color = _getStatusColor(status);
         
         return Container(
-          margin: const EdgeInsets.only(bottom: 8),
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: isDark ? Colors.grey[800] : Colors.white,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: color.withValues(alpha: 0.3)),
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Row(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Container(
-                    width: 12,
-                    height: 12,
+                    width: 10,
+                    height: 10,
                     decoration: BoxDecoration(
                       color: color,
                       shape: BoxShape.circle,
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Text(
-                    statusName,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w500,
-                      color: isDark ? textColor : Colors.black87,
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      statusName,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: isDark ? textColor : Colors.black87,
+                      ),
+                      textAlign: TextAlign.center,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
               ),
+              const SizedBox(height: 4),
               Text(
                 count.toString(),
                 style: TextStyle(
-                  fontSize: 16,
+                  fontSize: 18,
                   fontWeight: FontWeight.bold,
                   color: color,
                 ),
@@ -1371,7 +1528,7 @@ class ReportPopup extends StatelessWidget {
             ],
           ),
         );
-      }).toList(),
+      },
     );
   }
 
@@ -1382,10 +1539,12 @@ class ReportPopup extends StatelessWidget {
       itemCount: appointments.length,
       itemBuilder: (context, index) {
         final appointment = appointments[index];
-        final startTime = DateTime.tryParse(appointment['start_time'] ?? '');
-        final description = appointment['description'] ?? 'Sin descripción';
+        final date = appointment['date'] ?? 'N/A';
+        final service = appointment['service'] ?? 'Sin servicio';
+        final notes = appointment['notes'] ?? '';
         final status = appointment['status'] ?? 'N/A';
         final price = (appointment['price'] as num?)?.toDouble() ?? 0.0;
+        final deposit = (appointment['deposit_paid'] as num?)?.toDouble() ?? 0.0;
 
         return Container(
           margin: const EdgeInsets.only(bottom: 8),
@@ -1402,9 +1561,7 @@ class ReportPopup extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    startTime != null 
-                      ? '${startTime.day}/${startTime.month}/${startTime.year} ${startTime.hour}:${startTime.minute.toString().padLeft(2, '0')}'
-                      : 'Fecha N/A',
+                    date,
                     style: TextStyle(
                       fontWeight: FontWeight.w500,
                       color: isDark ? textColor : Colors.black87,
@@ -1429,23 +1586,70 @@ class ReportPopup extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                description,
+                service,
                 style: TextStyle(
                   fontSize: 14,
                   color: isDark ? hintColor : Colors.grey[600],
                 ),
               ),
-              if (price > 0) ...[
+              if (notes.isNotEmpty) ...[
                 const SizedBox(height: 4),
                 Text(
-                  _formatPrice(price),
+                  'Notas: $notes',
                   style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: primaryColor,
+                    fontSize: 12,
+                    color: isDark ? hintColor.withValues(alpha: 0.7) : Colors.grey[500],
                   ),
                 ),
               ],
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  if (price > 0)
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Precio',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isDark ? hintColor.withValues(alpha: 0.7) : Colors.grey[500],
+                          ),
+                        ),
+                        Text(
+                          _formatPrice(price),
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: primaryColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  if (deposit > 0)
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          'Depósito',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isDark ? hintColor.withValues(alpha: 0.7) : Colors.grey[500],
+                          ),
+                        ),
+                        Text(
+                          _formatPrice(deposit),
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green,
+                          ),
+                        ),
+                      ],
+                    ),
+                ],
+              ),
             ],
           ),
         );
@@ -1453,18 +1657,17 @@ class ReportPopup extends StatelessWidget {
     );
   }
 
-  Widget _buildServicesBreakdown(Map<String, dynamic> servicesBreakdown) {
+  Widget _buildServicesBreakdown(List<dynamic> services) {
     return ListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      itemCount: servicesBreakdown.length,
+      itemCount: services.length,
       itemBuilder: (context, index) {
-        final entry = servicesBreakdown.entries.elementAt(index);
-        final serviceName = entry.key;
-        final serviceData = entry.value as Map<String, dynamic>;
-        final count = serviceData['count'] ?? 0;
-        final totalRevenue = serviceData['total_revenue']?.toDouble() ?? 0.0;
-        final averagePrice = serviceData['average_price']?.toDouble() ?? 0.0;
+        final service = services[index] as Map<String, dynamic>;
+        final serviceName = service['name'] ?? 'Sin servicio';
+        final count = service['totalAppointments'] ?? 0;
+        final totalRevenue = (service['totalRevenue'] as num?)?.toDouble() ?? 0.0;
+        final averagePrice = (service['averagePrice'] as num?)?.toDouble() ?? 0.0;
 
         return Container(
           margin: const EdgeInsets.only(bottom: 8),
@@ -1527,6 +1730,7 @@ class ReportPopup extends StatelessWidget {
       },
     );
   }
+
   String _getStatusName(String status) {
     switch (status) {
       case 'pendiente': return 'Pendiente';
@@ -1534,6 +1738,7 @@ class ReportPopup extends StatelessWidget {
       case 'completa': return 'Completada';
       case 'cancelada': return 'Cancelada';
       case 'aplazada': return 'Aplazada';
+      case 'perdida': return 'Perdida';
       default: return status;
     }
   }
@@ -1545,6 +1750,7 @@ class ReportPopup extends StatelessWidget {
       case 'completa': return Colors.green;
       case 'cancelada': return Colors.red;
       case 'aplazada': return Colors.purple;
+      case 'perdida': return Colors.grey;
       default: return Colors.grey;
     }
   }

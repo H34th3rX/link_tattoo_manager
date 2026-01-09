@@ -6,13 +6,13 @@ plugins {
 
 android {
     namespace = "com.headev.link_tattoo_manager"
-    compileSdk = 35 
+    compileSdk = 36 
     ndkVersion = "29.0.13599879"
 
     defaultConfig {
         applicationId = "com.headev.link_tattoo_manager"
         minSdk = flutter.minSdkVersion   
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0.0"
     }
