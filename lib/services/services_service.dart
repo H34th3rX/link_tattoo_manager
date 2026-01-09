@@ -352,41 +352,34 @@ class ServicesService {
     }
   }
 
-  /// Obtener servicios más usados en citas (para estadísticas)
+ /// Obtener servicios más usados en citas (para estadísticas)
   static Future<List<Map<String, dynamic>>> getMostUsedServices(
     String employeeId, {
     int limit = 10,
     bool includeInactive = false,
   }) async {
     try {
-      // Obtener citas completadas con descripción
-      final appointments = await client
-          .from('appointments')
-          .select('description')
-          .eq('employee_id', employeeId)
-          .eq('status', 'completa');
-      
-      // Obtener servicios del empleado
+      // Obtener todos los servicios del empleado
       final services = await getServices(
         employeeId,
         onlyActive: includeInactive ? null : true,
       );
       
-      // Contar cuántas veces se usa cada servicio
+      // Contar cuántas veces se usa cada servicio en citas completadas
       Map<String, Map<String, dynamic>> serviceCount = {};
       
       for (var service in services) {
         final serviceId = service['id'] as String;
-        final serviceName = service['name'] as String;
-        int count = 0;
         
-        // Contar coincidencias en citas
-        for (var apt in appointments) {
-          final description = apt['description'] as String? ?? '';
-          if (description.toLowerCase().contains(serviceName.toLowerCase())) {
-            count++;
-          }
-        }
+        // Contar citas completadas con este servicio
+        final appointments = await client
+            .from('appointments')
+            .select('id')
+            .eq('employee_id', employeeId)
+            .eq('service_id', serviceId)  // CAMBIO: Usa service_id
+            .eq('status', 'completa');
+        
+        final count = appointments.length;
         
         serviceCount[serviceId] = {
           ...service,

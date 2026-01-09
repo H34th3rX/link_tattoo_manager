@@ -271,7 +271,7 @@ class _MainContentState extends State<MainContent> {
     // NUEVO: Cargar datos reales del gráfico semanal
     _weeklyRevenueData = AppointmentsService.getWeeklyRevenueData(userId);
     _statusDistribution = AppointmentsService.getAppointmentsStatusDistribution(userId);
-    _topServices = AppointmentsService.getTopServices(userId, limit: 5);
+    _topServices = AppointmentsService.getTopServices(employeeId: userId, limit: 5);
     _dayOfWeekData = AppointmentsService.getAppointmentsByDayOfWeek(userId);
   }
 

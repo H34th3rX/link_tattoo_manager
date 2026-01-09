@@ -196,11 +196,11 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
     final query = _searchCtrl.text.toLowerCase();
     List<Map<String, dynamic>> tempFilteredList = _appointments.where((appointment) {
       final clientName = _getClientName(appointment).toLowerCase();
-      final description = (appointment['description']?.toString() ?? '').toLowerCase();
+      final serviceName = _getServiceName(appointment).toLowerCase();
       final notes = (appointment['notes']?.toString() ?? '').toLowerCase();
 
       final matchesSearch = clientName.contains(query) ||
-                          description.contains(query) ||
+                          serviceName.contains(query) ||  // CAMBIO
                           notes.contains(query);
 
       return matchesSearch;
@@ -245,6 +245,14 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
       return clientsData['name']?.toString() ?? 'Cliente Desconocido';
     }
     return 'Cliente Desconocido';
+  }
+  
+  String _getServiceName(Map<String, dynamic> appointment) {
+    final services = appointment['services'];
+    if (services != null && services is Map) {
+      return services['name'] as String? ?? 'Sin servicio';
+    }
+    return 'Sin servicio';
   }
 
   int _calculateDuration(Map<String, dynamic> appointment) {
@@ -528,10 +536,10 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
     } catch (e) {
       _showError('Error al finalizar el proceso: ${e.toString()}');
     } finally {
-      _closePopup(); // Cerrar el popup
-      await Future.delayed(const Duration(milliseconds: 100)); // Pequeña pausa
+      _closePopup(); 
+      await Future.delayed(const Duration(milliseconds: 100)); 
       if (mounted) {
-        await _fetchAppointments(); // Actualizar la lista
+        await _fetchAppointments(); 
       }
     }
   }
@@ -539,7 +547,7 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
   // Método para cancelar el aplazamiento
   void _onAppointmentCancelled() {
     setState(() {
-      _originalAppointmentToPostpone = null; // Limpiar la referencia
+      _originalAppointmentToPostpone = null; 
     });
     _closePopup();
   }
@@ -603,13 +611,18 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
                     Positioned.fill(
                       left: isWide ? 280 : 0,
                       child: AppointmentPopup(
-                        onClose: _onAppointmentCancelled, // Usar el método de cancelación
+                        onClose: _onAppointmentCancelled,
                         isDark: isDark,
                         employeeId: user.id,
                         initialAppointment: _appointmentToEdit,
                         initialClientData: _initialClientForNewAppointment,
                         isPostponedAppointment: _isPostponedAppointment,
                         onSaved: _onAppointmentSaved,
+                        onServicesUpdated: () async {  
+                          if (mounted) {
+                            await _fetchAppointments();
+                          }
+                        } 
                       ),
                     ),
                   // Mensajes de error y éxito
@@ -769,7 +782,7 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
             ],
           ),
           ElevatedButton.icon(
-            onPressed: _loading ? null : _openCreateAppointmentPopup,
+            onPressed: _isPopupOpen ? null : _openCreateAppointmentPopup,
             icon: const Icon(Icons.add, color: Colors.black),
             label: const Text(
               'Nueva Cita',
@@ -836,16 +849,11 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
 
         const SizedBox(height: 16),
 
-        // Filtros
-        Row(
-          children: [
-            Expanded(
-              child: _buildFilterChips(isDark),
-            ),
-            const SizedBox(width: 16),
-            _buildAppointmentStats(isDark),
-          ],
-        ),
+        _buildFilterChips(isDark),
+        
+        const SizedBox(height: 12),
+        
+        _buildAppointmentStats(isDark),
       ],
     );
   }
@@ -994,7 +1002,6 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
       case 'perdida':
         chipColor = missedColor;
         break;
-
     }
 
     return GestureDetector(
@@ -1028,58 +1035,125 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
   }
 
   Widget _buildAppointmentStats(bool isDark) {
-    final confirmedCount = _appointments.where((a) => a['status'] == 'confirmada').length;
-    final completeCount = _appointments.where((a) => a['status'] == 'completa').length;
-    final pendingCount = _appointments.where((a) => a['status'] == 'pendiente').length;
-    final missedCount = _appointments.where((a) => a['status'] == 'perdida').length;
+  final pendingCount = _appointments.where((a) => a['status'] == 'pendiente').length;
+  final confirmedCount = _appointments.where((a) => a['status'] == 'confirmada').length;
+  final completeCount = _appointments.where((a) => a['status'] == 'completa').length;
+  final canceledCount = _appointments.where((a) => a['status'] == 'cancelada').length;
+  final postponedCount = _appointments.where((a) => a['status'] == 'aplazada').length;
+  final missedCount = _appointments.where((a) => a['status'] == 'perdida').length;
 
-    return AnimatedContainer(
-      duration: themeAnimationDuration,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: isDark ? Colors.grey[800] : Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: isDark ? Colors.grey[600]! : Colors.grey[300]!,
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _buildStatDot(confirmedColor, confirmedCount),
-          const SizedBox(width: 12),
-          _buildStatDot(completeColor, completeCount),
-          const SizedBox(width: 12),
-          _buildStatDot(pendingColor, pendingCount),
-          const SizedBox(width: 12),
-          _buildStatDot(missedColor, missedCount),
-        ],
-      ),
-    );
+  // Determinar color y contador según filtro activo
+  Color activeColor = isDark ? Colors.grey[800]! : Colors.white;
+  int? highlightCount;
+  
+  if (_selectedStatus != 'all') {
+    switch (_selectedStatus) {
+      case 'pendiente':
+        activeColor = pendingColor;
+        highlightCount = pendingCount;
+        break;
+      case 'confirmada':
+        activeColor = confirmedColor;
+        highlightCount = confirmedCount;
+        break;
+      case 'completa':
+        activeColor = completeColor;
+        highlightCount = completeCount;
+        break;
+      case 'cancelada':
+        activeColor = cancelledColor;
+        highlightCount = canceledCount;
+        break;
+      case 'aplazada':
+        activeColor = postponedColor;
+        highlightCount = postponedCount;
+        break;
+      case 'perdida':
+        activeColor = missedColor;
+        highlightCount = missedCount;
+        break;
+    }
   }
 
-  Widget _buildStatDot(Color color, int count) {
-    return Row(
-      children: [
-        Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
+  final bool isFiltered = _selectedStatus != 'all';
+
+  return AnimatedContainer(
+    duration: const Duration(milliseconds: 400),
+    curve: Curves.easeInOut,
+    height: 64,
+    padding: const EdgeInsets.all(16), 
+    decoration: BoxDecoration(
+      color: isFiltered ? activeColor.withValues(alpha: 0.15) : (isDark ? Colors.grey[800] : Colors.white),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(
+        color: isFiltered ? activeColor : (isDark ? Colors.grey[600]! : Colors.grey[300]!),
+        width: isFiltered ? 2 : 1,
+      ),
+    ),
+    child: isFiltered
+        ? Center(
+            child: TweenAnimationBuilder<double>(
+              key: ValueKey(_selectedStatus),
+              duration: const Duration(milliseconds: 500),
+              curve: Curves.easeOutBack,
+              tween: Tween(begin: 0.0, end: 1.0),
+              builder: (context, value, child) {
+                return Transform.scale(
+                  scale: 0.5 + (value * 0.5),
+                  child: Opacity(
+                    opacity: value.clamp(0.0, 1.0),
+                    child: Text(
+                      '$highlightCount',
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: activeColor,
+                        height: 1.0,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          )
+        : Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _buildStatItem(pendingColor, pendingCount),
+              _buildStatItem(confirmedColor, confirmedCount),
+              _buildStatItem(completeColor, completeCount),
+              _buildStatItem(cancelledColor, canceledCount),
+              _buildStatItem(postponedColor, postponedCount),
+              _buildStatItem(missedColor, missedCount),
+            ],
           ),
+  );
+}
+
+  Widget _buildStatItem(Color color, int count) {
+  return Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Container(
+        width: 10,
+        height: 10,
+        decoration: BoxDecoration(
+          color: color,
+          shape: BoxShape.circle,
         ),
-        const SizedBox(width: 4),
-        Text(
-          '$count',
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-          ),
+      ),
+      const SizedBox(width: 6),
+      Text(
+        '$count',
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.bold,
+          color: color,
         ),
-      ],
-    );
-  }
+      ),
+    ],
+  );
+}
 
   Widget _buildAppointmentsList(bool isDark, bool isWide) {
     if (_loading && _appointments.isEmpty) {
@@ -1498,16 +1572,15 @@ class AppointmentCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      if (appointment['description'] != null && appointment['description'].isNotEmpty)
-                        Text(
-                          appointment['description'],
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: isDark ? hintColor : Colors.grey[700],
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
+                      Text(
+                        _getServiceName(appointment),
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: isDark ? hintColor : Colors.grey[700],
                         ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                       if (appointment['notes'] != null && appointment['notes'].isNotEmpty) ...[
                         const SizedBox(height: 4),
                         Text(
@@ -1666,6 +1739,14 @@ class AppointmentCard extends StatelessWidget {
       ),
     );
   }
+
+  String _getServiceName(Map<String, dynamic> appointment) {
+    final services = appointment['services'];
+    if (services != null && services is Map) {
+      return services['name'] as String? ?? 'Sin servicio';
+    }
+    return 'Sin servicio';
+  }
 }
 
 //[------------- WIDGET: AppointmentPopup (Popup de Creación/Edición de Cita) --------------]
@@ -1677,6 +1758,7 @@ class AppointmentPopup extends StatefulWidget {
   final Map<String, dynamic>? initialClientData;
   final bool isPostponedAppointment;
   final VoidCallback onSaved;
+  final VoidCallback? onServicesUpdated; 
 
   const AppointmentPopup({
     super.key,
@@ -1687,6 +1769,7 @@ class AppointmentPopup extends StatefulWidget {
     this.initialClientData,
     this.isPostponedAppointment = false,
     required this.onSaved,
+     this.onServicesUpdated, 
   });
 
   @override
@@ -1789,7 +1872,16 @@ class _AppointmentPopupState extends State<AppointmentPopup>
         }
       }
 
-      _descriptionCtrl.text = appointment['description']?.toString() ?? '';
+      // Cargar servicio desde la relación con services
+      final serviceData = appointment['services'];
+      if (serviceData != null && serviceData is Map) {
+        _selectedServiceId = serviceData['id'];
+        _descriptionCtrl.text = serviceData['name'] ?? '';
+      } else {
+        // Cita sin servicio (durante migración)
+        _selectedServiceId = null;
+        _descriptionCtrl.text = '';
+      }
       _notesCtrl.text = appointment['notes']?.toString() ?? '';
       _priceCtrl.text = appointment['price']?.toString() ?? '';
       _depositCtrl.text = appointment['deposit_paid']?.toString() ?? '0.00';
@@ -1838,32 +1930,25 @@ class _AppointmentPopupState extends State<AppointmentPopup>
       if (mounted) {
         setState(() {
           _services = services;
-          _loadingServices = false;
           
-          // Validar si el servicio seleccionado todavía existe
-          if (_selectedServiceId != null) {
-            final serviceExists = _services.any((s) => s['id'] == _selectedServiceId);
-            if (!serviceExists) {
-              _selectedServiceId = null;
-              _descriptionCtrl.clear();
-            }
-          }
-          
-          // Intentar matchear con servicio existente si estamos editando
-          if (widget.initialAppointment != null && _selectedServiceId == null) {
-            final currentDescription = widget.initialAppointment!['description']?.toString() ?? '';
-            for (var service in _services) {
-              if (service['name'] == currentDescription) {
-                _selectedServiceId = service['id'];
-                _descriptionCtrl.text = service['name'];
-                break;
+          // Si estamos editando y el servicio está inactivo, agregarlo a la lista
+          if (widget.initialAppointment != null) {
+            final serviceData = widget.initialAppointment!['services'];
+            if (serviceData != null && serviceData is Map) {
+              final serviceId = serviceData['id'];
+              final isActive = serviceData['is_active'] as bool? ?? true;
+              
+              // Si el servicio está inactivo, agregarlo a la lista
+              if (!isActive) {
+                final serviceExists = _services.any((s) => s['id'] == serviceId);
+                if (!serviceExists) {
+                  _services.add(Map<String, dynamic>.from(serviceData));
+                }
               }
             }
-            // Si no match, mantener el texto original
-            if (_selectedServiceId == null && currentDescription.isNotEmpty) {
-              _descriptionCtrl.text = currentDescription;
-            }
           }
+          
+          _loadingServices = false;
         });
       }
     } catch (e) {
@@ -1916,6 +2001,30 @@ class _AppointmentPopupState extends State<AppointmentPopup>
     if (!_formKey.currentState!.validate()) {
       return;
     }
+    // Validar servicio seleccionado
+    if (_selectedClient == null) {
+      _showSafeMessage('Debes seleccionar un cliente', isError: true);
+      setState(() => _isSaving = false);
+      return;
+    }
+
+    // Verificar que el servicio seleccionado aún existe y está activo
+      final selectedService = _services.firstWhere(
+        (s) => s['id'] == _selectedServiceId,
+        orElse: () => <String, dynamic>{},
+      );
+      
+      if (selectedService.isEmpty) {
+        _showToast('El servicio seleccionado ya no existe. Por favor selecciona otro.', isError: true);
+        setState(() => _isSaving = false);
+        return;
+      }
+      
+      if (selectedService['is_active'] == false) {
+        _showToast('El servicio seleccionado está inactivo. Por favor selecciona otro.', isError: true);
+        setState(() => _isSaving = false);
+        return;
+      }
 
     if (_selectedClient == null) {
       _showSafeMessage('Debes seleccionar un cliente', isError: true);
@@ -1971,7 +2080,6 @@ class _AppointmentPopupState extends State<AppointmentPopup>
         depositPaid = double.tryParse(_depositCtrl.text);
       }
 
-      // Perform the database operation and verify mounted afterwards
       if (widget.initialAppointment != null) {
         // Actualizar cita existente
         await AppointmentsService.updateAppointment(
@@ -1980,7 +2088,7 @@ class _AppointmentPopupState extends State<AppointmentPopup>
           clientId: _selectedClient!['id'],
           startTime: selectedDateTime,
           endTime: endDateTime,
-          description: _descriptionCtrl.text.isEmpty ? null : _descriptionCtrl.text,
+          serviceId: _selectedServiceId!,
           status: _selectedStatus,
           price: price,
           depositPaid: depositPaid ?? 0.00,
@@ -1993,7 +2101,7 @@ class _AppointmentPopupState extends State<AppointmentPopup>
           employeeId: widget.employeeId,
           startTime: selectedDateTime,
           endTime: endDateTime,
-          description: _descriptionCtrl.text.isEmpty ? null : _descriptionCtrl.text,
+          serviceId: _selectedServiceId!,
           status: _selectedStatus,
           price: price,
           depositPaid: depositPaid ?? 0.00,
@@ -2061,20 +2169,77 @@ class _AppointmentPopupState extends State<AppointmentPopup>
       }
     }
   }
+  void _showToast(String message, {bool isError = false}) {
+    final overlay = Overlay.of(context);
+    final overlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        bottom: 50,
+        left: 20,
+        right: 20,
+        child: Material(
+          color: Colors.transparent,
+          child: Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              decoration: BoxDecoration(
+                color: isError ? errorColor : successColor,
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.3),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    isError ? Icons.error_outline : Icons.check_circle_outline,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 12),
+                  Flexible(
+                    child: Text(
+                      message,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    overlay.insert(overlayEntry);
+
+    Future.delayed(const Duration(seconds: 2), () {
+      overlayEntry.remove();
+    });
+  }
 
   Future<void> _showServicesManagementDialog() async {
     final userId = Supabase.instance.client.auth.currentUser!.id;
-    
-    await showDialog(
+    final result = await showDialog<bool>(
       context: context,
       builder: (context) => ServicesManagementDialog(
         userId: userId,
         isDark: widget.isDark,
       ),
     );
-    
-    // Actualizar dropdown
     await _loadServices();
+    if (result == true && widget.onServicesUpdated != null) {
+      widget.onServicesUpdated!();
+    }
   }
 
   @override
@@ -2432,22 +2597,24 @@ class _AppointmentPopupState extends State<AppointmentPopup>
                           decoration: _buildInputDecoration('Servicio *', Icons.work_outline),
                           style: TextStyle(color: widget.isDark ? textColor : Colors.black87),
                           validator: (value) {
-                            if ((value == null || value.isEmpty) && _descriptionCtrl.text.isEmpty) {
-                              return 'Selecciona un servicio o ingresa una descripción';
+                            if (value == null || value.isEmpty) {
+                              return 'Debes seleccionar un servicio';
                             }
                             return null;
                           },
                           items: _services.map((service) {
-                            return DropdownMenuItem<String>(
-                              value: service['id'],
-                              child: Text(
-                                service['name'],
-                                style: TextStyle(
-                                  color: widget.isDark ? textColor : Colors.black87,
+                              final isActive = service['is_active'] as bool? ?? true;
+                              return DropdownMenuItem<String>(
+                                value: service['id'],
+                                child: Text(
+                                  service['name'] + (!isActive ? ' (Inactivo)' : ''),
+                                  style: TextStyle(
+                                    color: widget.isDark ? textColor : Colors.black87,
+                                    decoration: !isActive ? TextDecoration.lineThrough : null,
+                                  ),
                                 ),
-                              ),
-                            );
-                          }).toList(),
+                              );
+                            }).toList(),
                           onChanged: (value) {
                             setState(() {
                               _selectedServiceId = value;
@@ -2704,14 +2871,15 @@ class _AppointmentPopupState extends State<AppointmentPopup>
               child: TextFormField(
                 controller: _priceCtrl,
                 style: TextStyle(color: widget.isDark ? textColor : Colors.black87),
-                decoration: _buildInputDecoration('Precio', Icons.attach_money_outlined),
+                decoration: _buildInputDecoration('Precio *', Icons.attach_money_outlined),
                 keyboardType: TextInputType.number,
                 validator: (value) {
-                  if (value != null && value.isNotEmpty) {
-                    final price = double.tryParse(value);
-                    if (price == null || price < 0) {
-                      return 'Ingresa un precio válido';
-                    }
+                  if (value == null || value.isEmpty) {
+                    return 'El precio es requerido';
+                  }
+                  final price = double.tryParse(value);
+                  if (price == null || price <= 0) {
+                    return 'El precio debe ser mayor a 0';
                   }
                   return null;
                 },
@@ -2937,6 +3105,13 @@ class AppointmentDetailsDialog extends StatelessWidget {
     }
     return 'Cliente Desconocido';
   }
+  String _getServiceName(Map<String, dynamic> appointment) {
+    final services = appointment['services'];
+    if (services != null && services is Map) {
+      return services['name'] as String? ?? 'Sin servicio';
+    }
+    return 'Sin servicio';
+  }
 
   String _getClientPhone(Map<String, dynamic> appointment) {
     final clientsData = appointment['clients'];
@@ -3094,13 +3269,12 @@ class AppointmentDetailsDialog extends StatelessWidget {
                 _getClientName(appointment),
                 isDark,
               ),
-              if (appointment['description'] != null && appointment['description'].isNotEmpty)
-                _buildDetailRow(
-                  Icons.work,
-                  'Servicio',
-                  appointment['description'],
-                  isDark,
-                ),
+             _buildDetailRow(
+                Icons.work,
+                'Servicio',
+                _getServiceName(appointment),
+                isDark,
+              ),
               _buildDetailRow(
                 Icons.calendar_today,
                 'Fecha',
@@ -3693,6 +3867,7 @@ class _ServicesManagementDialogState extends State<ServicesManagementDialog> {
       overlayEntry.remove();
     });
   }
+
   Future<void> _createService() async {
     final nameController = TextEditingController();
     if (!mounted) return;
@@ -3787,7 +3962,7 @@ class _ServicesManagementDialogState extends State<ServicesManagementDialog> {
                   name: name,
                 );
 
-                Navigator.pop(dialogContext, {'success': true});
+                Navigator.pop(dialogContext, {'success': true, 'updated': true});  // ← CAMBIO
               } catch (e) {
                 Navigator.pop(dialogContext, {'error': 'Error al crear servicio: $e'});
               }
@@ -3805,7 +3980,10 @@ class _ServicesManagementDialogState extends State<ServicesManagementDialog> {
         _showToast('✓ Servicio creado exitosamente');
         await _loadServices();
         
-        if (!mounted) return;
+        // Indicar que hubo cambios
+        if (result['updated'] == true && mounted) {
+          Navigator.pop(context, true);  // ← AGREGAR ESTO
+        }
       } else if (result['error'] != null) {
         _showToast(result['error'], isError: true);
       }
@@ -3910,7 +4088,7 @@ class _ServicesManagementDialogState extends State<ServicesManagementDialog> {
                   name: newName,
                 );
                 
-                Navigator.pop(dialogContext, {'success': true});
+                Navigator.pop(dialogContext, {'success': true, 'updated': true});  // ← CAMBIO
               } catch (e) {
                 Navigator.pop(dialogContext, {'error': 'Error al actualizar servicio: $e'});
               }
@@ -3925,6 +4103,14 @@ class _ServicesManagementDialogState extends State<ServicesManagementDialog> {
       if (result['success'] == true) {
         _showToast('✓ Servicio actualizado exitosamente');
         await _loadServices();
+        
+        // Indicar que hubo cambios
+        if (result['updated'] == true) {
+          // Cerrar el diálogo con confirmación de cambios
+          if (mounted) {
+            Navigator.pop(context, true);  // ← AGREGAR ESTO
+          }
+        }
       } else if (result['error'] != null) {
         _showToast(result['error'], isError: true);
       }

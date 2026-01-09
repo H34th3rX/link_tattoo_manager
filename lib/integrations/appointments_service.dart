@@ -18,11 +18,16 @@ class AppointmentsService {
         .eq('employee_id', employeeId)
         .select('''
           *,
-          clients(
+        clients(
             id,
             name,
             phone,
             email
+          ),
+          services(
+            id,
+            name,
+            is_active
           )
         ''')
         .single();
@@ -40,7 +45,7 @@ class AppointmentsService {
     required String employeeId,
     required DateTime startTime,
     required DateTime endTime,
-    String? description,
+    required String serviceId,
     String status = 'pendiente',
     double? price,
     double depositPaid = 0.00,
@@ -51,7 +56,7 @@ class AppointmentsService {
       'employee_id': employeeId,
       'start_time': startTime.toIso8601String(),
       'end_time': endTime.toIso8601String(),
-      'description': description,
+      'service_id': serviceId,
       'status': status,
       'price': price,
       'deposit_paid': depositPaid,
@@ -75,11 +80,16 @@ class AppointmentsService {
         .from('appointments')
         .select('''
           *,
-          clients(
+        clients(
             id,
             name,
             phone,
             email
+          ),
+          services(
+            id,
+            name,
+            is_active
           )
         ''')
         .eq('employee_id', employeeId)
@@ -107,11 +117,16 @@ class AppointmentsService {
         .from('appointments')
         .select('''
           *,
-          clients(
+        clients(
             id,
             name,
             phone,
             email
+          ),
+          services(
+            id,
+            name,
+            is_active
           )
         ''')
         .eq('employee_id', employeeId);
@@ -148,7 +163,7 @@ class AppointmentsService {
     String? clientId,
     DateTime? startTime,
     DateTime? endTime,
-    String? description,
+    required String serviceId,
     String? status,
     double? price,
     double? depositPaid,
@@ -159,7 +174,8 @@ class AppointmentsService {
     if (clientId != null) updateData['client_id'] = clientId;
     if (startTime != null) updateData['start_time'] = startTime.toIso8601String();
     if (endTime != null) updateData['end_time'] = endTime.toIso8601String();
-    if (description != null) updateData['description'] = description;
+    // ignore: unnecessary_null_comparison
+    if (serviceId != null) updateData['service_id'] = serviceId; 
     if (status != null) updateData['status'] = status;
     if (price != null) updateData['price'] = price;
     if (depositPaid != null) updateData['deposit_paid'] = depositPaid;
@@ -174,11 +190,16 @@ class AppointmentsService {
         .eq('employee_id', employeeId)
         .select('''
           *,
-          clients(
+        clients(
             id,
             name,
             phone,
             email
+          ),
+          services(
+            id,
+            name,
+            is_active
           )
         ''')
         .single();
@@ -210,11 +231,16 @@ class AppointmentsService {
         .eq('employee_id', employeeId)
         .select('''
           *,
-          clients(
+        clients(
             id,
             name,
             phone,
             email
+          ),
+          services(
+            id,
+            name,
+            is_active
           )
         ''')
         .single();
@@ -271,11 +297,16 @@ class AppointmentsService {
         .from('appointments')
         .select('''
           *,
-          clients(
+        clients(
             id,
             name,
             phone,
             email
+          ),
+          services(
+            id,
+            name,
+            is_active
           )
         ''')
         .eq('employee_id', employeeId)
@@ -304,11 +335,16 @@ class AppointmentsService {
         .from('appointments')
         .select('''
           *,
-          clients(
+        clients(
             id,
             name,
             phone,
             email
+          ),
+          services(
+            id,
+            name,
+            is_active
           )
         ''')
         .eq('employee_id', employeeId)
@@ -337,11 +373,16 @@ class AppointmentsService {
         .from('appointments')
         .select('''
           *,
-          clients(
+        clients(
             id,
             name,
             phone,
             email
+          ),
+          services(
+            id,
+            name,
+            is_active
           )
         ''')
         .eq('employee_id', employeeId)
@@ -459,15 +500,20 @@ class AppointmentsService {
         .from('appointments')
         .select('''
           *,
-          clients(
+        clients(
             id,
             name,
             phone,
             email
+          ),
+          services(
+            id,
+            name,
+            is_active
           )
         ''')
         .eq('employee_id', employeeId)
-        .or('description.ilike.%$searchQuery%,notes.ilike.%$searchQuery%,clients.name.ilike.%$searchQuery%')
+        .or('notes.ilike.%$searchQuery%,clients.name.ilike.%$searchQuery%')
         .order('start_time', ascending: true);
     return List<Map<String, dynamic>>.from(response);
   }
@@ -679,49 +725,62 @@ class AppointmentsService {
   }
   
   /// Obtener servicios más populares (para gráfico de dona)
-  static Future<List<Map<String, dynamic>>> getTopServices(String employeeId, {int limit = 5}) async {
-    try {
-      // Obtener citas completadas del mes actual
-      final now = DateTime.now();
-      final startOfMonth = DateTime(now.year, now.month, 1);
-      final endOfMonth = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
-      
-      final response = await client
-          .from('appointments')
-          .select('description, price')
-          .eq('employee_id', employeeId)
-          .eq('status', 'completa')
-          .gte('start_time', startOfMonth.toIso8601String())
-          .lte('start_time', endOfMonth.toIso8601String());
-      
-      // Agrupar por servicio
-      Map<String, Map<String, dynamic>> servicesMap = {};
-      
-      for (var appointment in response) {
-        final description = appointment['description'] as String? ?? 'Sin descripción';
-        final price = (appointment['price'] as num?)?.toDouble() ?? 0.0;
-        
-        if (servicesMap.containsKey(description)) {
-          servicesMap[description]!['count'] += 1;
-          servicesMap[description]!['total'] += price;
-        } else {
-          servicesMap[description] = {
-            'service': description,
-            'count': 1,
-            'total': price,
-          };
-        }
-      }
-      
-      // Convertir a lista y ordenar por cantidad
-      List<Map<String, dynamic>> servicesList = servicesMap.values.toList();
-      servicesList.sort((a, b) => (b['count'] as int).compareTo(a['count'] as int));
-      
-      // Retornar top servicios
-      return servicesList.take(limit).toList();
-    } catch (e) {
-      return [];
+  static Future<List<Map<String, dynamic>>> getTopServices({
+    required String employeeId,
+    DateTime? startDate,
+    DateTime? endDate,
+    int limit = 5,
+  }) async {
+    var query = client
+        .from('appointments')
+        .select('''
+          service_id,
+          price,
+          services(
+            id,
+            name,
+            is_active
+          )
+        ''')
+        .eq('employee_id', employeeId)
+        .not('service_id', 'is', null);  // Solo citas con servicio
+
+    if (startDate != null) {
+      query = query.gte('start_time', startDate.toIso8601String());
     }
+    if (endDate != null) {
+      query = query.lte('start_time', endDate.toIso8601String());
+    }
+
+    final response = await query;
+    
+    Map<String, Map<String, dynamic>> servicesMap = {};
+    
+    for (var appointment in response) {
+      final serviceData = appointment['services'];
+      if (serviceData == null) continue;
+      
+      final serviceId = serviceData['id'] as String;
+      final serviceName = serviceData['name'] as String? ?? 'Sin nombre';
+      final price = (appointment['price'] as num?)?.toDouble() ?? 0.0;
+      
+      if (servicesMap.containsKey(serviceId)) {
+        servicesMap[serviceId]!['count'] += 1;
+        servicesMap[serviceId]!['total'] += price;
+      } else {
+        servicesMap[serviceId] = {
+          'service': serviceName,
+          'service_id': serviceId,
+          'count': 1,
+          'total': price,
+        };
+      }
+    }
+    
+    final sortedServices = servicesMap.values.toList()
+      ..sort((a, b) => (b['count'] as int).compareTo(a['count'] as int));
+    
+    return sortedServices.take(limit).toList();
   }
   
   /// Obtener comparación de citas por día de la semana (para gráfico radial)
@@ -802,5 +861,24 @@ class AppointmentsService {
     } catch (e) {
       return 0.0;
     }
+  }
+
+  //[-------------HELPER PARA OBTENER NOMBRE DEL SERVICIO--------------]
+  /// Obtiene el nombre del servicio desde el objeto de appointment
+  static String getServiceName(Map<String, dynamic> appointment) {
+    final services = appointment['services'];
+    if (services != null && services is Map) {
+      return services['name'] as String? ?? 'Sin servicio';
+    }
+    return 'Sin servicio';
+  }
+
+  /// Verifica si el servicio está activo
+  static bool isServiceActive(Map<String, dynamic> appointment) {
+    final services = appointment['services'];
+    if (services != null && services is Map) {
+      return services['is_active'] as bool? ?? false;
+    }
+    return false;
   }
 }
