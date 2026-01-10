@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import './l10n/app_localizations.dart';
 import 'theme_provider.dart';
-import '../integrations/notifications_service.dart';
+import '../services/notifications_service.dart';
 import '../integrations/employee_service.dart';
 
 //[-------------CONSTANTES GLOBALES--------------]
