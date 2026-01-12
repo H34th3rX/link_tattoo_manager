@@ -14,11 +14,10 @@ class AppointmentAutoUpdater {
   static final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
   
   // Configuración del intervalo de verificación (en minutos)
-  static const int _checkIntervalMinutes = 5; // Verifica cada 1 minuto
+  static const int _checkIntervalMinutes = 1; 
   
   // Margen de tiempo para considerar una cita como "perdida" (en minutos)
-  static const int _missedMarginMinutes = 15; // 15 minutos después de la hora programada
-  
+  static const int _missedMarginMinutes = 15;   
   /// Inicializar el servicio de auto-actualización
   static Future<void> initialize() async {
     try {
@@ -73,14 +72,14 @@ class AppointmentAutoUpdater {
         return;
       }
       
-      final now = DateTime.now();
+      final now = DateTime.now().toUtc();
       final missedThreshold = now.subtract(Duration(minutes: _missedMarginMinutes));
       
       if (kDebugMode) {
-        print('🔍 Verificando citas... Hora actual: ${now.toIso8601String()}');
+        print('🔍 Verificando citas... Hora actual UTC: ${now.toIso8601String()}');
+        print('📅 Umbral de citas perdidas: ${missedThreshold.toIso8601String()}');
       }
       
-      // Obtener todas las citas confirmadas cuya hora de inicio ya pasó
       final response = await client
           .from('appointments')
           .select('''
@@ -95,7 +94,7 @@ class AppointmentAutoUpdater {
             )
           ''')
           .eq('employee_id', user.id)
-          .eq('status', 'confirmada')
+          .or('status.eq.confirmada,status.eq.pendiente')
           .lt('end_time', missedThreshold.toIso8601String())
           .order('start_time', ascending: true);
       
@@ -107,33 +106,31 @@ class AppointmentAutoUpdater {
       }
       
       if (kDebugMode) {
-        print('📋 Encontradas ${response.length} cita(s) vencida(s)');
+        print('📋 Encontradas ${response.length} cita(s) confirmada(s)/aplazada(s) vencida(s)');
       }
-      
-      // Actualizar cada cita vencida
+
       for (var appointment in response) {
         try {
           final appointmentId = appointment['id'] as String;
           final clientName = appointment['clients']['name'] as String;
           final endTimeStr = appointment['end_time'] as String;
           
-          // Parsear la hora de fin
+          if (kDebugMode) {
+            print('📌 Procesando cita: $appointmentId - $clientName - End time: $endTimeStr');
+          }
+          
           DateTime endTime;
-          if (endTimeStr.endsWith('+00:00')) {
-            final timeWithoutOffset = endTimeStr.replaceAll('+00:00', '');
-            endTime = DateTime.parse(timeWithoutOffset);
-          } else if (endTimeStr.endsWith('Z')) {
-            endTime = DateTime.parse(endTimeStr).toLocal();
+          if (endTimeStr.endsWith('+00:00') || endTimeStr.endsWith('Z')) {
+            endTime = DateTime.parse(endTimeStr.replaceAll('+00:00', 'Z')).toLocal();
           } else {
             endTime = DateTime.parse(endTimeStr);
           }
           
-          // Cambiar estado a "perdida" (missed)
           await client
               .from('appointments')
               .update({
                 'status': 'perdida',
-                'updated_at': DateTime.now().toIso8601String(),
+                'updated_at': DateTime.now().toUtc().toIso8601String(),
               })
               .eq('id', appointmentId)
               .eq('employee_id', user.id);
@@ -142,13 +139,11 @@ class AppointmentAutoUpdater {
             print('✅ Cita actualizada a "perdida": $appointmentId - $clientName');
           }
           
-          // Enviar notificación al usuario
           await _sendMissedAppointmentNotification(
             clientName: clientName,
             appointmentTime: endTime,
           );
           
-          // Cancelar la notificación programada para esta cita
           await NotificationScheduler.cancelAppointmentNotification(appointmentId);
           
         } catch (e) {
@@ -229,7 +224,7 @@ class AppointmentAutoUpdater {
           .from('appointments')
           .select('id')
           .eq('employee_id', user.id)
-          .eq('status', 'confirmada')
+          .or('status.eq.confirmada,status.eq.pendiente')
           .lt('end_time', missedThreshold.toIso8601String());
       
       final count = response.length;

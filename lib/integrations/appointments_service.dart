@@ -12,7 +12,7 @@ class AppointmentsService {
         .from('appointments')
         .update({
           'status': 'aplazada',
-          'updated_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
         })
         .eq('id', appointmentId)
         .eq('employee_id', employeeId)
@@ -66,8 +66,8 @@ class AppointmentsService {
           .insert({
             'client_id': clientId,
             'employee_id': employeeId,
-            'start_time': startTime.toIso8601String(),
-            'end_time': endTime.toIso8601String(),
+            'start_time': startTime.toUtc().toIso8601String(),
+            'end_time': endTime.toUtc().toIso8601String(),
             'service_id': serviceId,
             'service_name_snapshot': serviceName,
             'status': status,
@@ -180,21 +180,20 @@ class AppointmentsService {
     String? notes,
   }) async {
     try {
-      final updates = <String, dynamic>{
+     final updates = <String, dynamic>{
         'client_id': clientId,
-        'start_time': startTime.toIso8601String(),
-        'end_time': endTime.toIso8601String(),
+        'start_time': startTime.toUtc().toIso8601String(),
+        'end_time': endTime.toUtc().toIso8601String(),
         'status': status,
         'price': price,
         'deposit_paid': depositPaid,
         'notes': notes,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
       };
 
-      // SI CAMBIA EL SERVICIO, ACTUALIZAR SNAPSHOT
       if (serviceId != null) {
         updates['service_id'] = serviceId;
         
-        // Obtener nombre actual del servicio
         final serviceData = await Supabase.instance.client
             .from('services')
             .select('name')
@@ -233,7 +232,7 @@ class AppointmentsService {
         .from('appointments')
         .update({
           'status': newStatus,
-          'updated_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
         })
         .eq('id', appointmentId)
         .eq('employee_id', employeeId)
@@ -477,7 +476,9 @@ class AppointmentsService {
         .from('appointments')
         .select('id, start_time, end_time')
         .eq('employee_id', employeeId)
-        .neq('status', 'cancelada');
+        .neq('status', 'cancelada')
+        .neq('status', 'perdida')
+        .neq('status', 'aplazada');
 
     if (excludeAppointmentId != null) {
       query = query.neq('id', excludeAppointmentId);
@@ -485,18 +486,16 @@ class AppointmentsService {
 
     final response = await query;
     
-    // Verificar manualmente si hay conflictos de horario
     for (final appointment in response) {
       final appointmentStart = DateTime.parse(appointment['start_time']);
       final appointmentEnd = DateTime.parse(appointment['end_time']);
       
-      // Verificar si hay solapamiento
       if (startTime.isBefore(appointmentEnd) && endTime.isAfter(appointmentStart)) {
-        return false; // Hay conflicto
+        return false;
       }
     }
     
-    return true; // No hay conflictos
+    return true;
   }
 
   // Buscar citas por texto
@@ -541,7 +540,7 @@ class AppointmentsService {
       
       if (status == 'completa') {
         total += price;
-      } else if ((status == 'perdida' || status == 'aplazada') && deposit > 0) {
+      } else if ((status == 'perdida') && deposit > 0) {
         total += deposit;
       }
     }

@@ -28,9 +28,7 @@ class ReportsService {
       final appointments = allAppointments.where((apt) {
         final status = apt['status'] as String;
         final deposit = (apt['deposit_paid'] as num?)?.toDouble() ?? 0.0;
-        return status == 'completa' || 
-               (status == 'perdida' && deposit > 0) ||
-               (status == 'aplazada' && deposit > 0);
+        return status == 'completa' || (status == 'perdida' && deposit > 0);
       }).toList();
 
       // Calcular totales

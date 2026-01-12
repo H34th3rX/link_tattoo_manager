@@ -59,8 +59,8 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
   // Datos para el modo de edición o precarga de nueva cita
   Map<String, dynamic>? _appointmentToEdit;
   Map<String, dynamic>? _initialClientForNewAppointment;
-  bool _isPostponedAppointment = false; // Flag para identificar citas aplazadas
-  // Nuevo: información para el proceso de aplazamiento
+  Map<String, dynamic>? _originalAppointmentDataForPostpone;
+  bool _isPostponedAppointment = false;
   Map<String, dynamic>? _originalAppointmentToPostpone;
 
   // Flag para asegurar que el popup se abra solo una vez al navegar
@@ -318,11 +318,16 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
   }
 
   //[------------- MÉTODOS DE GESTIÓN DE POPUPS Y CITAS --------------]
-  void _openCreateAppointmentPopup({Map<String, dynamic>? clientData, bool isPostponed = false}) {
+   void _openCreateAppointmentPopup({
+    Map<String, dynamic>? clientData, 
+    bool isPostponed = false,
+    Map<String, dynamic>? originalAppointmentData,
+  }) {
     setState(() {
       _appointmentToEdit = null;
       _initialClientForNewAppointment = clientData;
       _isPostponedAppointment = isPostponed;
+      _originalAppointmentDataForPostpone = originalAppointmentData;
       _isPopupOpen = true;
     });
   }
@@ -337,14 +342,15 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
     });
   }
 
-  void _closePopup() {
+ void _closePopup() {
     if (mounted) {
       setState(() {
         _isPopupOpen = false;
         _appointmentToEdit = null;
         _initialClientForNewAppointment = null;
         _isPostponedAppointment = false;
-        _originalAppointmentToPostpone = null; // Limpiar referencia de aplazamiento
+        _originalAppointmentToPostpone = null;
+        _originalAppointmentDataForPostpone = null;
       });
     }
   }
@@ -421,9 +427,8 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
   }
 
   // Método mejorado para aplazar citas - ahora no marca inmediatamente como aplazada
-  Future<void> _postponeAppointment(Map<String, dynamic> appointment) async {
+ Future<void> _postponeAppointment(Map<String, dynamic> appointment) async {
     try {
-      // Mostrar diálogo de confirmación
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
@@ -450,7 +455,7 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
               ),
               const SizedBox(height: 16),
               Text(
-                'Podrás programar una nueva fecha con el mismo cliente. La cita actual se marcará como aplazada solo si confirmas la nueva cita.',
+                'Podrás programar una nueva fecha con el mismo cliente.',
                 style: TextStyle(
                   color: Provider.of<ThemeProvider>(context).isDark ? hintColor : Colors.grey[600],
                   fontSize: 14,
@@ -483,7 +488,19 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
       );
 
       if (confirmed == true) {
-        // Preparar datos del cliente para la nueva cita
+        final user = Supabase.instance.client.auth.currentUser!;
+        
+        final originalStatus = appointment['status'];
+        
+        await AppointmentsService.postponeAppointment(
+          appointmentId: appointment['id'],
+          employeeId: user.id,
+        );
+        
+        await Future.delayed(const Duration(milliseconds: 500));
+        
+        await _fetchAppointments();
+        
         final clientsData = appointment['clients'];
         Map<String, dynamic>? clientData;
         
@@ -503,14 +520,19 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
           };
         }
 
-        // Guardar referencia de la cita original para aplazarla después
         setState(() {
-          _originalAppointmentToPostpone = appointment;
+          _originalAppointmentToPostpone = {
+            ...appointment,
+            'original_status': originalStatus,
+          };
         });
 
-        // Abrir popup para nueva cita con datos del cliente bloqueados
         if (clientData != null) {
-          _openCreateAppointmentPopup(clientData: clientData, isPostponed: true);
+          _openCreateAppointmentPopup(
+            clientData: clientData, 
+            isPostponed: true,
+            originalAppointmentData: appointment,
+          );
         }
       }
     } catch (e) {
@@ -520,16 +542,8 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
 
   Future<void> _onAppointmentSaved() async {
     try {
-      // Si es una cita de reemplazo (aplazamiento), marcar la original como aplazada
       if (_originalAppointmentToPostpone != null) {
-        final user = Supabase.instance.client.auth.currentUser!;
-        
-        await AppointmentsService.postponeAppointment(
-          appointmentId: _originalAppointmentToPostpone!['id'],
-          employeeId: user.id,
-        );
-        
-        _showSuccess('Cita original aplazada y nueva cita creada exitosamente');
+        _showSuccess('Cita aplazada y nueva cita creada exitosamente');
       } else {
         _showSuccess('Cita guardada exitosamente');
       }
@@ -545,9 +559,27 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
   }
 
   // Método para cancelar el aplazamiento
-  void _onAppointmentCancelled() {
+  void _onAppointmentCancelled() async {
+    if (_originalAppointmentToPostpone != null) {
+      try {
+        final user = Supabase.instance.client.auth.currentUser!;
+        final originalStatus = _originalAppointmentToPostpone!['original_status'];
+        
+        await AppointmentsService.updateAppointmentStatus(
+          appointmentId: _originalAppointmentToPostpone!['id'],
+          employeeId: user.id,
+          newStatus: originalStatus,
+        );
+        
+        await _fetchAppointments();
+      } catch (e) {
+        _showError('Error al revertir el aplazamiento: ${e.toString()}');
+      }
+    }
+    
     setState(() {
-      _originalAppointmentToPostpone = null; 
+      _originalAppointmentToPostpone = null;
+      _originalAppointmentDataForPostpone = null;
     });
     _closePopup();
   }
@@ -617,6 +649,7 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
                         initialAppointment: _appointmentToEdit,
                         initialClientData: _initialClientForNewAppointment,
                         isPostponedAppointment: _isPostponedAppointment,
+                        originalAppointmentData: _originalAppointmentDataForPostpone,
                         onSaved: _onAppointmentSaved,
                         onServicesUpdated: () async {  
                           if (mounted) {
@@ -1011,13 +1044,14 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected
-              ? chipColor.withValues(alpha: 0.2)
-              : (isDark ? Colors.grey[800] : Colors.white),
+              ? chipColor.withValues(alpha: 0.25)
+              : chipColor.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: isSelected
                 ? chipColor
-                : (isDark ? Colors.grey[600]! : Colors.grey[300]!),
+                : chipColor.withValues(alpha: 0.4),
+            width: isSelected ? 2 : 1,
           ),
         ),
         child: Text(
@@ -1027,7 +1061,7 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
             fontWeight: FontWeight.w500,
             color: isSelected
                 ? chipColor
-                : (isDark ? hintColor : Colors.grey[600]),
+                : chipColor.withValues(alpha: 0.9),
           ),
         ),
       ),
@@ -1256,7 +1290,9 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
                                     appointment: appointment,
                                     isDark: isDark,
                                     onView: () => _viewAppointmentDetails(appointment),
-                                    onEdit: () => _openEditAppointmentPopup(appointment),
+                                    onEdit: appointment['status'] == 'aplazada' 
+                                    ? null 
+                                    : () => _openEditAppointmentPopup(appointment),
                                     onDelete: () => _deleteAppointment(appointment['id']),
                                     onPostpone: () => _postponeAppointment(appointment),
                                     isLoading: _loading,
@@ -1280,7 +1316,9 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
                                       appointment: appointment,
                                       isDark: isDark,
                                       onView: () => _viewAppointmentDetails(appointment),
-                                      onEdit: () => _openEditAppointmentPopup(appointment),
+                                      onEdit: appointment['status'] == 'aplazada' 
+    ? null 
+    : () => _openEditAppointmentPopup(appointment),
                                       onDelete: () => _deleteAppointment(appointment['id']),
                                       onPostpone: () => _postponeAppointment(appointment),
                                       isLoading: _loading,
@@ -1432,7 +1470,7 @@ class AppointmentCard extends StatelessWidget {
   final Map<String, dynamic> appointment;
   final bool isDark;
   final VoidCallback onView;
-  final VoidCallback onEdit;
+  final VoidCallback? onEdit;
   final VoidCallback onDelete;
   final VoidCallback onPostpone;
   final bool isLoading;
@@ -1444,7 +1482,7 @@ class AppointmentCard extends StatelessWidget {
     required this.appointment,
     required this.isDark,
     required this.onView,
-    required this.onEdit,
+    this.onEdit,
     required this.onDelete,
     required this.onPostpone,
     required this.isLoading,
@@ -1686,27 +1724,29 @@ class AppointmentCard extends StatelessWidget {
                         tooltip: 'Eliminar cita',
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    // Botón de editar
-                    Container(
-                      width: isWide ? 36 : 32,
-                      height: isWide ? 36 : 32,
-                      decoration: BoxDecoration(
-                        color: primaryColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                          color: primaryColor.withValues(alpha: 0.3),
-                          width: 1,
+                    // Botón de editar (solo si onEdit no es null)
+                    if (onEdit != null) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        width: isWide ? 36 : 32,
+                        height: isWide ? 36 : 32,
+                        decoration: BoxDecoration(
+                          color: primaryColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: primaryColor.withValues(alpha: 0.3),
+                            width: 1,
+                          ),
+                        ),
+                        child: IconButton(
+                          padding: EdgeInsets.zero,
+                          icon: Icon(Icons.edit, size: isWide ? 20 : 18),
+                          color: primaryColor,
+                          onPressed: isLoading ? null : onEdit,
+                          tooltip: 'Editar',
                         ),
                       ),
-                      child: IconButton(
-                        padding: EdgeInsets.zero,
-                        icon: Icon(Icons.edit, size: isWide ? 20 : 18),
-                        color: primaryColor,
-                        onPressed: isLoading ? null : onEdit,
-                        tooltip: 'Editar',
-                      ),
-                    ),
+                    ],
                     // Botón de aplazar (solo si se puede aplazar)
                     if (canPostpone) ...[
                       const SizedBox(width: 8),
@@ -1757,8 +1797,9 @@ class AppointmentPopup extends StatefulWidget {
   final Map<String, dynamic>? initialAppointment;
   final Map<String, dynamic>? initialClientData;
   final bool isPostponedAppointment;
+  final Map<String, dynamic>? originalAppointmentData;
   final VoidCallback onSaved;
-  final VoidCallback? onServicesUpdated; 
+  final VoidCallback? onServicesUpdated;
 
   const AppointmentPopup({
     super.key,
@@ -1768,8 +1809,9 @@ class AppointmentPopup extends StatefulWidget {
     this.initialAppointment,
     this.initialClientData,
     this.isPostponedAppointment = false,
+    this.originalAppointmentData,
     required this.onSaved,
-     this.onServicesUpdated, 
+    this.onServicesUpdated,
   });
 
   @override
@@ -1841,11 +1883,9 @@ class _AppointmentPopupState extends State<AppointmentPopup>
   }
 
   void _initializeFields() {
-    // Rellenar campos si está en modo edición o con datos iniciales de cliente
     if (widget.initialAppointment != null) {
       final appointment = widget.initialAppointment!;
       
-      // Obtener datos del cliente de la relación
       final clientsData = appointment['clients'];
       if (clientsData != null) {
         if (clientsData is List && clientsData.isNotEmpty) {
@@ -1872,16 +1912,15 @@ class _AppointmentPopupState extends State<AppointmentPopup>
         }
       }
 
-      // Cargar servicio desde la relación con services
       final serviceData = appointment['services'];
       if (serviceData != null && serviceData is Map) {
         _selectedServiceId = serviceData['id'];
         _descriptionCtrl.text = serviceData['name'] ?? '';
       } else {
-        // Cita sin servicio (durante migración)
         _selectedServiceId = null;
         _descriptionCtrl.text = '';
       }
+      
       _notesCtrl.text = appointment['notes']?.toString() ?? '';
       _priceCtrl.text = appointment['price']?.toString() ?? '';
       _depositCtrl.text = appointment['deposit_paid']?.toString() ?? '0.00';
@@ -1893,19 +1932,36 @@ class _AppointmentPopupState extends State<AppointmentPopup>
       final endTime = DateTime.parse(appointment['end_time']);
       _selectedDuration = endTime.difference(startTime).inMinutes;
       
-      // Asegurar que el estado de la cita esté en los estados disponibles
       String currentStatus = appointment['status'] ?? 'pendiente';
       if (_availableStatuses.contains(currentStatus)) {
         _selectedStatus = currentStatus;
       } else {
-        // Si es una cita aplazada siendo editada, usar pendiente como estado por defecto
         _selectedStatus = 'pendiente';
       }
-    } else if (widget.initialClientData != null) {
-      _clientNameCtrl.text = widget.initialClientData!['name']?.toString() ?? '';
-      _clientPhoneCtrl.text = widget.initialClientData!['phone']?.toString() ?? '';
-      _clientEmailCtrl.text = widget.initialClientData!['email']?.toString() ?? '';
-      _selectedClient = widget.initialClientData;
+      
+    } else if (widget.isPostponedAppointment && widget.originalAppointmentData != null) {
+      if (widget.initialClientData != null) {
+        _clientNameCtrl.text = widget.initialClientData!['name']?.toString() ?? '';
+        _clientPhoneCtrl.text = widget.initialClientData!['phone']?.toString() ?? '';
+        _clientEmailCtrl.text = widget.initialClientData!['email']?.toString() ?? '';
+        _selectedClient = widget.initialClientData;
+      }
+      
+      final original = widget.originalAppointmentData!;
+      
+      final serviceData = original['services'];
+      if (serviceData != null && serviceData is Map) {
+        _selectedServiceId = serviceData['id'];
+        _descriptionCtrl.text = serviceData['name'] ?? '';
+      }
+      
+      _notesCtrl.text = original['notes']?.toString() ?? '';
+      _priceCtrl.text = original['price']?.toString() ?? '';
+      _depositCtrl.text = original['deposit_paid']?.toString() ?? '0.00';
+      
+      final startTime = DateTime.parse(original['start_time']);
+      final endTime = DateTime.parse(original['end_time']);
+      _selectedDuration = endTime.difference(startTime).inMinutes;
     }
   }
 
@@ -2049,10 +2105,10 @@ class _AppointmentPopupState extends State<AppointmentPopup>
       final endDateTime = selectedDateTime.add(Duration(minutes: _selectedDuration));
 
       // Verificar disponibilidad de horario
-      final isAvailable = await AppointmentsService.isTimeSlotAvailable(
+    final isAvailable = await AppointmentsService.isTimeSlotAvailable(
         employeeId: widget.employeeId,
-        startTime: selectedDateTime,
-        endTime: endDateTime,
+        startTime: selectedDateTime.toUtc(),
+        endTime: endDateTime.toUtc(),
         excludeAppointmentId: widget.initialAppointment?['id'],
       );
 
@@ -2639,7 +2695,7 @@ class _AppointmentPopupState extends State<AppointmentPopup>
                 borderRadius: BorderRadius.circular(borderRadius),
                 boxShadow: [
                   BoxShadow(
-                    color: primaryColor.withValues(alpha:0.3),
+                    color: primaryColor.withValues(alpha: 0.3),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -2666,10 +2722,16 @@ class _AppointmentPopupState extends State<AppointmentPopup>
                     _datePickerKey = UniqueKey();
                   });
                   
+                  final DateTime minDate = widget.initialAppointment != null
+                      ? _selectedDate.isBefore(DateTime.now())
+                          ? _selectedDate
+                          : DateTime.now()
+                      : DateTime.now();
+                  
                   final date = await showDatePicker(
                     context: context,
                     initialDate: _selectedDate,
-                    firstDate: DateTime.now(),
+                    firstDate: minDate,
                     lastDate: DateTime.now().add(const Duration(days: 365)),
                     builder: (context, child) {
                       return Theme(
