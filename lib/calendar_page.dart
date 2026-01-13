@@ -1,5 +1,6 @@
 import 'dart:collection';
 import 'dart:ui' as ui;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -8,6 +9,7 @@ import 'appbar.dart';
 import 'nav_panel.dart';
 import 'theme_provider.dart';
 import './integrations/appointments_service.dart';
+import './services/reminder_generator_dialog.dart';
 
 // [------------- CONSTANTES DE ESTILO Y TEMAS --------------]
 const Color primaryColor = Color(0xFFBDA206);
@@ -46,6 +48,7 @@ class _CalendarPageState extends State<CalendarPage> with TickerProviderStateMix
   List<Map<String, dynamic>> _appointments = [];
   LinkedHashMap<String, List<Map<String, dynamic>>> _groupedAppointments = LinkedHashMap();
   Set<DateTime> _datesWithAppointments = {};
+  bool _hasProcessedDeepLink = false;
 
   // [------------- INICIALIZACIÓN Y LIMPIEZA --------------]
   @override
@@ -61,6 +64,24 @@ class _CalendarPageState extends State<CalendarPage> with TickerProviderStateMix
       vsync: this,
     );
     _fetchAppointments();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    
+    // Manejar deep link desde notificación
+    if (!_hasProcessedDeepLink) {
+      _hasProcessedDeepLink = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final args = ModalRoute.of(context)?.settings.arguments;
+        if (args != null && args is Map<String, dynamic>) {
+          if (args['generateReminder'] == true && args['appointmentId'] != null) {
+            _handleGenerateReminderFromNotification(args['appointmentId']);
+          }
+        }
+      });
+    }
   }
 
   @override
@@ -383,6 +404,178 @@ class _CalendarPageState extends State<CalendarPage> with TickerProviderStateMix
       _focusedDay = DateTime(_focusedDay.year, _focusedDay.month + 1, 1);
     });
     _fetchAppointments();
+  }
+
+  // [------------- GENERACIÓN DE RECORDATORIOS --------------]
+  Future<void> _handleGenerateReminderFromNotification(String appointmentId) async {
+    try {
+      final user = Supabase.instance.client.auth.currentUser!;
+      final response = await Supabase.instance.client
+          .from('appointments')
+          .select('''
+            id,
+            start_time,
+            price,
+            deposit_paid,
+            notes,
+            status,
+            client_id,
+            service_id,
+            clients(name),
+            services(name)
+          ''')
+          .eq('id', appointmentId)
+          .eq('employee_id', user.id)
+          .single();
+      
+      final clientName = response['clients']['name'] as String;
+      final serviceName = response['services']['name'] as String;
+      DateTime startTime = DateTime.parse(response['start_time']);
+      final price = (response['price'] as num).toDouble();
+      final depositPaid = (response['deposit_paid'] as num?)?.toDouble() ?? 0.0;
+      final notes = response['notes'] as String?;
+      final status = response['status'] as String;
+      
+      // Si la cita está aplazada, buscar la nueva cita (más reciente con mismo cliente y servicio)
+      if (status.toLowerCase() == 'aplazada') {
+        try {
+          final clientId = response['client_id'] as String;
+          final serviceId = response['service_id'] as String;
+          
+          final newAppointment = await Supabase.instance.client
+              .from('appointments')
+              .select('start_time')
+              .eq('employee_id', user.id)
+              .eq('client_id', clientId)
+              .eq('service_id', serviceId)
+              .neq('status', 'aplazada')
+              .neq('status', 'cancelada')
+              .neq('status', 'perdida')
+              .gte('start_time', response['start_time']) // Debe ser posterior a la cita aplazada
+              .order('start_time', ascending: true)
+              .limit(1)
+              .maybeSingle();
+          
+          if (newAppointment != null) {
+            startTime = DateTime.parse(newAppointment['start_time']);
+          }
+        } catch (e) {
+          // Si no se encuentra nueva cita, usar la fecha original
+          if (kDebugMode) {
+            print('No se encontró nueva cita: $e');
+          }
+        }
+      }
+      
+      if (mounted) {
+        final isDark = Provider.of<ThemeProvider>(context, listen: false).isDark;
+        
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => ReminderGeneratorDialog(
+            clientName: clientName,
+            appointmentTime: startTime,
+            serviceName: serviceName,
+            price: price,
+            depositPaid: depositPaid,
+            status: status,
+            notes: notes,
+            isDark: isDark,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al generar recordatorio: $e'),
+            backgroundColor: errorColor,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _generateReminderForAppointment(Map<String, dynamic> appointment) async {
+    try {
+      final clientsData = appointment['clients'];
+      String clientName = 'Cliente';
+      if (clientsData is Map) {
+        clientName = clientsData['name'] ?? 'Cliente';
+      }
+      
+      final servicesData = appointment['services'];
+      String serviceName = 'Servicio';
+      if (servicesData is Map) {
+        serviceName = servicesData['name'] ?? 'Servicio';
+      }
+      
+      DateTime startTime = DateTime.parse(appointment['start_time']);
+      final price = (appointment['price'] as num?)?.toDouble() ?? 0.0;
+      final depositPaid = (appointment['deposit_paid'] as num?)?.toDouble() ?? 0.0;
+      final notes = appointment['notes'] as String?;
+      final status = appointment['status'] as String;
+      
+      // Si la cita está aplazada, buscar la nueva cita
+      if (status.toLowerCase() == 'aplazada') {
+        try {
+          final user = Supabase.instance.client.auth.currentUser!;
+          final clientId = appointment['client_id'] as String;
+          final serviceId = appointment['service_id'] as String;
+          
+          final newAppointment = await Supabase.instance.client
+              .from('appointments')
+              .select('start_time')
+              .eq('employee_id', user.id)
+              .eq('client_id', clientId)
+              .eq('service_id', serviceId)
+              .neq('status', 'aplazada')
+              .neq('status', 'cancelada')
+              .neq('status', 'perdida')
+              .gte('start_time', appointment['start_time'])
+              .order('start_time', ascending: true)
+              .limit(1)
+              .maybeSingle();
+          
+          if (newAppointment != null) {
+            startTime = DateTime.parse(newAppointment['start_time']);
+          }
+        } catch (e) {
+          if (kDebugMode) {
+            print('No se encontró nueva cita: $e');
+          }
+        }
+      }
+      
+      if (mounted) {
+        final isDark = Provider.of<ThemeProvider>(context, listen: false).isDark;
+        
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => ReminderGeneratorDialog(
+            clientName: clientName,
+            appointmentTime: startTime,
+            serviceName: serviceName,
+            price: price,
+            depositPaid: depositPaid,
+            status: status,
+            notes: notes,
+            isDark: isDark,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: errorColor,
+          ),
+        );
+      }
+    }
   }
 
   // [------------- CONSTRUCCIÓN DEL LAYOUT PRINCIPAL --------------]
@@ -873,6 +1066,9 @@ class _CalendarPageState extends State<CalendarPage> with TickerProviderStateMix
                       final appointmentDate = DateTime.parse(appointment['start_time']);
                       _showAppointmentDetails(appointmentDate);
                     },
+                    onGenerateReminder: (appointment['status'] == 'confirmada' || appointment['status'] == 'aplazada')
+                        ? () => _generateReminderForAppointment(appointment)
+                        : null,
                   ),
                 );
               },
@@ -895,6 +1091,7 @@ class AppointmentListItem extends StatelessWidget {
   final Map<String, dynamic> appointment;
   final bool isDark;
   final VoidCallback? onTap;
+  final VoidCallback? onGenerateReminder;
   final Color Function(String) getStatusColor;
   final String Function(String) getStatusText;
 
@@ -905,6 +1102,7 @@ class AppointmentListItem extends StatelessWidget {
     required this.getStatusColor,
     required this.getStatusText,
     this.onTap,
+    this.onGenerateReminder,
   });
 
   @override
@@ -985,38 +1183,54 @@ class AppointmentListItem extends StatelessWidget {
                 ],
               ),
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: statusColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: statusColor.withValues(alpha: 0.3),
-                  width: 1,
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Ícono especial para citas aplazadas
-                  if (status == 'aplazada') ...[
-                    Icon(
-                      Icons.schedule,
-                      size: 12,
-                      color: statusColor,
-                    ),
-                    const SizedBox(width: 4),
-                  ],
-                  Text(
-                    statusText,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: statusColor,
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (onGenerateReminder != null) ...[
+                  IconButton(
+                    icon: const Icon(Icons.share, size: 20),
+                    color: primaryColor,
+                    tooltip: 'Generar Recordatorio',
+                    onPressed: onGenerateReminder,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: statusColor.withValues(alpha: 0.3),
+                      width: 1,
                     ),
                   ),
-                ],
-              ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Ícono especial para citas aplazadas
+                      if (status == 'aplazada') ...[
+                        Icon(
+                          Icons.schedule,
+                          size: 12,
+                          color: statusColor,
+                        ),
+                        const SizedBox(width: 4),
+                      ],
+                      Text(
+                        statusText,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: statusColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ],
         ),

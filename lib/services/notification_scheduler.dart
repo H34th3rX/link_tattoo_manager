@@ -201,19 +201,48 @@ class NotificationScheduler {
     if (kIsWeb) return;
     
     final payload = response.payload;
+    final actionId = response.actionId;
+    
     if (payload != null) {
       try {
         final data = jsonDecode(payload);
+        
+        // Si se presionó "Generar Recordatorio"
+        if (actionId == 'generate_reminder') {
+          _navigateToCalendarWithReminder(data);
+          return;
+        }
+        
         final type = data['type'] as String?;
-        _navigateToPage(type ?? 'appointments');
+        _navigateToPage(type ?? 'appointments', data);
       } catch (e) {
-        _navigateToPage('appointments');
+        _navigateToPage('appointments', {});
+      }
+    }
+  }
+  
+  // Navegar al calendario para generar recordatorio
+  static void _navigateToCalendarWithReminder(Map<String, dynamic> data) {
+    final context = navigatorKey.currentContext;
+    if (context != null) {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user != null) {
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          '/calendar', 
+          (route) => false,
+          arguments: {
+            'generateReminder': true,
+            'appointmentId': data['appointmentId'],
+          },
+        );
+      } else {
+        Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
       }
     }
   }
   
   // Navegar a la página correspondiente
-  static void _navigateToPage(String type) {
+  static void _navigateToPage(String type, Map<String, dynamic> data) {
     final context = navigatorKey.currentContext;
     if (context != null) {
       final user = Supabase.instance.client.auth.currentUser;
@@ -322,9 +351,10 @@ class NotificationScheduler {
               icon: DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
             ),
             AndroidNotificationAction(
-              'dismiss',
-              'Descartar',
-              cancelNotification: true,
+              'generate_reminder',
+              'Generar Recordatorio',
+              icon: DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
+              showsUserInterface: true,
             ),
           ],
         );

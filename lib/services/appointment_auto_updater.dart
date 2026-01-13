@@ -14,7 +14,7 @@ class AppointmentAutoUpdater {
   static final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
   
   // Configuración del intervalo de verificación (en minutos)
-  static const int _checkIntervalMinutes = 1; 
+  static const int _checkIntervalMinutes = 5; 
   
   // Margen de tiempo para considerar una cita como "perdida" (en minutos)
   static const int _missedMarginMinutes = 15;   

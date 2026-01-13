@@ -1,8 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import './l10n/app_localizations.dart';
 import 'theme_provider.dart';
 import '../services/notifications_service.dart';
+import '../services/reminder_generator_dialog.dart';
 import '../integrations/employee_service.dart';
 
 //[-------------CONSTANTES GLOBALES--------------]
@@ -466,6 +469,10 @@ class DynamicNotificationTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const Color hintColor = Colors.white70;
+    
+    // Determinar si se debe mostrar el botón de generar recordatorio
+    final bool canGenerateReminder = notification.type == 'next_appointment' || 
+                                      notification.type == 'pending_confirmation';
 
     return AnimatedContainer(
       duration: themeAnimationDuration,
@@ -493,17 +500,131 @@ class DynamicNotificationTile extends StatelessWidget {
           ),
           child: Text(notification.subtitle),
         ),
-        trailing: AnimatedDefaultTextStyle(
-          duration: themeAnimationDuration,
-          style: const TextStyle(
-            color: Colors.amber, // Color amarillo para el tiempo
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-          ),
-          child: Text(notification.time),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (canGenerateReminder) ...[
+              IconButton(
+                icon: const Icon(Icons.share, size: 20),
+                color: primaryColor,
+                tooltip: 'Generar Recordatorio',
+                onPressed: () => _generateReminderFromNotification(notification, context),
+              ),
+              const SizedBox(width: 8),
+            ],
+            AnimatedDefaultTextStyle(
+              duration: themeAnimationDuration,
+              style: const TextStyle(
+                color: Colors.amber,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+              child: Text(notification.time),
+            ),
+          ],
         ),
       ),
     );
+  }
+
+  Future<void> _generateReminderFromNotification(
+    NotificationItem notification,
+    BuildContext context,
+  ) async {
+    try {
+      // Extraer appointment ID del notification ID
+      // El ID tiene formato: "next_appointment_{appointmentId}" o "pending_{appointmentId}"
+      final parts = notification.id.split('_');
+      final appointmentId = parts.last;
+      
+      // Buscar la cita
+      final user = Supabase.instance.client.auth.currentUser!;
+      final response = await Supabase.instance.client
+          .from('appointments')
+          .select('''
+            id,
+            start_time,
+            price,
+            deposit_paid,
+            notes,
+            status,
+            client_id,
+            service_id,
+            clients(name),
+            services(name)
+          ''')
+          .eq('id', appointmentId)
+          .eq('employee_id', user.id)
+          .single();
+      
+      // Extraer datos
+      final clientName = response['clients']['name'] as String;
+      final serviceName = response['services']['name'] as String;
+      DateTime startTime = DateTime.parse(response['start_time']);
+      final price = (response['price'] as num).toDouble();
+      final depositPaid = (response['deposit_paid'] as num?)?.toDouble() ?? 0.0;
+      final notes = response['notes'] as String?;
+      final status = response['status'] as String;
+      
+      // Si la cita está aplazada, buscar la nueva cita
+      if (status.toLowerCase() == 'aplazada') {
+        try {
+          final clientId = response['client_id'] as String;
+          final serviceId = response['service_id'] as String;
+          
+          final newAppointment = await Supabase.instance.client
+              .from('appointments')
+              .select('start_time')
+              .eq('employee_id', user.id)
+              .eq('client_id', clientId)
+              .eq('service_id', serviceId)
+              .neq('status', 'aplazada')
+              .neq('status', 'cancelada')
+              .neq('status', 'perdida')
+              .gte('start_time', response['start_time'])
+              .order('start_time', ascending: true)
+              .limit(1)
+              .maybeSingle();
+          
+          if (newAppointment != null) {
+            startTime = DateTime.parse(newAppointment['start_time']);
+          }
+        } catch (e) {
+          if (kDebugMode) {
+            print('No se encontró nueva cita: $e');
+          }
+        }
+      }
+      
+      // Mostrar diálogo
+      if (context.mounted) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => ReminderGeneratorDialog(
+            clientName: clientName,
+            appointmentTime: startTime,
+            serviceName: serviceName,
+            price: price,
+            depositPaid: depositPaid,
+            status: status,
+            notes: notes,
+            isDark: isDark,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al generar recordatorio: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   IconData _getIconData(String iconName) {
