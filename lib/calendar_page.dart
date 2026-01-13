@@ -407,6 +407,69 @@ class _CalendarPageState extends State<CalendarPage> with TickerProviderStateMix
   }
 
   // [------------- GENERACIÓN DE RECORDATORIOS --------------]
+
+  
+  /// Verifica si una cita puede generar recordatorio
+  Future<bool> _canGenerateReminder(Map<String, dynamic> appointment) async {
+    final status = appointment['status'] as String;
+    
+    // Confirmadas y pendientes siempre pueden
+    if (status == 'confirmada' || status == 'pendiente') {
+      return true;
+    }
+    
+    // Completas, canceladas y perdidas NO pueden
+    if (status == 'completa' || status == 'cancelada' || status == 'perdida') {
+      return false;
+    }
+    
+    // Para aplazadas, verificar si la nueva cita existe y su status
+    if (status == 'aplazada') {
+      try {
+        final user = Supabase.instance.client.auth.currentUser!;
+        final clientId = appointment['client_id'] as String;
+        final serviceId = appointment['service_id'] as String;
+        final originalStartTime = appointment['start_time'] as String;
+        
+        // Buscar la nueva cita - INCLUIR perdidas/canceladas para verificarlas
+        final newAppointment = await Supabase.instance.client
+            .from('appointments')
+            .select('status')
+            .eq('employee_id', user.id)
+            .eq('client_id', clientId)
+            .eq('service_id', serviceId)
+            .neq('status', 'aplazada')  // Solo excluir otras aplazadas
+            .gte('start_time', originalStartTime)
+            .order('start_time', ascending: true)
+            .limit(1)
+            .maybeSingle();
+        
+        // Si no hay nueva cita, permitir generar recordatorio
+        if (newAppointment == null) {
+          return true;
+        }
+        
+        // Verificar el status de la nueva cita encontrada
+        final newStatus = newAppointment['status'] as String;
+        
+        // Si la nueva cita está completa, perdida o cancelada → NO permitir
+        if (newStatus == 'completa' || newStatus == 'perdida' || newStatus == 'cancelada') {
+          return false;
+        }
+        
+        // Si la nueva cita está confirmada o pendiente → SÍ permitir
+        return true;
+      } catch (e) {
+        if (kDebugMode) {
+          print('Error al verificar nueva cita: $e');
+        }
+        return false;
+      }
+    }
+    
+    return false;
+  }
+  
   Future<void> _handleGenerateReminderFromNotification(String appointmentId) async {
     try {
       final user = Supabase.instance.client.auth.currentUser!;
@@ -1066,9 +1129,8 @@ class _CalendarPageState extends State<CalendarPage> with TickerProviderStateMix
                       final appointmentDate = DateTime.parse(appointment['start_time']);
                       _showAppointmentDetails(appointmentDate);
                     },
-                    onGenerateReminder: (appointment['status'] == 'confirmada' || appointment['status'] == 'aplazada')
-                        ? () => _generateReminderForAppointment(appointment)
-                        : null,
+                    onGenerateReminder: () => _generateReminderForAppointment(appointment),
+                    canGenerateReminder: _canGenerateReminder,
                   ),
                 );
               },
@@ -1087,13 +1149,15 @@ class _CalendarPageState extends State<CalendarPage> with TickerProviderStateMix
 }
 
 // [------------- COMPONENTE PARA ELEMENTOS DE LA LISTA DE CITAS MEJORADO --------------]
-class AppointmentListItem extends StatelessWidget {
+// [------------- COMPONENTE PARA ELEMENTOS DE LA LISTA DE CITAS MEJORADO --------------]
+class AppointmentListItem extends StatefulWidget {
   final Map<String, dynamic> appointment;
   final bool isDark;
   final VoidCallback? onTap;
   final VoidCallback? onGenerateReminder;
   final Color Function(String) getStatusColor;
   final String Function(String) getStatusText;
+  final Future<bool> Function(Map<String, dynamic>)? canGenerateReminder;
 
   const AppointmentListItem({
     super.key,
@@ -1103,26 +1167,58 @@ class AppointmentListItem extends StatelessWidget {
     required this.getStatusText,
     this.onTap,
     this.onGenerateReminder,
+    this.canGenerateReminder,
   });
 
   @override
+  State<AppointmentListItem> createState() => _AppointmentListItemState();
+}
+
+class _AppointmentListItemState extends State<AppointmentListItem> {
+  bool _canShowButton = false;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkIfCanGenerateReminder();
+  }
+
+  Future<void> _checkIfCanGenerateReminder() async {
+    if (widget.canGenerateReminder != null && widget.onGenerateReminder != null) {
+      final canGenerate = await widget.canGenerateReminder!(widget.appointment);
+      if (mounted) {
+        setState(() {
+          _canShowButton = canGenerate;
+          _isLoading = false;
+        });
+      }
+    } else {
+      setState(() {
+        _canShowButton = false;
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final startTime = DateTime.parse(appointment['start_time']);
-    final endTime = DateTime.parse(appointment['end_time']);
-    final status = appointment['status'] as String;
-    final clientData = appointment['clients'] as Map<String, dynamic>?;
+    final startTime = DateTime.parse(widget.appointment['start_time']);
+    final endTime = DateTime.parse(widget.appointment['end_time']);
+    final status = widget.appointment['status'] as String;
+    final clientData = widget.appointment['clients'] as Map<String, dynamic>?;
     final clientName = clientData?['name'] ?? 'Cliente sin nombre';
 
-    final statusColor = getStatusColor(status);
-    final statusText = getStatusText(status);
+    final statusColor = widget.getStatusColor(status);
+    final statusText = widget.getStatusText(status);
 
     return GestureDetector(
-      onTap: onTap,
+      onTap: widget.onTap,
       child: AnimatedContainer(
         duration: themeAnimationDuration,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isDark ? Colors.grey[800] : Colors.white,
+          color: widget.isDark ? Colors.grey[800] : Colors.white,
           borderRadius: BorderRadius.circular(borderRadius),
           border: Border.all(
             color: statusColor.withValues(alpha: 0.2),
@@ -1156,7 +1252,7 @@ class AppointmentListItem extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: isDark ? textColor : Colors.black87,
+                      color: widget.isDark ? textColor : Colors.black87,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -1164,17 +1260,17 @@ class AppointmentListItem extends StatelessWidget {
                     '${DateFormat('HH:mm').format(startTime)} - ${DateFormat('HH:mm').format(endTime)}',
                     style: TextStyle(
                       fontSize: 14,
-                      color: isDark ? hintColor : Colors.grey[600],
+                      color: widget.isDark ? hintColor : Colors.grey[600],
                     ),
                   ),
-                  if (appointment['description'] != null)
+                  if (widget.appointment['description'] != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
                       child: Text(
-                        appointment['description'],
+                        widget.appointment['description'],
                         style: TextStyle(
                           fontSize: 12,
-                          color: isDark ? hintColor : Colors.grey[500],
+                          color: widget.isDark ? hintColor : Colors.grey[500],
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -1186,12 +1282,13 @@ class AppointmentListItem extends StatelessWidget {
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (onGenerateReminder != null) ...[
+                // Mostrar botón solo si canShowButton es true
+                if (!_isLoading && _canShowButton && widget.onGenerateReminder != null) ...[
                   IconButton(
                     icon: const Icon(Icons.share, size: 20),
                     color: primaryColor,
                     tooltip: 'Generar Recordatorio',
-                    onPressed: onGenerateReminder,
+                    onPressed: widget.onGenerateReminder,
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
                   ),

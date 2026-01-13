@@ -8,6 +8,7 @@ import '../services/notifications_service.dart';
 import '../services/reminder_generator_dialog.dart';
 import '../integrations/employee_service.dart';
 
+import 'package:intl/intl.dart';
 //[-------------CONSTANTES GLOBALES--------------]
 const Color primaryColor = Color(0xFFBDA206);
 const Color textColor = Colors.white;
@@ -124,10 +125,19 @@ class _CustomAppBarState extends State<CustomAppBar> {
   }
 
 Widget _buildNotificationButton(BuildContext context, bool isDark, AppLocalizations localizations) {
-  return FutureBuilder<List<NotificationItem>>(
-    future: NotificationsService.getNotifications(),
+  return FutureBuilder<List<dynamic>>(
+    future: Future.wait([
+      NotificationsService.getNotifications(),
+      _getCurrentAppointmentsCount(),
+    ]),
     builder: (context, snapshot) {
-      final notificationCount = snapshot.hasData ? snapshot.data!.length : 0;
+      int notificationCount = 0;
+      
+      if (snapshot.hasData) {
+        final notifications = snapshot.data![0] as List<NotificationItem>;
+        final appointmentsCount = snapshot.data![1] as int;
+        notificationCount = notifications.length + appointmentsCount;
+      }
       
       return AnimatedContainer(
         duration: themeAnimationDuration,
@@ -175,6 +185,42 @@ Widget _buildNotificationButton(BuildContext context, bool isDark, AppLocalizati
       );
     },
   );
+}
+
+Future<int> _getCurrentAppointmentsCount() async {
+  try {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return 0;
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final tomorrow = today.add(const Duration(days: 1));
+
+    final response = await Supabase.instance.client
+        .from('appointments')
+        .select('id, start_time, end_time')
+        .eq('employee_id', user.id)
+        .gte('start_time', today.toIso8601String())
+        .lt('start_time', tomorrow.toIso8601String())
+        .inFilter('status', ['confirmada', 'pendiente']);
+
+    if (response.isEmpty) return 0;
+
+    int count = 0;
+    for (final appointment in response) {
+      final startTime = DateTime.parse(appointment['start_time']);
+      final endTime = DateTime.parse(appointment['end_time']);
+
+      // Contar citas en curso o próximas
+      if ((now.isAfter(startTime) && now.isBefore(endTime)) || now.isBefore(startTime)) {
+        count++;
+      }
+    }
+
+    return count;
+  } catch (e) {
+    return 0;
+  }
 }
 
   void _showNotificationsBottomSheet(BuildContext context) {
@@ -343,8 +389,11 @@ class DynamicNotificationsBottomSheet extends StatelessWidget {
   }
 
   Widget _buildDynamicNotificationsList(BuildContext context, AppLocalizations localizations, bool isDark) {
-    return FutureBuilder<List<NotificationItem>>(
-      future: NotificationsService.getNotifications(),
+    return FutureBuilder<List<dynamic>>(
+      future: Future.wait([
+        NotificationsService.getNotifications(),
+        _getAppointmentsCount(),
+      ]),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
@@ -381,56 +430,106 @@ class DynamicNotificationsBottomSheet extends StatelessWidget {
           );
         }
 
-        final notifications = snapshot.data ?? [];
+        final notifications = (snapshot.data![0] as List<NotificationItem>?) ?? [];
+        final appointmentsCount = snapshot.data![1] as int;
 
-        if (notifications.isEmpty) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                children: [
-                  Icon(
-                    Icons.notifications_none,
-                    size: 48,
-                    color: isDark ? Colors.white38 : Colors.grey[400],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'No hay notificaciones',
-                    style: TextStyle(
-                      color: isDark ? Colors.white70 : Colors.grey[600],
-                      fontSize: 16,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }
-
+        // Construir lista de widgets
         return ConstrainedBox(
           constraints: const BoxConstraints(maxHeight: 400),
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: notifications.length,
-            itemBuilder: (context, index) {
-              final notification = notifications[index];
-              return DynamicNotificationTile(
-                notification: notification,
-                isDark: isDark,
-                onTap: () {
-                  NotificationsService.markAsRead(notification.id);
-                  Navigator.pop(context); // Cerrar el bottom sheet
-                  
-                  // Navegar según el tipo de notificación
-                  _navigateBasedOnNotificationType(context, notification.type);
-                },
-              );
-            },
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
+                // Widget de cita en curso y próxima cita
+                CurrentAppointmentNotification(isDark: isDark),
+                
+                // Notificaciones normales con animación
+                if (notifications.isNotEmpty)
+                  ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: notifications.length,
+                    itemBuilder: (context, index) {
+                      final notification = notifications[index];
+                      // Índice ajustado: suma las citas en curso/próximas
+                      final animationIndex = appointmentsCount + index;
+                      
+                      return AnimatedNotificationItem(
+                        index: animationIndex,
+                        child: DynamicNotificationTile(
+                          notification: notification,
+                          isDark: isDark,
+                          onTap: () {
+                            NotificationsService.markAsRead(notification.id);
+                            Navigator.pop(context);
+                            _navigateBasedOnNotificationType(context, notification.type);
+                          },
+                        ),
+                      );
+                    },
+                  )
+                else
+                  Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.notifications_none,
+                          size: 48,
+                          color: isDark ? Colors.white38 : Colors.grey[400],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'No hay más notificaciones',
+                          style: TextStyle(
+                            color: isDark ? Colors.white70 : Colors.grey[600],
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
           ),
         );
       },
     );
+  }
+
+  Future<int> _getAppointmentsCount() async {
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) return 0;
+
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final tomorrow = today.add(const Duration(days: 1));
+
+      final response = await Supabase.instance.client
+          .from('appointments')
+          .select('id, start_time, end_time')
+          .eq('employee_id', user.id)
+          .gte('start_time', today.toIso8601String())
+          .lt('start_time', tomorrow.toIso8601String())
+          .inFilter('status', ['confirmada', 'pendiente']);
+
+      if (response.isEmpty) return 0;
+
+      int count = 0;
+      for (final appointment in response) {
+        final startTime = DateTime.parse(appointment['start_time']);
+        final endTime = DateTime.parse(appointment['end_time']);
+
+        // Contar citas en curso o próximas
+        if ((now.isAfter(startTime) && now.isBefore(endTime)) || now.isBefore(startTime)) {
+          count++;
+        }
+      }
+
+      return count;
+    } catch (e) {
+      return 0;
+    }
   }
 
   void _navigateBasedOnNotificationType(BuildContext context, String notificationType) {
@@ -454,7 +553,7 @@ class DynamicNotificationsBottomSheet extends StatelessWidget {
 }
 
 //[-------------ELEMENTO DE NOTIFICACIÓN DINÁMICO--------------]
-class DynamicNotificationTile extends StatelessWidget {
+class DynamicNotificationTile extends StatefulWidget {
   final NotificationItem notification;
   final bool isDark;
   final VoidCallback? onTap;
@@ -467,62 +566,169 @@ class DynamicNotificationTile extends StatelessWidget {
   });
 
   @override
+  State<DynamicNotificationTile> createState() => _DynamicNotificationTileState();
+}
+
+class _DynamicNotificationTileState extends State<DynamicNotificationTile> {
+  bool _canShowButton = false;
+  bool _isChecking = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkIfCanGenerateReminder();
+  }
+
+  Future<void> _checkIfCanGenerateReminder() async {
+    // Solo verificar para tipos de notificación relevantes
+    if (widget.notification.type != 'next_appointment' && 
+        widget.notification.type != 'pending_confirmation') {
+      setState(() {
+        _canShowButton = false;
+        _isChecking = false;
+      });
+      return;
+    }
+
+    try {
+      // Extraer appointment ID del notification ID
+      final parts = widget.notification.id.split('_');
+      final appointmentId = parts.last;
+      
+      // Buscar la cita
+      final user = Supabase.instance.client.auth.currentUser!;
+      final response = await Supabase.instance.client
+          .from('appointments')
+          .select('''
+            id,
+            status,
+            client_id,
+            service_id,
+            start_time
+          ''')
+          .eq('id', appointmentId)
+          .eq('employee_id', user.id)
+          .maybeSingle();
+      
+      if (response == null) {
+        setState(() {
+          _canShowButton = false;
+          _isChecking = false;
+        });
+        return;
+      }
+      
+      final status = response['status'] as String;
+      
+      // Verificar según el status
+      if (status == 'confirmada' || status == 'pendiente') {
+        setState(() {
+          _canShowButton = true;
+          _isChecking = false;
+        });
+        return;
+      }
+      
+      if (status == 'aplazada') {
+        // Verificar si la nueva cita está completa
+        final clientId = response['client_id'] as String;
+        final serviceId = response['service_id'] as String;
+        final originalStartTime = response['start_time'] as String;
+        
+        final newAppointment = await Supabase.instance.client
+            .from('appointments')
+            .select('status')
+            .eq('employee_id', user.id)
+            .eq('client_id', clientId)
+            .eq('service_id', serviceId)
+            .neq('status', 'aplazada')
+            .gte('start_time', originalStartTime)
+            .order('start_time', ascending: true)
+            .limit(1)
+            .maybeSingle();
+        
+        // Si no hay nueva cita, mostrar botón (aún pueden crear la nueva cita)
+        if (newAppointment == null) {
+          setState(() {
+            _canShowButton = true;
+            _isChecking = false;
+          });
+          return;
+        }
+        
+        // Si hay nueva cita, verificar su status
+        final newStatus = newAppointment['status'] as String;
+        
+        // Si está completa, perdida o cancelada → NO mostrar botón
+        final canShow = newStatus != 'completa' && newStatus != 'perdida' && newStatus != 'cancelada';
+        setState(() {
+          _canShowButton = canShow;
+          _isChecking = false;
+        });
+        return;
+      }
+      
+      // Para otros status (completa, cancelada, perdida), no mostrar
+      setState(() {
+        _canShowButton = false;
+        _isChecking = false;
+      });
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error al verificar si puede generar recordatorio: $e');
+      }
+      setState(() {
+        _canShowButton = false;
+        _isChecking = false;
+      });
+    }
+  }
+
+  @override
+  @override
   Widget build(BuildContext context) {
     const Color hintColor = Colors.white70;
-    
-    // Determinar si se debe mostrar el botón de generar recordatorio
-    final bool canGenerateReminder = notification.type == 'next_appointment' || 
-                                      notification.type == 'pending_confirmation';
 
-    return AnimatedContainer(
-      duration: themeAnimationDuration,
-      child: ListTile(
-        onTap: onTap,
-        leading: AnimatedContainer(
-          duration: themeAnimationDuration,
-          child: CircleAvatar(
-            backgroundColor: primaryColor.withValues(alpha: 0.1),
-            child: Icon(_getIconData(notification.icon), color: primaryColor),
-          ),
+    return ListTile(
+      onTap: widget.onTap,
+      leading: CircleAvatar(
+        backgroundColor: primaryColor.withValues(alpha: 0.1),
+        child: Icon(_getIconData(widget.notification.icon), color: primaryColor),
+      ),
+      title: Text(
+        widget.notification.title,
+        style: TextStyle(
+          fontWeight: FontWeight.w600,
+          color: widget.isDark ? textColor : Colors.black87,
         ),
-        title: AnimatedDefaultTextStyle(
-          duration: themeAnimationDuration,
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            color: isDark ? textColor : Colors.black87,
-          ),
-          child: Text(notification.title),
+      ),
+      subtitle: Text(
+        widget.notification.subtitle,
+        style: TextStyle(
+          color: widget.isDark ? hintColor : Colors.grey[600],
         ),
-        subtitle: AnimatedDefaultTextStyle(
-          duration: themeAnimationDuration,
-          style: TextStyle(
-            color: isDark ? hintColor : Colors.grey[600],
-          ),
-          child: Text(notification.subtitle),
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (canGenerateReminder) ...[
-              IconButton(
-                icon: const Icon(Icons.share, size: 20),
-                color: primaryColor,
-                tooltip: 'Generar Recordatorio',
-                onPressed: () => _generateReminderFromNotification(notification, context),
-              ),
-              const SizedBox(width: 8),
-            ],
-            AnimatedDefaultTextStyle(
-              duration: themeAnimationDuration,
-              style: const TextStyle(
-                color: Colors.amber,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-              child: Text(notification.time),
+      ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (!_isChecking && _canShowButton) ...[
+            IconButton(
+              icon: const Icon(Icons.share, size: 20),
+              color: primaryColor,
+              tooltip: 'Generar Recordatorio',
+              onPressed: () => _generateReminderFromNotification(widget.notification, context),
             ),
+            const SizedBox(width: 8),
           ],
-        ),
+          Text(
+            widget.notification.time,
+            style: const TextStyle(
+              color: Colors.amber,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -640,5 +846,418 @@ class DynamicNotificationTile extends StatelessWidget {
       default:
         return Icons.notifications;
     }
+  }
+}// [------------- WIDGET DE CITA EN CURSO --------------]
+// [------------- WIDGET DE CITA EN CURSO --------------]
+class CurrentAppointmentNotification extends StatefulWidget {
+  final bool isDark;
+  
+  const CurrentAppointmentNotification({
+    super.key,
+    required this.isDark,
+  });
+
+  @override
+  State<CurrentAppointmentNotification> createState() => _CurrentAppointmentNotificationState();
+}
+
+class _CurrentAppointmentNotificationState extends State<CurrentAppointmentNotification>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _rotationController;
+  late Future<Map<String, dynamic>?> _appointmentsFuture;
+  
+  @override
+  void initState() {
+    super.initState();
+    _rotationController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat();
+    
+    // Memoizar el Future para evitar múltiples llamadas
+    _appointmentsFuture = _getCurrentAndNextAppointments();
+  }
+
+  @override
+  void dispose() {
+    _rotationController.dispose();
+    super.dispose();
+  }
+
+  Future<Map<String, dynamic>?> _getCurrentAndNextAppointments() async {
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) return null;
+
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final tomorrow = today.add(const Duration(days: 1));
+
+      // Buscar citas de hoy
+      final response = await Supabase.instance.client
+          .from('appointments')
+          .select('''
+            id,
+            start_time,
+            end_time,
+            status,
+            clients(name),
+            services(name)
+          ''')
+          .eq('employee_id', user.id)
+          .gte('start_time', today.toIso8601String())
+          .lt('start_time', tomorrow.toIso8601String())
+          .inFilter('status', ['confirmada', 'pendiente'])
+          .order('start_time', ascending: true);
+
+      if (response.isEmpty) return null;
+
+      Map<String, dynamic>? currentAppointment;
+      Map<String, dynamic>? nextAppointment;
+
+      for (final appointment in response) {
+        final startTime = DateTime.parse(appointment['start_time']);
+        final endTime = DateTime.parse(appointment['end_time']);
+
+        // Verificar si la cita está en curso
+        if (now.isAfter(startTime) && now.isBefore(endTime)) {
+          currentAppointment = appointment;
+        } else if (now.isBefore(startTime) && nextAppointment == null) {
+          // La próxima cita que aún no ha empezado
+          nextAppointment = appointment;
+        }
+      }
+
+      return {
+        'current': currentAppointment,
+        'next': nextAppointment,
+      };
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error al obtener citas: $e');
+      }
+      return null;
+    }
+  }
+
+  @override
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<Map<String, dynamic>?>(
+      future: _appointmentsFuture,
+      builder: (context, snapshot) {
+        // Mostrar nada mientras carga o si hay error
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox.shrink();
+        }
+        
+        if (snapshot.hasError || !snapshot.hasData || snapshot.data == null) {
+          return const SizedBox.shrink();
+        }
+
+        final data = snapshot.data!;
+        final currentAppointment = data['current'];
+        final nextAppointment = data['next'];
+
+        if (currentAppointment == null && nextAppointment == null) {
+          return const SizedBox.shrink();
+        }
+
+        int index = 0;
+        
+        return Column(
+          children: [
+            // Cita en curso con animación
+            if (currentAppointment != null)
+              AnimatedNotificationItem(
+                index: index++,
+                child: _buildCurrentAppointmentTile(currentAppointment),
+              ),
+            
+            // Próxima cita con animación
+            if (nextAppointment != null)
+              AnimatedNotificationItem(
+                index: index++,
+                child: _buildNextAppointmentTile(nextAppointment),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildCurrentAppointmentTile(Map<String, dynamic> appointment) {
+    final startTime = DateTime.parse(appointment['start_time']);
+    final endTime = DateTime.parse(appointment['end_time']);
+    final clientName = appointment['clients']['name'] as String;
+    
+    final timeFormat = DateFormat('HH:mm');
+    final timeRange = '${timeFormat.format(startTime)} - ${timeFormat.format(endTime)}';
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: widget.isDark ? const Color(0xFF1E1E1E) : Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: Colors.green,
+              width: 2,
+            ),
+          ),
+          child: Row(
+            children: [
+              // Ícono girando
+              RotationTransition(
+                turns: _rotationController,
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.green.withValues(alpha: 0.1),
+                    border: Border.all(color: Colors.green, width: 2),
+                  ),
+                  child: const Icon(
+                    Icons.access_time,
+                    color: Colors.green,
+                    size: 18,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              
+              // Información con badge a la derecha
+              Expanded(
+                child: Stack(
+                  children: [
+                    // Contenido (nombre y hora)
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          clientName,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: widget.isDark ? textColor : Colors.black87,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          timeRange,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.green,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                    
+                    // Badge posicionado a la derecha - MÁS ANCHO
+                    Positioned(
+                      top: 0,
+                      right: 0,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), // ✅ Más padding
+                        decoration: BoxDecoration(
+                          color: Colors.green,
+                          borderRadius: BorderRadius.circular(10), // ✅ Bordes más grandes
+                        ),
+                        child: const Text(
+                          'EN CURSO',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNextAppointmentTile(Map<String, dynamic> appointment) {
+    final startTime = DateTime.parse(appointment['start_time']);
+    final clientName = appointment['clients']['name'] as String;
+    
+    final timeFormat = DateFormat('HH:mm');
+    final time = timeFormat.format(startTime);
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: widget.isDark ? const Color(0xFF1E1E1E) : Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: Colors.amber.withValues(alpha: 0.3),
+              width: 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              // Ícono
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.amber.withValues(alpha: 0.1),
+                  border: Border.all(color: Colors.amber, width: 2),
+                ),
+                child: const Icon(
+                  Icons.schedule,
+                  color: Colors.amber,
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 12),
+              
+              // Información con badge a la derecha
+              Expanded(
+                child: Stack(
+                  children: [
+                    // Contenido (nombre y hora)
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          clientName,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: widget.isDark ? textColor : Colors.black87,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          time,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.amber,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                    
+                    // Badge posicionado a la derecha - MÁS ANCHO
+                    Positioned(
+                      top: 0,
+                      right: 0,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), // ✅ Más padding
+                        decoration: BoxDecoration(
+                          color: Colors.amber,
+                          borderRadius: BorderRadius.circular(10), // ✅ Bordes más grandes
+                        ),
+                        child: const Text(
+                          'PRÓXIMA',
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// [------------- WIDGET ANIMADO PARA NOTIFICACIONES --------------]
+class AnimatedNotificationItem extends StatefulWidget {
+  final Widget child;
+  final int index;
+  
+  const AnimatedNotificationItem({
+    super.key,
+    required this.child,
+    required this.index,
+  });
+
+  @override
+  State<AnimatedNotificationItem> createState() => _AnimatedNotificationItemState();
+}
+
+class _AnimatedNotificationItemState extends State<AnimatedNotificationItem>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 400),
+      vsync: this,
+    );
+
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOut,
+    ));
+
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.3), // Empieza abajo
+      end: Offset.zero,            // Termina en posición normal
+    ).animate(CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutCubic,
+    ));
+
+    // Delay basado en el index para efecto escalonado suave
+    Future.delayed(Duration(milliseconds: widget.index * 50), () {
+      if (mounted) {
+        _controller.forward();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SlideTransition(
+      position: _slideAnimation,
+      child: FadeTransition(
+        opacity: _fadeAnimation,
+        child: widget.child,
+      ),
+    );
   }
 }
