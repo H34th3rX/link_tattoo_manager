@@ -650,19 +650,25 @@ class AppointmentsService {
       final startOfDay = DateTime(day.year, day.month, day.day);
       final endOfDay = DateTime(day.year, day.month, day.day, 23, 59, 59);
       
+      // Obtener citas completadas y perdidas del día
       final response = await client
           .from('appointments')
-          .select('price')
+          .select('price, deposit_paid, status')
           .eq('employee_id', employeeId)
-          .eq('status', 'completa')
+          .inFilter('status', ['completa', 'perdida'])
           .gte('start_time', startOfDay.toIso8601String())
           .lte('start_time', endOfDay.toIso8601String());
       
       double dayTotal = 0.0;
       for (final appointment in response) {
-        final price = appointment['price'];
-        if (price != null) {
-          dayTotal += (price as num).toDouble();
+        final status = appointment['status'] as String?;
+        final price = (appointment['price'] as num?)?.toDouble() ?? 0.0;
+        final deposit = (appointment['deposit_paid'] as num?)?.toDouble() ?? 0.0;
+        
+        if (status == 'completa') {
+          dayTotal += price;
+        } else if (status == 'perdida' && deposit > 0) {
+          dayTotal += deposit;
         }
       }
       
@@ -675,7 +681,6 @@ class AppointmentsService {
     
     return weeklyData;
   }
-
    //[-------------DATOS PARA GRÁFICOS DASHBOARD--------------]
   
   /// Obtener distribución de citas por estado (para gráfico de pastel)
@@ -797,33 +802,28 @@ class AppointmentsService {
   /// Obtener comparación de citas por día de la semana (para gráfico radial)
   static Future<Map<String, int>> getAppointmentsByDayOfWeek(String employeeId) async {
     try {
-      // Obtener citas del mes actual
       final now = DateTime.now();
       final startOfMonth = DateTime(now.year, now.month, 1);
       final endOfMonth = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
       
       final response = await client
           .from('appointments')
-          .select('start_time')
+          .select('start_time, status')
           .eq('employee_id', employeeId)
+          .eq('status', 'completa') 
           .gte('start_time', startOfMonth.toIso8601String())
           .lte('start_time', endOfMonth.toIso8601String());
       
-      // Contar por día de la semana
       Map<String, int> dayDistribution = {
-        'Lun': 0,
-        'Mar': 0,
-        'Mié': 0,
-        'Jue': 0,
-        'Vie': 0,
-        'Sáb': 0,
-        'Dom': 0,
+        'Lun': 0, 'Mar': 0, 'Mié': 0, 'Jue': 0,
+        'Vie': 0, 'Sáb': 0, 'Dom': 0,
       };
       
       for (var appointment in response) {
         final startTime = DateTime.parse(appointment['start_time']).toLocal();
         final weekday = startTime.weekday;
         
+         
         switch (weekday) {
           case 1: dayDistribution['Lun'] = (dayDistribution['Lun'] ?? 0) + 1; break;
           case 2: dayDistribution['Mar'] = (dayDistribution['Mar'] ?? 0) + 1; break;
@@ -838,13 +838,8 @@ class AppointmentsService {
       return dayDistribution;
     } catch (e) {
       return {
-        'Lun': 0,
-        'Mar': 0,
-        'Mié': 0,
-        'Jue': 0,
-        'Vie': 0,
-        'Sáb': 0,
-        'Dom': 0,
+        'Lun': 0, 'Mar': 0, 'Mié': 0, 'Jue': 0,
+        'Vie': 0, 'Sáb': 0, 'Dom': 0,
       };
     }
   }

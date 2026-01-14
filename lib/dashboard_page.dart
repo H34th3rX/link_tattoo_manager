@@ -742,17 +742,119 @@ class _MainContentState extends State<MainContent> {
   }
 
   Widget _buildLatestAppointment(Map? appointmentData, bool isDark, AppLocalizations localizations) {
+    // Función helper para formatear el status
+    String formatStatus(String status) {
+      switch (status.toLowerCase()) {
+        case 'completa':
+          return 'Completa';
+        case 'confirmada':
+          return 'Confirmada';
+        case 'pendiente':
+          return 'Pendiente';
+        case 'cancelada':
+          return 'Cancelada';
+        case 'perdida':
+          return 'Perdida';
+        case 'aplazada':
+          return 'Aplazada';
+        default:
+          return status[0].toUpperCase() + status.substring(1);
+      }
+    }
+
+    // Función helper para obtener el color del status
+    Color getStatusColorByName(String status) {
+      switch (status.toLowerCase()) {
+        case 'completa':
+          return const Color(0xFF4CAF50);
+        case 'confirmada':
+          return const Color(0xFF2196F3);
+        case 'pendiente':
+          return const Color(0xFFFF9800);
+        case 'cancelada':
+          return const Color(0xFF9E9E9E);
+        case 'perdida':
+          return const Color(0xFFFF5722);
+        case 'aplazada':
+          return const Color(0xFF9C27B0);
+        default:
+          return const ui.Color(0xFFBDA206);
+      }
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 8),
         if (appointmentData != null)
-          ActivityTile(
-            title: appointmentData['clientName'] ?? localizations.unknownClient,
-            subtitle: '${localizations.time}: ${DateTime.parse(appointmentData['start_time']).toLocal().toString().split(' ')[1].substring(0, 5)}',
-            time: appointmentData['status'] ?? localizations.noStatus,
-            isDark: isDark,
-            icon: Icons.event,
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: isDark ? Colors.grey[700]?.withValues(alpha: 0.3) : Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: isDark ? Colors.grey[600]! : Colors.grey[200]!,
+                width: 0.5,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: const ui.Color(0xFFBDA206).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Icon(
+                    Icons.event,
+                    size: 16,
+                    color: ui.Color(0xFFBDA206),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        appointmentData['clientName'] ?? localizations.unknownClient,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                          color: isDark ? Colors.white : Colors.black87,
+                        ),
+                      ),
+                      Text(
+                        '${localizations.time}: ${DateTime.parse(appointmentData['start_time']).toLocal().toString().split(' ')[1].substring(0, 5)}',
+                        style: TextStyle(
+                          color: isDark ? Colors.grey[400] : Colors.grey[600],
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: getStatusColorByName(appointmentData['status'] ?? '').withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: getStatusColorByName(appointmentData['status'] ?? '').withValues(alpha: 0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Text(
+                    formatStatus(appointmentData['status'] ?? localizations.noStatus),
+                    style: TextStyle(
+                      color: getStatusColorByName(appointmentData['status'] ?? ''),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           )
         else
           Text(
@@ -1088,18 +1190,20 @@ class _MainContentState extends State<MainContent> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(
-                  Icons.radar,
+                  Icons.bar_chart,
                   size: 20,
                   color: ui.Color(0xFFBDA206),
                 ),
               ),
               const SizedBox(width: 12),
-              Text(
-                'Citas por Día de la Semana - Este Mes',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: widget.isDark ? Colors.white : Colors.black87,
+              Expanded(
+                child: Text(
+                  'Citas por Día de la Semana - Este Mes',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: widget.isDark ? Colors.white : Colors.black87,
+                  ),
                 ),
               ),
             ],
@@ -1132,37 +1236,150 @@ class _MainContentState extends State<MainContent> {
               }
               
               final data = snapshot.data!;
-              final chartData = data.entries.map((e) => _ChartData(e.key, e.value)).toList();
+              // Ordenar los días de la semana correctamente
+              final orderedDays = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+              final chartData = orderedDays
+                  .map((day) => _ChartData(day, data[day] ?? 0))
+                  .toList();
+              
+              // Encontrar el valor máximo para el gradiente
+              final maxValue = chartData.map((e) => e.value).reduce((a, b) => a > b ? a : b);
               
               return SizedBox(
                 height: 300,
-                child: SfCircularChart(
-                  legend: Legend(
-                    isVisible: false,
+                child: SfCartesianChart(
+                  plotAreaBorderWidth: 0,
+                  backgroundColor: Colors.transparent,
+                  primaryXAxis: CategoryAxis(
+                    majorGridLines: const MajorGridLines(width: 0),
+                    axisLine: const AxisLine(width: 0),
+                    majorTickLines: const MajorTickLines(size: 0),
+                    labelStyle: TextStyle(
+                      color: widget.isDark ? Colors.white70 : Colors.black87,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  primaryYAxis: NumericAxis(
+                    majorGridLines: MajorGridLines(
+                      width: 0.5,
+                      color: widget.isDark ? Colors.grey[700] : Colors.grey[300],
+                      dashArray: const [5, 5],
+                    ),
+                    axisLine: const AxisLine(width: 0),
+                    majorTickLines: const MajorTickLines(size: 0),
+                    labelStyle: TextStyle(
+                      color: widget.isDark ? Colors.white70 : Colors.black87,
+                      fontSize: 11,
+                    ),
+                    minimum: 0,
+                    interval: maxValue > 10 ? (maxValue / 5).ceilToDouble() : 2,
                   ),
                   tooltipBehavior: TooltipBehavior(
                     enable: true,
                     format: 'point.x: point.y citas',
                     textStyle: const TextStyle(fontSize: 12),
+                    color: const ui.Color(0xFFBDA206),
+                    borderColor: const ui.Color(0xFFBDA206),
+                    borderWidth: 2,
                   ),
-                  series: <CircularSeries>[
-                    RadialBarSeries<_ChartData, String>(
+                  series: <CartesianSeries>[
+                    BarSeries<_ChartData, String>(
                       dataSource: chartData,
                       xValueMapper: (_ChartData data, _) => data.label,
                       yValueMapper: (_ChartData data, _) => data.value,
-                      pointColorMapper: (_ChartData data, _) => const ui.Color(0xFFBDA206),
+                      // Gradiente de color según el valor
+                      pointColorMapper: (_ChartData data, _) {
+                        if (maxValue == 0) return const ui.Color(0xFFBDA206);
+                        final intensity = data.value / maxValue;
+                        return Color.lerp(
+                          const ui.Color(0xFFBDA206).withValues(alpha: 0.3),
+                          const ui.Color(0xFFBDA206),
+                          intensity,
+                        )!;
+                      },
                       dataLabelSettings: DataLabelSettings(
                         isVisible: true,
+                        labelAlignment: ChartDataLabelAlignment.outer,
                         textStyle: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
                           color: widget.isDark ? Colors.white : Colors.black87,
                         ),
                       ),
-                      dataLabelMapper: (_ChartData data, _) => '${data.label}\n${data.value}',
-                      cornerStyle: CornerStyle.bothCurve,
+                      dataLabelMapper: (_ChartData data, _) => data.value.toString(),
+                      borderRadius: const BorderRadius.only(
+                        topRight: Radius.circular(8),
+                        bottomRight: Radius.circular(8),
+                      ),
                       enableTooltip: true,
-                      maximumValue: chartData.map((e) => e.value).reduce((a, b) => a > b ? a : b).toDouble() * 1.2,
+                      animationDuration: 1000,
+                      gradient: LinearGradient(
+                        colors: [
+                          const ui.Color(0xFFBDA206).withValues(alpha: 0.6),
+                          const ui.Color(0xFFBDA206),
+                        ],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+          // Resumen estadístico
+          const SizedBox(height: 16),
+          FutureBuilder<Map<String, int>>(
+            future: _dayOfWeekData,
+            builder: (context, snapshot) {
+              if (!snapshot.hasData || snapshot.data!.values.every((v) => v == 0)) {
+                return const SizedBox.shrink();
+              }
+              
+              final data = snapshot.data!;
+              final values = data.values.toList();
+              final total = values.reduce((a, b) => a + b);
+              final maxDay = data.entries.reduce((a, b) => a.value > b.value ? a : b);
+              final average = (total / 7).toStringAsFixed(1);
+              
+              return Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const ui.Color(0xFFBDA206).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: const ui.Color(0xFFBDA206).withValues(alpha: 0.3),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildStatItem(
+                      icon: Icons.event,
+                      label: 'Total',
+                      value: total.toString(),
+                    ),
+                    Container(
+                      width: 1,
+                      height: 30,
+                      color: widget.isDark ? Colors.grey[700] : Colors.grey[300],
+                    ),
+                    _buildStatItem(
+                      icon: Icons.trending_up,
+                      label: 'Día pico',
+                      value: maxDay.key,
+                    ),
+                    Container(
+                      width: 1,
+                      height: 30,
+                      color: widget.isDark ? Colors.grey[700] : Colors.grey[300],
+                    ),
+                    _buildStatItem(
+                      icon: Icons.analytics,
+                      label: 'Promedio',
+                      value: average,
                     ),
                   ],
                 ),
@@ -1171,6 +1388,44 @@ class _MainContentState extends State<MainContent> {
           ),
         ],
       ),
+    );
+  }
+
+  // Widget auxiliar para mostrar estadísticas
+  Widget _buildStatItem({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Row(
+      children: [
+        Icon(
+          icon,
+          size: 18,
+          color: const ui.Color(0xFFBDA206),
+        ),
+        const SizedBox(width: 6),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                color: widget.isDark ? Colors.grey[400] : Colors.grey[600],
+              ),
+            ),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: widget.isDark ? Colors.white : Colors.black87,
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 

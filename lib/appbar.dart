@@ -913,25 +913,24 @@ class _CurrentAppointmentNotificationState extends State<CurrentAppointmentNotif
       if (response.isEmpty) return null;
 
       Map<String, dynamic>? currentAppointment;
-      Map<String, dynamic>? nextAppointment;
 
       for (final appointment in response) {
         final startTime = DateTime.parse(appointment['start_time']);
         final endTime = DateTime.parse(appointment['end_time']);
 
-        // Verificar si la cita está en curso
+        // SOLO verificar si está EN CURSO
         if (now.isAfter(startTime) && now.isBefore(endTime)) {
           currentAppointment = appointment;
-        } else if (now.isBefore(startTime) && nextAppointment == null) {
-          // La próxima cita que aún no ha empezado
-          nextAppointment = appointment;
+          break; // Solo necesitamos una
         }
       }
 
-      return {
-        'current': currentAppointment,
-        'next': nextAppointment,
-      };
+      // Solo retornar si hay cita en curso
+      if (currentAppointment != null) {
+        return {'current': currentAppointment};
+      }
+
+      return null;
     } catch (e) {
       if (kDebugMode) {
         print('Error al obtener citas: $e');
@@ -940,7 +939,6 @@ class _CurrentAppointmentNotificationState extends State<CurrentAppointmentNotif
     }
   }
 
-  @override
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<Map<String, dynamic>?>(
@@ -957,30 +955,16 @@ class _CurrentAppointmentNotificationState extends State<CurrentAppointmentNotif
 
         final data = snapshot.data!;
         final currentAppointment = data['current'];
-        final nextAppointment = data['next'];
 
-        if (currentAppointment == null && nextAppointment == null) {
+        // Si no hay cita en curso, no mostrar nada
+        if (currentAppointment == null) {
           return const SizedBox.shrink();
         }
 
-        int index = 0;
-        
-        return Column(
-          children: [
-            // Cita en curso con animación
-            if (currentAppointment != null)
-              AnimatedNotificationItem(
-                index: index++,
-                child: _buildCurrentAppointmentTile(currentAppointment),
-              ),
-            
-            // Próxima cita con animación
-            if (nextAppointment != null)
-              AnimatedNotificationItem(
-                index: index++,
-                child: _buildNextAppointmentTile(nextAppointment),
-              ),
-          ],
+        // Solo mostrar la cita EN CURSO con animación
+        return AnimatedNotificationItem(
+          index: 0,
+          child: _buildCurrentAppointmentTile(currentAppointment),
         );
       },
     );
@@ -1090,105 +1074,6 @@ class _CurrentAppointmentNotificationState extends State<CurrentAppointmentNotif
     );
   }
 
-  Widget _buildNextAppointmentTile(Map<String, dynamic> appointment) {
-    final startTime = DateTime.parse(appointment['start_time']);
-    final clientName = appointment['clients']['name'] as String;
-    
-    final timeFormat = DateFormat('HH:mm');
-    final time = timeFormat.format(startTime);
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Material(
-        color: Colors.transparent,
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: widget.isDark ? const Color(0xFF1E1E1E) : Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: Colors.amber.withValues(alpha: 0.3),
-              width: 1,
-            ),
-          ),
-          child: Row(
-            children: [
-              // Ícono
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.amber.withValues(alpha: 0.1),
-                  border: Border.all(color: Colors.amber, width: 2),
-                ),
-                child: const Icon(
-                  Icons.schedule,
-                  color: Colors.amber,
-                  size: 18,
-                ),
-              ),
-              const SizedBox(width: 12),
-              
-              // Información con badge a la derecha
-              Expanded(
-                child: Stack(
-                  children: [
-                    // Contenido (nombre y hora)
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          clientName,
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: widget.isDark ? textColor : Colors.black87,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          time,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.amber,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                    
-                    // Badge posicionado a la derecha - MÁS ANCHO
-                    Positioned(
-                      top: 0,
-                      right: 0,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), // ✅ Más padding
-                        decoration: BoxDecoration(
-                          color: Colors.amber,
-                          borderRadius: BorderRadius.circular(10), // ✅ Bordes más grandes
-                        ),
-                        child: const Text(
-                          'PRÓXIMA',
-                          style: TextStyle(
-                            color: Colors.black,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 // [------------- WIDGET ANIMADO PARA NOTIFICACIONES --------------]
