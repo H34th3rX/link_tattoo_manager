@@ -413,13 +413,13 @@ class _CalendarPageState extends State<CalendarPage> with TickerProviderStateMix
   Future<bool> _canGenerateReminder(Map<String, dynamic> appointment) async {
     final status = appointment['status'] as String;
     
-    // Confirmadas y pendientes siempre pueden
-    if (status == 'confirmada' || status == 'pendiente') {
+    // Solo confirmadas pueden generar recordatorios
+    if (status == 'confirmada') {
       return true;
     }
     
     // Completas, canceladas y perdidas NO pueden
-    if (status == 'completa' || status == 'cancelada' || status == 'perdida') {
+    if (status == 'completa' || status == 'cancelada' || status == 'perdida' || status == 'pendiente') {
       return false;
     }
     
@@ -452,12 +452,12 @@ class _CalendarPageState extends State<CalendarPage> with TickerProviderStateMix
         // Verificar el status de la nueva cita encontrada
         final newStatus = newAppointment['status'] as String;
         
-        // Si la nueva cita está completa, perdida o cancelada → NO permitir
-        if (newStatus == 'completa' || newStatus == 'perdida' || newStatus == 'cancelada') {
+        // Si la nueva cita está completa, perdida, cancelada o pendiente → NO permitir
+        if (newStatus == 'completa' || newStatus == 'perdida' || newStatus == 'cancelada' || newStatus == 'pendiente') {
           return false;
         }
         
-        // Si la nueva cita está confirmada o pendiente → SÍ permitir
+        // Si la nueva cita está confirmada → SÍ permitir
         return true;
       } catch (e) {
         if (kDebugMode) {
@@ -1148,7 +1148,6 @@ class _CalendarPageState extends State<CalendarPage> with TickerProviderStateMix
   }
 }
 
-// [------------- COMPONENTE PARA ELEMENTOS DE LA LISTA DE CITAS MEJORADO --------------]
 // [------------- COMPONENTE PARA ELEMENTOS DE LA LISTA DE CITAS MEJORADO --------------]
 class AppointmentListItem extends StatefulWidget {
   final Map<String, dynamic> appointment;

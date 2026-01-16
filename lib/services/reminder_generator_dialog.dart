@@ -19,7 +19,7 @@ class ReminderGeneratorDialog extends StatefulWidget {
     required this.serviceName,
     required this.price,
     required this.depositPaid,
-    required this.status, // ← NUEVO
+    required this.status,
     this.notes,
     required this.isDark,
   });

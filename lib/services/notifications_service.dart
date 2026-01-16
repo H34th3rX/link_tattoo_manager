@@ -202,7 +202,7 @@ class NotificationsService {
           notifications.add(NotificationItem(
             id: 'pending_${appointment['id']}',
             type: 'pending_confirmation',
-            title: 'Cita Pendiente por Confirmar',
+            title: 'Cita pendiente por confirmar',
             subtitle: clientName,
             time: _formatTime(startTime),
             icon: 'schedule',
@@ -250,7 +250,7 @@ class NotificationsService {
         notifications.add(NotificationItem(
           id: 'new_client_${client['id']}',
           type: 'new_client',
-          title: 'Nuevo Cliente Registrado',
+          title: 'Nuevo cliente registrado',
           subtitle: client['name'],
           time: _formatTime(createdAt),
           icon: 'person_add',

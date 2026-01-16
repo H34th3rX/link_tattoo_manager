@@ -549,7 +549,7 @@ class _ClientProfilePageState extends State<ClientProfilePage> with TickerProvid
             'email': widget.client['email'] ?? '',
           };
           
-          Navigator.pushNamed(
+         Navigator.popAndPushNamed(
             context,
             '/appointments',
             arguments: {

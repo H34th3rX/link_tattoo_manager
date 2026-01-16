@@ -620,8 +620,7 @@ class _DynamicNotificationTileState extends State<DynamicNotificationTile> {
       
       final status = response['status'] as String;
       
-      // Verificar según el status
-      if (status == 'confirmada' || status == 'pendiente') {
+      if (status == 'confirmada') {
         setState(() {
           _canShowButton = true;
           _isChecking = false;
@@ -629,8 +628,16 @@ class _DynamicNotificationTileState extends State<DynamicNotificationTile> {
         return;
       }
       
+      if (status == 'pendiente') {
+        setState(() {
+          _canShowButton = false;
+          _isChecking = false;
+        });
+        return;
+      }
+      
+      // Si la cita está aplazada, verificar la nueva cita
       if (status == 'aplazada') {
-        // Verificar si la nueva cita está completa
         final clientId = response['client_id'] as String;
         final serviceId = response['service_id'] as String;
         final originalStartTime = response['start_time'] as String;
@@ -659,8 +666,8 @@ class _DynamicNotificationTileState extends State<DynamicNotificationTile> {
         // Si hay nueva cita, verificar su status
         final newStatus = newAppointment['status'] as String;
         
-        // Si está completa, perdida o cancelada → NO mostrar botón
-        final canShow = newStatus != 'completa' && newStatus != 'perdida' && newStatus != 'cancelada';
+        // Solo permitir si la nueva cita está CONFIRMADA
+        final canShow = newStatus == 'confirmada';
         setState(() {
           _canShowButton = canShow;
           _isChecking = false;
@@ -847,7 +854,8 @@ class _DynamicNotificationTileState extends State<DynamicNotificationTile> {
         return Icons.notifications;
     }
   }
-}// [------------- WIDGET DE CITA EN CURSO --------------]
+}
+
 // [------------- WIDGET DE CITA EN CURSO --------------]
 class CurrentAppointmentNotification extends StatefulWidget {
   final bool isDark;

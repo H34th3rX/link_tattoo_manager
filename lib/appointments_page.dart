@@ -86,20 +86,17 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Abre el popup de nueva cita si se navega con el argumento `openNewAppointmentPopup`
-    if (!_hasProcessedInitialPopup) {
-      final args = ModalRoute.of(context)?.settings.arguments;
-      if (args != null && args is Map<String, dynamic>) {
-        if (args['openNewAppointmentPopup'] == true) {
-          _hasProcessedInitialPopup = true;
-          _initialClientForNewAppointment = args['initialClientData'];
-          // Programa la apertura del popup después de que el frame actual se haya construido
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-              _openCreateAppointmentPopup(clientData: _initialClientForNewAppointment);
-            }
-          });
-        }
+    final args = ModalRoute.of(context)?.settings.arguments;    
+    if (args != null && args is Map<String, dynamic>) {
+      if (args['openNewAppointmentPopup'] == true && !_hasProcessedInitialPopup) {
+        _hasProcessedInitialPopup = true;
+        _initialClientForNewAppointment = args['initialClientData'];
+        
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && !_isPopupOpen) {
+            _openCreateAppointmentPopup(clientData: _initialClientForNewAppointment);
+          }
+        });
       }
     }
   }
@@ -318,7 +315,7 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
   }
 
   //[------------- MÉTODOS DE GESTIÓN DE POPUPS Y CITAS --------------]
-   void _openCreateAppointmentPopup({
+  void _openCreateAppointmentPopup({
     Map<String, dynamic>? clientData, 
     bool isPostponed = false,
     Map<String, dynamic>? originalAppointmentData,
@@ -337,7 +334,7 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
       _appointmentToEdit = appointment;
       _initialClientForNewAppointment = null;
       _isPostponedAppointment = false;
-      _originalAppointmentToPostpone = null; // Limpiar cualquier referencia de aplazamiento
+      _originalAppointmentToPostpone = null;
       _isPopupOpen = true;
     });
   }
@@ -351,6 +348,7 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
         _isPostponedAppointment = false;
         _originalAppointmentToPostpone = null;
         _originalAppointmentDataForPostpone = null;
+        _hasProcessedInitialPopup = false;
       });
     }
   }
@@ -419,7 +417,7 @@ class _AppointmentsPageState extends State<AppointmentsPage> with TickerProvider
       if (confirmed == true) {
         await AppointmentsService.deleteAppointment(id, user.id);
         _showSuccess('Cita eliminada exitosamente');
-        _fetchAppointments(); // Recargar la lista
+        _fetchAppointments();
       }
     } catch (e) {
       _showError('Error al eliminar la cita: ${e.toString()}');
@@ -1962,6 +1960,11 @@ class _AppointmentPopupState extends State<AppointmentPopup>
       final startTime = DateTime.parse(original['start_time']);
       final endTime = DateTime.parse(original['end_time']);
       _selectedDuration = endTime.difference(startTime).inMinutes;
+    } else if (widget.initialClientData != null) {
+      _clientNameCtrl.text = widget.initialClientData!['name']?.toString() ?? '';
+      _clientPhoneCtrl.text = widget.initialClientData!['phone']?.toString() ?? '';
+      _clientEmailCtrl.text = widget.initialClientData!['email']?.toString() ?? '';
+      _selectedClient = widget.initialClientData;
     }
   }
 
@@ -2057,14 +2060,45 @@ class _AppointmentPopupState extends State<AppointmentPopup>
     if (!_formKey.currentState!.validate()) {
       return;
     }
-    // Validar servicio seleccionado
-    if (_selectedClient == null) {
-      _showSafeMessage('Debes seleccionar un cliente', isError: true);
-      setState(() => _isSaving = false);
-      return;
-    }
 
-    // Verificar que el servicio seleccionado aún existe y está activo
+    if (!mounted) return;
+
+    setState(() {
+      _isSaving = true;
+    });
+
+    try {
+      String clientId;
+      
+      // Si no hay cliente seleccionado, crear uno nuevo
+      if (_selectedClient == null) {
+        final clientName = _clientNameCtrl.text.trim();
+        final clientPhone = _clientPhoneCtrl.text.trim();
+        final clientEmail = _clientEmailCtrl.text.trim();
+        
+        if (clientName.isEmpty) {
+          _showSafeMessage('El nombre del cliente es requerido', isError: true);
+          setState(() => _isSaving = false);
+          return;
+        }
+        
+        // Crear nuevo cliente
+        final newClient = await ClientsService.createClient(
+          employeeId: widget.employeeId,
+          name: clientName,
+          phone: clientPhone.isEmpty ? null : clientPhone,
+          email: clientEmail.isEmpty ? null : clientEmail,
+          preferredContactMethod: 'sms',
+        );
+        
+        clientId = newClient['id'] as String;
+        
+        _showToast('✓ Nuevo cliente creado: $clientName');
+      } else {
+        clientId = _selectedClient!['id'];
+      }
+
+      // Verificar que el servicio seleccionado aún existe y está activo
       final selectedService = _services.firstWhere(
         (s) => s['id'] == _selectedServiceId,
         orElse: () => <String, dynamic>{},
@@ -2082,18 +2116,6 @@ class _AppointmentPopupState extends State<AppointmentPopup>
         return;
       }
 
-    if (_selectedClient == null) {
-      _showSafeMessage('Debes seleccionar un cliente', isError: true);
-      return;
-    }
-
-    if (!mounted) return;
-
-    setState(() {
-      _isSaving = true;
-    });
-
-    try {
       final selectedDateTime = DateTime(
         _selectedDate.year,
         _selectedDate.month,
@@ -2105,14 +2127,13 @@ class _AppointmentPopupState extends State<AppointmentPopup>
       final endDateTime = selectedDateTime.add(Duration(minutes: _selectedDuration));
 
       // Verificar disponibilidad de horario
-    final isAvailable = await AppointmentsService.isTimeSlotAvailable(
+      final isAvailable = await AppointmentsService.isTimeSlotAvailable(
         employeeId: widget.employeeId,
         startTime: selectedDateTime.toUtc(),
         endTime: endDateTime.toUtc(),
         excludeAppointmentId: widget.initialAppointment?['id'],
       );
 
-      // Verificar mounted after each asynchronous operation
       if (!mounted) return;
 
       if (!isAvailable) {
@@ -2141,7 +2162,7 @@ class _AppointmentPopupState extends State<AppointmentPopup>
         await AppointmentsService.updateAppointment(
           appointmentId: widget.initialAppointment!['id'],
           employeeId: widget.employeeId,
-          clientId: _selectedClient!['id'],
+          clientId: clientId,
           startTime: selectedDateTime,
           endTime: endDateTime,
           serviceId: _selectedServiceId!,
@@ -2153,7 +2174,7 @@ class _AppointmentPopupState extends State<AppointmentPopup>
       } else {
         // Crear nueva cita
         await AppointmentsService.createAppointment(
-          clientId: _selectedClient!['id'],
+          clientId: clientId,
           employeeId: widget.employeeId,
           startTime: selectedDateTime,
           endTime: endDateTime,
@@ -2167,34 +2188,28 @@ class _AppointmentPopupState extends State<AppointmentPopup>
 
       if (_notifyMe && (_selectedStatus == 'confirmada' || _selectedStatus == 'pendiente')) {
         try {
-          // Schedule notification using the scheduler
           await NotificationScheduler.scheduleAppointmentNotification(
             appointmentId: widget.initialAppointment?['id'] ?? 'new_appointment',
-            clientName: _selectedClient!['name'] ?? 'Cliente',
+            clientName: _clientNameCtrl.text,
             appointmentTime: selectedDateTime,
             employeeId: widget.employeeId,
           );
         } catch (e) {
-          // Don't fail the appointment creation if notification fails
           if (kDebugMode) {
             print('Error programando notificación automática: $e');
           }
         }
       }
 
-      // Verify mounted before any operation with context or setState
       if (!mounted) return;
 
-      // Reset saving state before closing
       setState(() {
         _isSaving = false;
       });
 
-      // Call callback that is responsible for closing the popup and updating
       widget.onSaved();
       
     } catch (e) {
-      // Verify mounted before showing error
       if (mounted) {
         setState(() {
           _isSaving = false;
@@ -2461,6 +2476,72 @@ class _AppointmentPopupState extends State<AppointmentPopup>
                       color: widget.isDark ? textColor : Colors.black87,
                     ),
                   ),
+                  const SizedBox(width: 8),
+                  // Botón de ayuda
+                  GestureDetector(
+                    onTap: () {
+                      showDialog(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          backgroundColor: widget.isDark ? Colors.grey[900] : Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          title: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: primaryColor.withValues(alpha: 0.1),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.info_outline, color: primaryColor, size: 20),
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                '¿Nuevo Cliente?',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  color: widget.isDark ? textColor : Colors.black87,
+                                ),
+                              ),
+                            ],
+                          ),
+                          content: Text(
+                            'Si llenas los datos manualmente, puedes crear un nuevo cliente sin necesidad de ir a la página de clientes. Solo ingresa el nombre (obligatorio) y opcionalmente el teléfono o email.',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: widget.isDark ? hintColor : Colors.grey[700],
+                            ),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: Text(
+                                'Entendido',
+                                style: TextStyle(
+                                  color: primaryColor,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: primaryColor.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.help_outline,
+                        color: primaryColor,
+                        size: 16,
+                      ),
+                    ),
+                  ),
                   if (widget.isPostponedAppointment) ...[
                     const SizedBox(width: 8),
                     Container(
@@ -2520,7 +2601,7 @@ class _AppointmentPopupState extends State<AppointmentPopup>
           controller: _clientNameCtrl,
           style: TextStyle(color: widget.isDark ? textColor : Colors.black87),
           decoration: _buildInputDecoration('Nombre completo *', Icons.person_outline),
-          readOnly: true, // Siempre solo lectura porque viene de la selección
+          readOnly: widget.isPostponedAppointment || _selectedClient != null,
           validator: (value) {
             if (value == null || value.isEmpty) {
               return 'El nombre es requerido';
@@ -2537,7 +2618,7 @@ class _AppointmentPopupState extends State<AppointmentPopup>
                 style: TextStyle(color: widget.isDark ? textColor : Colors.black87),
                 decoration: _buildInputDecoration('Teléfono', Icons.phone_outlined),
                 keyboardType: TextInputType.phone,
-                readOnly: true,
+                readOnly: widget.isPostponedAppointment || _selectedClient != null,
                 validator: (value) {
                   if (value != null && value.isNotEmpty && !RegExp(r'^\+?[0-9]{7,15}$').hasMatch(value)) {
                     return 'Ingresa un número de teléfono válido';
@@ -2553,7 +2634,7 @@ class _AppointmentPopupState extends State<AppointmentPopup>
                 style: TextStyle(color: widget.isDark ? textColor : Colors.black87),
                 decoration: _buildInputDecoration('Email', Icons.email_outlined),
                 keyboardType: TextInputType.emailAddress,
-                readOnly: true,
+                readOnly: widget.isPostponedAppointment || _selectedClient != null,
                 validator: (value) {
                   if (value != null && value.isNotEmpty && !RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) {
                     return 'Ingresa un email válido';

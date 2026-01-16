@@ -275,6 +275,48 @@ class _MainContentState extends State<MainContent> {
     _dayOfWeekData = AppointmentsService.getAppointmentsByDayOfWeek(userId);
   }
 
+  // Función helper para formatear el status
+  String _formatStatus(String status) {
+    switch (status.toLowerCase()) {
+      case 'completa':
+        return 'Completa';
+      case 'confirmada':
+        return 'Confirmada';
+      case 'pendiente':
+        return 'Pendiente';
+      case 'cancelada':
+        return 'Cancelada';
+      case 'perdida':
+        return 'Perdida';
+      case 'aplazada':
+        return 'Aplazada';
+      default:
+        return status[0].toUpperCase() + status.substring(1);
+    }
+  }
+
+  // Función helper para obtener el color del status
+ Color _getStatusColor(String status) {
+  final statusLower = status.toLowerCase();
+  
+  // Manejar estados en singular y plural
+  if (statusLower.contains('completa')) {
+    return const Color(0xFF4CAF50); // Verde
+  } else if (statusLower.contains('confirmada')) {
+    return const Color(0xFF2196F3); // Azul
+  } else if (statusLower.contains('pendiente')) {
+    return const Color(0xFFFF9800); // Naranja
+  } else if (statusLower.contains('cancelada')) {
+    return const Color(0xFF9E9E9E); // Gris
+  } else if (statusLower.contains('perdida')) {
+    return const Color(0xFFFF5722); // Rojo
+  } else if (statusLower.contains('aplazada')) {
+    return const Color(0xFF9C27B0); // Morado
+  } else {
+    return const ui.Color(0xFFBDA206); // Amarillo por defecto
+  }
+}
+
   @override
   Widget build(BuildContext context) {
     final Size size = MediaQuery.of(context).size;
@@ -742,46 +784,6 @@ class _MainContentState extends State<MainContent> {
   }
 
   Widget _buildLatestAppointment(Map? appointmentData, bool isDark, AppLocalizations localizations) {
-    // Función helper para formatear el status
-    String formatStatus(String status) {
-      switch (status.toLowerCase()) {
-        case 'completa':
-          return 'Completa';
-        case 'confirmada':
-          return 'Confirmada';
-        case 'pendiente':
-          return 'Pendiente';
-        case 'cancelada':
-          return 'Cancelada';
-        case 'perdida':
-          return 'Perdida';
-        case 'aplazada':
-          return 'Aplazada';
-        default:
-          return status[0].toUpperCase() + status.substring(1);
-      }
-    }
-
-    // Función helper para obtener el color del status
-    Color getStatusColorByName(String status) {
-      switch (status.toLowerCase()) {
-        case 'completa':
-          return const Color(0xFF4CAF50);
-        case 'confirmada':
-          return const Color(0xFF2196F3);
-        case 'pendiente':
-          return const Color(0xFFFF9800);
-        case 'cancelada':
-          return const Color(0xFF9E9E9E);
-        case 'perdida':
-          return const Color(0xFFFF5722);
-        case 'aplazada':
-          return const Color(0xFF9C27B0);
-        default:
-          return const ui.Color(0xFFBDA206);
-      }
-    }
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -837,17 +839,17 @@ class _MainContentState extends State<MainContent> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: getStatusColorByName(appointmentData['status'] ?? '').withValues(alpha: 0.15),
+                    color: _getStatusColor(appointmentData['status'] ?? '').withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: getStatusColorByName(appointmentData['status'] ?? '').withValues(alpha: 0.3),
+                      color: _getStatusColor(appointmentData['status'] ?? '').withValues(alpha: 0.3),
                       width: 1,
                     ),
                   ),
                   child: Text(
-                    formatStatus(appointmentData['status'] ?? localizations.noStatus),
+                    _formatStatus(appointmentData['status'] ?? localizations.noStatus),
                     style: TextStyle(
-                      color: getStatusColorByName(appointmentData['status'] ?? ''),
+                      color: _getStatusColor(appointmentData['status'] ?? ''),
                       fontWeight: FontWeight.bold,
                       fontSize: 12,
                     ),
@@ -875,12 +877,74 @@ class _MainContentState extends State<MainContent> {
             children: appointments.take(2).map((appointment) {
               return Padding(
                 padding: const EdgeInsets.only(bottom: 8),
-                child: ActivityTile(
-                  title: appointment['clientName'] ?? localizations.unknownClient,
-                  subtitle: '${localizations.time}: ${DateTime.parse(appointment['start_time']).toLocal().toString().split(' ')[1].substring(0, 5)}',
-                  time: appointment['status'] ?? localizations.noStatus,
-                  isDark: isDark,
-                  icon: Icons.schedule,
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.grey[700]?.withValues(alpha: 0.3) : Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isDark ? Colors.grey[600]! : Colors.grey[200]!,
+                      width: 0.5,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: const ui.Color(0xFFBDA206).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Icon(
+                          Icons.schedule,
+                          size: 16,
+                          color: ui.Color(0xFFBDA206),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              appointment['clientName'] ?? localizations.unknownClient,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                                color: isDark ? Colors.white : Colors.black87,
+                              ),
+                            ),
+                            Text(
+                              '${localizations.time}: ${DateTime.parse(appointment['start_time']).toLocal().toString().split(' ')[1].substring(0, 5)}',
+                              style: TextStyle(
+                                color: isDark ? Colors.grey[400] : Colors.grey[600],
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: _getStatusColor(appointment['status'] ?? '').withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: _getStatusColor(appointment['status'] ?? '').withValues(alpha: 0.3),
+                            width: 1,
+                          ),
+                        ),
+                        child: Text(
+                          _formatStatus(appointment['status'] ?? localizations.noStatus),
+                          style: TextStyle(
+                            color: _getStatusColor(appointment['status'] ?? ''),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               );
             }).toList(),
@@ -972,7 +1036,16 @@ class _MainContentState extends State<MainContent> {
               }
               
               final data = snapshot.data!;
-              final chartData = data.entries
+              
+              // Mapear los estados a sus versiones formateadas
+              final Map<String, int> formattedData = {};
+              data.forEach((key, value) {
+                final formattedKey = _formatStatus(key);
+                formattedData[formattedKey] = value;
+              });
+              
+              // Crear datos del gráfico solo con valores mayores a 0
+              final chartData = formattedData.entries
                   .where((e) => e.value > 0)
                   .map((e) => _ChartData(e.key, e.value))
                   .toList();
@@ -1427,18 +1500,6 @@ class _MainContentState extends State<MainContent> {
         ),
       ],
     );
-  }
-
-  /// Helper: Obtener color por estado
-  Color _getStatusColor(String status) {
-    switch (status) {
-      case 'Completadas': return const Color(0xFF4CAF50); // Verde
-      case 'Confirmadas': return const Color(0xFF2196F3); // Azul
-      case 'Pendientes': return const Color(0xFFFF9800); // Naranja
-      case 'Canceladas': return const Color(0xFF9E9E9E); // Gris
-      case 'Perdidas': return const Color(0xFFFF5722); // Rojo
-      default: return const Color(0xFFBDA206); // Amarillo
-    }
   }
 
   /// Helper: Obtener color por índice de servicio
